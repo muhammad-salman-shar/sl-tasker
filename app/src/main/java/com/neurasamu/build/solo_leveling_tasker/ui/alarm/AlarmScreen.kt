@@ -371,7 +371,7 @@ private fun AddAlarmDialog(
                     }
                 }
 
-                if (selectedMethod == DismissMethod.PIN_VERIFICATION) {
+                if (selectedMethod == DismissMethod.PIN) {
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = pinCode,

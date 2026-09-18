@@ -69,7 +69,7 @@ fun CreateQuestDialog(
     var durationText by remember { mutableStateOf("30") }
     var selectedPriority by remember { mutableStateOf(Priority.MEDIUM) }
     var selectedDifficulty by remember { mutableStateOf(Difficulty.NORMAL) }
-    var selectedRepeatRule by remember { mutableStateOf(RepeatRule.NONE) }
+    var selectedRepeatRule by remember { mutableStateOf<RepeatRule>(RepeatRule.ONCE) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
