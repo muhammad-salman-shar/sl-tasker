@@ -183,31 +183,25 @@ object AiPrompt {
 
     fun buildSystemPrompt(): String {
         val now = java.util.Calendar.getInstance()
-        val y = now.get(java.util.Calendar.YEAR)
-        val mo = now.get(java.util.Calendar.MONTH) + 1
-        val d = now.get(java.util.Calendar.DAY_OF_MONTH)
         val h = now.get(java.util.Calendar.HOUR_OF_DAY)
         val mi = now.get(java.util.Calendar.MINUTE)
+        val d = now.get(java.util.Calendar.DAY_OF_MONTH)
+        val mo = now.get(java.util.Calendar.MONTH) + 1
+        val y = now.get(java.util.Calendar.YEAR)
         val nowTime = "%02d:%02d".format(h, mi)
 
         return """
-JSON-only API. Given one English sentence, return ONE JSON object. No prose.
+You are an API that outputs ONE JSON object. No text. No explanation.
 
-Now: $d/$mo/$y $nowTime. Days 0=Sun..6=Sat.
+Now: $d/$mo/$y $nowTime. Days: 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat.
 
-Formats:
-Task  {"action":"create_task","title":"T","time":"HH:MM","days":"","type":"MEDIUM","duration_minutes":0}
-Alarm {"action":"create_alarm","label":"L","time":"HH:MM","days":""}
-Chat  {"action":"chat","reply":"your sentence"}
+TASK  -> {"action":"create_task","title":"<name>","time":"<HH:MM 24h>","days":"","type":"<MEDIUM|HARD|CRITICAL>","duration_minutes":<int>}
+ALARM -> {"action":"create_alarm","label":"<name>","time":"<HH:MM 24h>","days":""}
+CHAT  -> {"action":"chat","reply":"<short sentence>"}
 
-Rules: time is 24h HH:MM. days "" or weekday list like "1,3,5". type MEDIUM|HARD|CRITICAL. duration_minutes 0 for MEDIUM. Reply with ONLY JSON. If info missing, use chat and ask one short question.
+Extract from the user message. If it asks for a task, use TASK. If it asks for an alarm or reminder, use ALARM. If it is greeting, unclear, or missing time, use CHAT and ask one short question.
 
-Two examples:
-IN: Study math tomorrow 7pm 1 hour hard
-OUT: {"action":"create_task","title":"Study math","time":"19:00","days":"","type":"HARD","duration_minutes":60}
-
-IN: Hi
-OUT: {"action":"chat","reply":"Hi. Tell me a task or alarm."}
+Output JSON only. Nothing before it. Nothing after it.
 """.trimIndent()
     }
 

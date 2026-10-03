@@ -95,16 +95,8 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 val sysMsg = ChatMsg("system", AiPrompt.buildSystemPrompt())
-                // Only real user + assistant messages — never "error" entries
-                // For assistant turns, feed the ORIGINAL JSON reply back to the model,
-                // never the friendly text — otherwise small models copy the friendly text.
-                val history = _messages.value.mapNotNull { m ->
-                    when (m.role) {
-                        "user" -> ChatMsg("user", m.text)
-                        "assistant" -> ChatMsg("assistant", m.raw ?: m.text)
-                        else -> null
-                    }
-                }
+                // Send ONLY the current message. No history.
+                val history = listOf(ChatMsg("user", trimmed))
 
                 _lastRawRequest.value = buildString {
                     append("URL: ").append(cfg.baseUrl).append('\n')
