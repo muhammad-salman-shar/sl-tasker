@@ -16,9 +16,7 @@ class AiApiClient {
 
     suspend fun chat(config: AiConfig, messages: List<ChatMsg>): String =
         withContext(Dispatchers.IO) {
-            val base = config.baseUrl.trimEnd('/')
-            val endpoint = if (base.endsWith("/chat/completions")) base
-                           else "$base/chat/completions"
+            val endpoint = buildEndpoint(config.baseUrl)
 
             val body = JSONObject().apply {
                 put("model", config.model)
@@ -73,6 +71,36 @@ class AiApiClient {
                 conn.disconnect()
             }
         }
+
+    /**
+     * Normalizes user-supplied base URL into a full /chat/completions endpoint.
+     * Handles common mistakes:
+     *   - 0.0.0.0      -> 127.0.0.1   (0.0.0.0 is a bind address, not routable)
+     *   - missing http:// -> prepend http://
+     *   - trailing slashes removed
+     *   - if URL already ends with /chat/completions, use as-is
+     *   - if URL ends with /v1 (or /v1/), append /chat/completions
+     *   - otherwise append /v1/chat/completions
+     */
+    private fun buildEndpoint(raw: String): String {
+        var s = raw.trim()
+        if (s.isBlank()) throw RuntimeException("Base URL is empty")
+
+        if (!s.startsWith("http://") && !s.startsWith("https://")) {
+            s = "http://$s"
+        }
+
+        // Replace 0.0.0.0 host with 127.0.0.1 (only the host part)
+        s = s.replace("://0.0.0.0", "://127.0.0.1")
+
+        while (s.endsWith("/")) s = s.dropLast(1)
+
+        if (s.endsWith("/chat/completions")) return s
+
+        if (s.endsWith("/v1")) return "$s/chat/completions"
+
+        return "$s/v1/chat/completions"
+    }
 }
 
 object AiPrompt {
