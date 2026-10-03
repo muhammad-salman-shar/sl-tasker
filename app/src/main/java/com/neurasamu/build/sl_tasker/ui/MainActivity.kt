@@ -145,10 +145,6 @@ fun MainAppScaffold(
         TabItem("Player", Icons.Rounded.MilitaryTech),
     )
     val context = LocalContext.current
-    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) { nowMillis = System.currentTimeMillis(); delay(1000L) }
-    }
     LaunchedEffect(Unit) {
         while (true) {
             taskViewModel.applyOverduePenalties()
@@ -165,21 +161,13 @@ fun MainAppScaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    val sdf = java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.getDefault())
-                    val sdfDate = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
-                    val now = java.util.Date(nowMillis)
                     Column {
                         Text(
                             text = tabs[selectedTabIndex].title,
                             style = MaterialTheme.typography.titleMedium,
                             color = PrimaryManaBlue
                         )
-                        Text(
-                            text = "${sdf.format(now)}  |  ${sdfDate.format(now)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
-                            fontSize = 10.sp
-                        )
+                        LiveClock()
                     }
                 },
                 actions = {
@@ -305,4 +293,24 @@ fun MainAppScaffold(
     if (showSettings) {
         PlayerSettingsScreen(onClose = { showSettings = false })
     }
+}
+
+@Composable
+private fun LiveClock() {
+    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            delay(1000L)
+        }
+    }
+    val sdf = remember { java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.getDefault()) }
+    val sdfDate = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()) }
+    val now = java.util.Date(nowMillis)
+    Text(
+        text = "${sdf.format(now)}  |  ${sdfDate.format(now)}",
+        style = MaterialTheme.typography.labelSmall,
+        color = com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
+        fontSize = 10.sp
+    )
 }

@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -41,7 +42,7 @@ class TaskViewModel(
             val task = taskMap[occurrence.taskId] ?: return@mapNotNull null
             TaskOccurrenceItem(task = task, occurrence = occurrence)
         }.sortedByDescending { it.occurrence.completedAt }
-    }.stateIn(
+    }.distinctUntilChanged().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
@@ -60,7 +61,7 @@ class TaskViewModel(
                 null
             }
         }.sortedBy { it.occurrence.deadlineAt }
-    }.stateIn(
+    }.distinctUntilChanged().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
