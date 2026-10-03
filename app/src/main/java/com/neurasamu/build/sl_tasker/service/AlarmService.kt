@@ -54,9 +54,12 @@ class AlarmService : Service() {
         val alarmLabel = intent?.getStringExtra("ALARM_LABEL") ?: "Wake Up Hunter"
         val dismissMethod = intent?.getStringExtra("DISMISS_METHOD") ?: "EASY"
         val pinCode = intent?.getStringExtra("PIN_CODE") ?: ""
+        val snoozeEnabled = intent?.getBooleanExtra("SNOOZE_ENABLED", true) ?: true
+        val snoozeMinutes = intent?.getIntExtra("SNOOZE_MINUTES", 10) ?: 10
+        val vibrate = intent?.getBooleanExtra("VIBRATE", true) ?: true
 
         startForeground(NOTIFICATION_ID, buildNotification(alarmLabel, alarmId, dismissMethod, pinCode))
-        playAlarm()
+        playAlarm(vibrate)
 
         val ringIntent = Intent(this, AlarmRingActivity::class.java).apply {
             this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -64,13 +67,15 @@ class AlarmService : Service() {
             putExtra("ALARM_LABEL", alarmLabel)
             putExtra("DISMISS_METHOD", dismissMethod)
             putExtra("PIN_CODE", pinCode)
+            putExtra("SNOOZE_ENABLED", snoozeEnabled)
+            putExtra("SNOOZE_MINUTES", snoozeMinutes)
         }
         startActivity(ringIntent)
 
         return START_STICKY
     }
 
-    private fun playAlarm() {
+    private fun playAlarm(vibrate: Boolean = true) {
         try {
             val alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
@@ -90,12 +95,14 @@ class AlarmService : Service() {
             e.printStackTrace()
         }
 
-        val pattern = longArrayOf(0, 1000, 1000)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator?.vibrate(pattern, 0)
+        if (vibrate) {
+            val pattern = longArrayOf(0, 1000, 1000)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(pattern, 0)
+            }
         }
     }
 

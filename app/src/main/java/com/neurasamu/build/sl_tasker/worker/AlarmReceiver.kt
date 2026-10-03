@@ -40,11 +40,17 @@ class AlarmReceiver : BroadcastReceiver() {
             }
         }
 
+        val snoozeEnabled = intent.getBooleanExtra("SNOOZE_ENABLED", true)
+        val snoozeMinutes = intent.getIntExtra("SNOOZE_MINUTES", 10)
+        val vibrate = intent.getBooleanExtra("VIBRATE", true)
         val serviceIntent = Intent(context, AlarmService::class.java).apply {
             putExtra("ALARM_ID", alarmId)
             putExtra("ALARM_LABEL", alarmLabel)
             putExtra("DISMISS_METHOD", dismissMethod)
             putExtra("PIN_CODE", pinCode)
+            putExtra("SNOOZE_ENABLED", snoozeEnabled)
+            putExtra("SNOOZE_MINUTES", snoozeMinutes)
+            putExtra("VIBRATE", vibrate)
         }
         ContextCompat.startForegroundService(context, serviceIntent)
     }

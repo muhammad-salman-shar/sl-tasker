@@ -29,6 +29,9 @@ class AlarmScheduler(private val context: Context) {
             putExtra("ALARM_LABEL", alarm.label)
             putExtra("DISMISS_METHOD", alarm.dismissMethod.name)
             putExtra("PIN_CODE", alarm.pinCode)
+            putExtra("SNOOZE_ENABLED", alarm.snoozeEnabled)
+            putExtra("SNOOZE_MINUTES", alarm.snoozeMinutes)
+            putExtra("VIBRATE", alarm.vibrate)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -55,6 +58,30 @@ class AlarmScheduler(private val context: Context) {
             )
         } catch (_: Throwable) {
             scheduleExact(triggerAt, pendingIntent)
+        }
+    }
+
+    fun snooze(alarmId: Long, minutes: Int, label: String, dismissMethod: String, pinCode: String) {
+        val triggerAt = System.currentTimeMillis() + minutes * 60_000L
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            putExtra("ALARM_ID", alarmId)
+            putExtra("ALARM_LABEL", label)
+            putExtra("DISMISS_METHOD", dismissMethod)
+            putExtra("PIN_CODE", pinCode)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            (alarmId + 700_000).toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerAt, pi),
+                pi
+            )
+        } catch (_: Throwable) {
+            scheduleExact(triggerAt, pi)
         }
     }
 
