@@ -17,16 +17,12 @@ class AlarmScheduler(private val context: Context) {
     fun scheduleAlarm(alarm: AlarmEntity) {
         if (!alarm.enabled) return
 
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, alarm.hour)
-            set(Calendar.MINUTE, alarm.minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-
-        if (calendar.timeInMillis <= System.currentTimeMillis()) {
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
-        }
+        val triggerAt = ScheduleHelper.nextTrigger(
+            hour = alarm.hour,
+            minute = alarm.minute,
+            daysCsv = alarm.customDays,
+            repeat = alarm.repeatRule
+        ) ?: return
 
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("ALARM_ID", alarm.id)
@@ -42,7 +38,24 @@ class AlarmScheduler(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        scheduleExact(calendar.timeInMillis, pendingIntent)
+        // Use setAlarmClock for reliability across Doze
+        val showIntent = Intent(context, com.neurasamu.build.sl_tasker.ui.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val showPi = PendingIntent.getActivity(
+            context,
+            alarm.id.toInt() + 1,
+            showIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerAt, showPi),
+                pendingIntent
+            )
+        } catch (_: Throwable) {
+            scheduleExact(triggerAt, pendingIntent)
+        }
     }
 
     fun cancelAlarm(alarmId: Long) {

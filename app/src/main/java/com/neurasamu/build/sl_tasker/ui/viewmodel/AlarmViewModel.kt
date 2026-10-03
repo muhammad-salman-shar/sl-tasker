@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.neurasamu.build.sl_tasker.data.db.AppDatabase
 import com.neurasamu.build.sl_tasker.data.model.AlarmEntity
 import com.neurasamu.build.sl_tasker.data.model.DismissMethod
+import com.neurasamu.build.sl_tasker.data.model.RepeatRule
 import com.neurasamu.build.sl_tasker.data.repository.AlarmRepository
 import com.neurasamu.build.sl_tasker.domain.scheduler.AlarmScheduler
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,12 @@ class AlarmViewModel(
         minute: Int,
         label: String,
         dismissMethod: DismissMethod,
-        pinCode: String
+        pinCode: String,
+        daysCsv: String,
+        isRepeat: Boolean,
+        snoozeEnabled: Boolean,
+        snoozeMinutes: Int,
+        vibrate: Boolean
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val newAlarm = AlarmEntity(
@@ -43,6 +49,11 @@ class AlarmViewModel(
                 label = label,
                 dismissMethod = dismissMethod,
                 pinCode = pinCode,
+                customDays = daysCsv,
+                repeatRule = if (isRepeat || daysCsv.isNotBlank()) RepeatRule.CUSTOM else RepeatRule.ONCE,
+                snoozeEnabled = snoozeEnabled,
+                snoozeMinutes = snoozeMinutes,
+                vibrate = vibrate,
                 enabled = true
             )
             val id = alarmRepository.insertAlarm(newAlarm)

@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.neurasamu.build.sl_tasker.data.model.AlarmEntity
 import com.neurasamu.build.sl_tasker.data.model.DismissMethod
+import com.neurasamu.build.sl_tasker.data.model.RepeatRule
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
@@ -158,8 +159,19 @@ fun AlarmScreen(
     if (showAddDialog) {
         AddAlarmDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { hour, minute, label, method, pin ->
-                alarmViewModel.addAlarm(hour, minute, label, method, pin)
+            onConfirm = { hour, minute, label, method, pin, isRepeat, csv, snoozeOn, snoozeMin, vib ->
+                alarmViewModel.addAlarm(
+                    hour = hour,
+                    minute = minute,
+                    label = label,
+                    dismissMethod = method,
+                    pinCode = pin,
+                    daysCsv = csv,
+                    isRepeat = isRepeat,
+                    snoozeEnabled = snoozeOn,
+                    snoozeMinutes = snoozeMin,
+                    vibrate = vib
+                )
             }
         )
     }
@@ -262,13 +274,32 @@ private fun AlarmCard(
 @Composable
 private fun AddAlarmDialog(
     onDismiss: () -> Unit,
-    onConfirm: (hour: Int, minute: Int, label: String, method: DismissMethod, pin: String) -> Unit
+    onConfirm: (
+        hour: Int,
+        minute: Int,
+        label: String,
+        method: DismissMethod,
+        pin: String,
+        isRepeat: Boolean,
+        daysCsv: String,
+        snoozeEnabled: Boolean,
+        snoozeMinutes: Int,
+        vibrate: Boolean
+    ) -> Unit
 ) {
     var hourText by remember { mutableStateOf("07") }
     var minuteText by remember { mutableStateOf("00") }
-    var label by remember { mutableStateOf("Morning Awakening") }
+    var amPm by remember { mutableStateOf("AM") }
+    var is24h by remember { mutableStateOf(false) }
+    var label by remember { mutableStateOf("Wake Up Hunter") }
     var selectedMethod by remember { mutableStateOf(DismissMethod.EASY) }
     var pinCode by remember { mutableStateOf("") }
+    var isRepeat by remember { mutableStateOf(false) }
+    var selectedDays by remember { mutableStateOf(setOf<Int>()) }
+    var snoozeEnabled by remember { mutableStateOf(true) }
+    var snoozeText by remember { mutableStateOf("10") }
+    var vibrate by remember { mutableStateOf(true) }
+    val dayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -276,7 +307,7 @@ private fun AddAlarmDialog(
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
-                text = "INITIALIZE ALARM",
+                text = "NEW ALARM",
                 style = MaterialTheme.typography.titleLarge,
                 color = PrimaryManaBlue
             )
@@ -287,14 +318,105 @@ private fun AddAlarmDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
+                // Schedule mode (Single / Repeat)
+                Text("SCHEDULE", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(false to "Single", true to "Repeat").forEach { (flag, text) ->
+                        val sel = isRepeat == flag
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                .border(1.dp, if (sel) PrimaryManaBlue else DarkBorder, RoundedCornerShape(6.dp))
+                                .clickable { isRepeat = flag }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text, color = if (sel) PrimaryManaBlue else TextSecondary, fontSize = 11.sp)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Days selection
+                Text(
+                    if (isRepeat) "DAYS (select 1+)" else "PICK A DAY (optional)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    dayShort.forEachIndexed { idx, d ->
+                        val sel = idx in selectedDays
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(CircleShape)
+                                .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                .border(1.dp, if (sel) PrimaryManaBlue else DarkBorder, CircleShape)
+                                .clickable {
+                                    selectedDays = if (sel) selectedDays - idx else selectedDays + idx
+                                }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(d, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 11.sp)
+                        }
+                    }
+                }
+                if (isRepeat && selectedDays.size == 7) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Daily alarm (all 7 days)", color = PrimaryManaBlue, fontSize = 10.sp)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Time
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("TIME", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(DarkSurface)
+                            .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
+                    ) {
+                        listOf(false to "12h", true to "24h").forEach { (flag, txt) ->
+                            val sel = is24h == flag
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                    .clickable { is24h = flag }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(txt, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
                         value = hourText,
                         onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) hourText = it },
-                        label = { Text("Hour (0-23)", color = TextSecondary) },
+                        label = { Text(if (is24h) "HH" else "HH (1-12)", color = TextSecondary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.weight(1f),
@@ -305,10 +427,11 @@ private fun AddAlarmDialog(
                             unfocusedTextColor = TextPrimary
                         )
                     )
+                    Text(":", color = TextPrimary, fontSize = 18.sp)
                     OutlinedTextField(
                         value = minuteText,
                         onValueChange = { if (it.length <= 2 && it.all { c -> c.isDigit() }) minuteText = it },
-                        label = { Text("Minute (0-59)", color = TextSecondary) },
+                        label = { Text("MM", color = TextSecondary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.weight(1f),
@@ -319,9 +442,30 @@ private fun AddAlarmDialog(
                             unfocusedTextColor = TextPrimary
                         )
                     )
+                    if (!is24h) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(DarkSurface)
+                                .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
+                        ) {
+                            listOf("AM", "PM").forEach { t ->
+                                val sel = amPm == t
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                        .clickable { amPm = t }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(t, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 10.sp)
+                                }
+                            }
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedTextField(
                     value = label,
@@ -339,11 +483,66 @@ private fun AddAlarmDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Text(
-                    text = "DISMISS METHOD",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
+                // Snooze
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("SNOOZE", color = TextPrimary, fontSize = 12.sp)
+                        Text("Allow delaying this alarm", color = TextMuted, fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = snoozeEnabled,
+                        onCheckedChange = { snoozeEnabled = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DarkCard,
+                            checkedTrackColor = PrimaryManaBlue
+                        )
+                    )
+                }
+                if (snoozeEnabled) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = snoozeText,
+                        onValueChange = { snoozeText = it.filter { c -> c.isDigit() }.take(3) },
+                        label = { Text("Snooze minutes", color = TextSecondary) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryManaBlue,
+                            unfocusedBorderColor = DarkBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Vibrate
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("VIBRATE", color = TextPrimary, fontSize = 12.sp)
+                        Text("Vibrate when alarm rings", color = TextMuted, fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = vibrate,
+                        onCheckedChange = { vibrate = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DarkCard,
+                            checkedTrackColor = PrimaryManaBlue
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text("DISMISS METHOD", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -393,9 +592,31 @@ private fun AddAlarmDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val hour = hourText.toIntOrNull()?.coerceIn(0, 23) ?: 7
-                    val minute = minuteText.toIntOrNull()?.coerceIn(0, 59) ?: 0
-                    onConfirm(hour, minute, label.trim(), selectedMethod, pinCode.trim())
+                    val rawH = hourText.toIntOrNull() ?: 7
+                    val minute = (minuteText.toIntOrNull() ?: 0).coerceIn(0, 59)
+                    val hour24 = if (is24h) {
+                        rawH.coerceIn(0, 23)
+                    } else {
+                        val h12 = if (rawH == 0) 12 else rawH.coerceIn(1, 12)
+                        when {
+                            amPm == "AM" && h12 == 12 -> 0
+                            amPm == "PM" && h12 != 12 -> h12 + 12
+                            else -> h12
+                        }
+                    }
+                    val csv = if (isRepeat) selectedDays.sorted().joinToString(",") else selectedDays.sorted().joinToString(",")
+                    onConfirm(
+                        hour24,
+                        minute,
+                        label.trim(),
+                        selectedMethod,
+                        pinCode.trim(),
+                        isRepeat || selectedDays.isNotEmpty(),
+                        csv,
+                        snoozeEnabled,
+                        (snoozeText.toIntOrNull() ?: 10).coerceAtLeast(1),
+                        vibrate
+                    )
                     onDismiss()
                 },
                 colors = ButtonDefaults.buttonColors(
@@ -404,20 +625,12 @@ private fun AddAlarmDialog(
                 ),
                 shape = RoundedCornerShape(6.dp)
             ) {
-                Text(
-                    text = "SAVE",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = DarkCard
-                )
+                Text("SAVE", style = MaterialTheme.typography.labelLarge, color = DarkCard)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(
-                    text = "CANCEL",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = TextMuted
-                )
+                Text("CANCEL", style = MaterialTheme.typography.labelLarge, color = TextMuted)
             }
         }
     )
