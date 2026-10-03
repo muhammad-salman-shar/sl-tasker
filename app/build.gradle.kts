@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.neurasamu.build.solo_leveling_tasker"
+    namespace = "com.neurasamu.build.sl_tasker"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.neurasamu.build.solo_leveling_tasker"
+        applicationId = "com.neurasamu.build.sl_tasker"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

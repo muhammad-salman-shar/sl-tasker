@@ -8,3 +8,5 @@ app/build/
 .cxx
 *.apk
 *.aab
+
+build.log
