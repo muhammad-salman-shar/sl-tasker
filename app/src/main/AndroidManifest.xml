@@ -33,6 +33,17 @@
         </activity>
 
         <activity
+            android:name=".ui.block.BlockOverlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <activity
             android:name=".ui.alarm.AlarmRingActivity"
             android:exported="false"
             android:excludeFromRecents="true"

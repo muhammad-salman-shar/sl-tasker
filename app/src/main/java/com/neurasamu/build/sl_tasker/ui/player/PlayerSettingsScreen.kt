@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.data.block.BlockMode
 import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
+import com.neurasamu.build.sl_tasker.data.block.PROTECTED_PACKAGES
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
@@ -60,17 +61,6 @@ import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import kotlinx.coroutines.launch
-
-private val PROTECTED_PKGS = setOf(
-    "com.neurasamu.build.sl_tasker",
-    "com.android.settings",
-    "com.android.systemui",
-    "com.android.dialer",
-    "com.google.android.dialer",
-    "com.android.mms",
-    "com.google.android.apps.messaging",
-    "com.android.phone"
-)
 
 data class AppRow(val pkg: String, val label: String)
 
@@ -309,7 +299,7 @@ private fun loadInstalledApps(context: Context): List<AppRow> {
     return list
         .mapNotNull { info ->
             val pkg = info.activityInfo?.packageName ?: return@mapNotNull null
-            if (pkg in PROTECTED_PKGS) return@mapNotNull null
+            if (pkg in PROTECTED_PACKAGES) return@mapNotNull null
             AppRow(pkg = pkg, label = info.loadLabel(pm).toString())
         }
         .distinctBy { it.pkg }

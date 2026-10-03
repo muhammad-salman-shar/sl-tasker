@@ -10,6 +10,18 @@ import kotlinx.coroutines.flow.map
 
 private val Context.blockDataStore by preferencesDataStore("block_prefs")
 
+val PROTECTED_PACKAGES: Set<String> = setOf(
+    "com.neurasamu.build.sl_tasker",
+    "com.android.settings",
+    "com.android.systemui",
+    "com.android.dialer",
+    "com.google.android.dialer",
+    "com.android.mms",
+    "com.google.android.apps.messaging",
+    "com.android.phone",
+    "com.android.server.telecom"
+)
+
 enum class BlockMode { OFF, TEST, STRICT }
 
 data class BlockState(

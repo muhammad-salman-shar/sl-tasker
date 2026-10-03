@@ -1,63 +1,71 @@
 package com.neurasamu.build.sl_tasker.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
-import android.widget.Toast
-import com.neurasamu.build.sl_tasker.data.datastore.UserPreferences
-import com.neurasamu.build.sl_tasker.data.db.AppDatabase
+import com.neurasamu.build.sl_tasker.data.block.BlockMode
+import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
+import com.neurasamu.build.sl_tasker.data.block.PROTECTED_PACKAGES
+import com.neurasamu.build.sl_tasker.ui.block.BlockOverlayActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class AppBlockerAccessibilityService : AccessibilityService() {
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private lateinit var userPreferences: UserPreferences
-    private lateinit var database: AppDatabase
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private lateinit var blockPrefs: BlockPrefs
+    private var lastBlockedAt = 0L
+    private var lastBlockedPkg: String? = null
 
     override fun onCreate() {
         super.onCreate()
-        userPreferences = UserPreferences(applicationContext)
-        database = AppDatabase.getInstance(applicationContext)
+        blockPrefs = BlockPrefs(applicationContext)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (event == null) return
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            event.eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
 
         val targetPackage = event.packageName?.toString() ?: return
         if (targetPackage == packageName) return
+        if (targetPackage in PROTECTED_PACKAGES) return
 
         serviceScope.launch {
             try {
-                val stats = database.playerStatsDao().getPlayerStats()
-                val isFocusLockActive = stats?.focusLockActive == true
-
-                if (!isFocusLockActive) return@launch
-
-                val blockedPackages = userPreferences.blockedPackagesFlow.first()
-                if (blockedPackages.contains(targetPackage)) {
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            applicationContext,
-                            "⚔️ SYSTEM WARNING: Focus Lock active! Clear your quest first.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                val state = blockPrefs.state.first()
+                val shouldBlock = when (state.mode) {
+                    BlockMode.OFF -> false
+                    BlockMode.TEST -> targetPackage in state.selectedPackages
+                    BlockMode.STRICT -> true
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+                if (!shouldBlock) return@launch
+
+                val now = System.currentTimeMillis()
+                if (targetPackage == lastBlockedPkg && now - lastBlockedAt < 400L) return@launch
+                lastBlockedPkg = targetPackage
+                lastBlockedAt = now
+
+                performGlobalAction(GLOBAL_ACTION_HOME)
+
+                val intent = Intent(applicationContext, BlockOverlayActivity::class.java)
+                    .addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                            or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    )
+                    .putExtra("blocked_pkg", targetPackage)
+                applicationContext.startActivity(intent)
+            } catch (_: Exception) {
             }
         }
     }
 
-    override fun onInterrupt() {
-        // No-op
-    }
+    override fun onInterrupt() {}
 
     override fun onDestroy() {
         serviceScope.cancel()
