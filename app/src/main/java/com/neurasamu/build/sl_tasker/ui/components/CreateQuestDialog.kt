@@ -23,8 +23,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimeInput
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +48,6 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 
 private val DayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateQuestDialog(
     onDismiss: () -> Unit,
@@ -73,7 +70,8 @@ fun CreateQuestDialog(
     }
     val initHour = (initialTask?.reminderMinutesOfDay ?: 420) / 60
     val initMinute = (initialTask?.reminderMinutesOfDay ?: 420) % 60
-    val timeState = rememberTimePickerState(initialHour = initHour, initialMinute = initMinute, is24Hour = false)
+    var hourText by remember { mutableStateOf("%02d".format(initHour)) }
+    var minuteText by remember { mutableStateOf("%02d".format(initMinute)) }
     var selectedDays by remember {
         mutableStateOf(
             initialTask?.customRepeatDays
@@ -132,6 +130,8 @@ fun CreateQuestDialog(
                     value = description,
                     onValueChange = { if (it.length <= 100) description = it },
                     label = { Text("Description (max 100)") },
+                    minLines = 2,
+                    maxLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PrimaryManaBlue,
@@ -232,8 +232,52 @@ fun CreateQuestDialog(
                 }
                 }
 
-                SectionLabel("TIME")
-                TimeInput(state = timeState)
+                SectionLabel("TIME (24h)")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = hourText,
+                        onValueChange = { v ->
+                            val digits = v.filter { it.isDigit() }.take(2)
+                            hourText = digits
+                        },
+                        label = { Text("HH") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryManaBlue,
+                            unfocusedBorderColor = DarkBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedLabelColor = PrimaryManaBlue,
+                            unfocusedLabelColor = TextMuted
+                        )
+                    )
+                    Text(":", color = TextPrimary, fontSize = 18.sp)
+                    OutlinedTextField(
+                        value = minuteText,
+                        onValueChange = { v ->
+                            val digits = v.filter { it.isDigit() }.take(2)
+                            minuteText = digits
+                        },
+                        label = { Text("MM") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryManaBlue,
+                            unfocusedBorderColor = DarkBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedLabelColor = PrimaryManaBlue,
+                            unfocusedLabelColor = TextMuted
+                        )
+                    )
+                }
 
                 if (requiresTimer) {
                     SectionLabel("TIMER (MINUTES)")
@@ -262,7 +306,9 @@ fun CreateQuestDialog(
                 (!requiresTimer || (durationText.toIntOrNull() ?: 0) > 0)
             Button(
                 onClick = {
-                    val minutes = timeState.hour * 60 + timeState.minute
+                    val hh = (hourText.toIntOrNull() ?: 0).coerceIn(0, 23)
+                    val mm = (minuteText.toIntOrNull() ?: 0).coerceIn(0, 59)
+                    val minutes = hh * 60 + mm
                     val csv = if (isRepeat) selectedDays.sorted().joinToString(",") else ""
                     val dur = if (requiresTimer) durationText.toIntOrNull() ?: 0 else 0
                     onConfirm(title, description, difficulty, minutes, csv, dur)
