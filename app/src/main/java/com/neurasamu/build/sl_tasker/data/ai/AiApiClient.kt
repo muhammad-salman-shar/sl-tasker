@@ -20,9 +20,10 @@ class AiApiClient {
 
             val body = JSONObject().apply {
                 put("model", config.model)
-                put("temperature", 0.2)
+                put("temperature", 0.1)
                 put("max_tokens", 512)
                 put("stream", true)
+                put("response_format", JSONObject().apply { put("type", "json_object") })
                 put("messages", JSONArray().apply {
                     messages.forEach { m ->
                         put(JSONObject().apply {
@@ -144,30 +145,73 @@ class AiApiClient {
 }
 
 object AiPrompt {
-    val SYSTEM: String = """
-You are SL Tasker AI. Reply ONLY with a single JSON object. No prose, no markdown, no explanation.
 
-Three actions are allowed:
+    fun buildSystemPrompt(): String {
+        val now = java.util.Calendar.getInstance()
+        val y = now.get(java.util.Calendar.YEAR)
+        val mo = now.get(java.util.Calendar.MONTH) + 1
+        val d = now.get(java.util.Calendar.DAY_OF_MONTH)
+        val h = now.get(java.util.Calendar.HOUR_OF_DAY)
+        val mi = now.get(java.util.Calendar.MINUTE)
+        val dow = when (now.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.SUNDAY -> "Sunday"
+            java.util.Calendar.MONDAY -> "Monday"
+            java.util.Calendar.TUESDAY -> "Tuesday"
+            java.util.Calendar.WEDNESDAY -> "Wednesday"
+            java.util.Calendar.THURSDAY -> "Thursday"
+            java.util.Calendar.FRIDAY -> "Friday"
+            else -> "Saturday"
+        }
+        val nowTime = "%02d:%02d".format(h, mi)
 
-1) Create a task:
-{"action":"create_task","title":"...","time":"HH:MM","days":"","type":"MEDIUM","duration_minutes":0}
+        return """
+You convert the user's English sentence into ONE JSON object. Output ONLY the JSON. No markdown, no explanation, no extra text.
+
+Current date: $d/$mo/$y ($dow). Current time: $nowTime (24-hour).
+Days numbering: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat.
+
+Possible outputs:
+
+Create task:
+{"action":"create_task","title":"Math","time":"20:00","days":"","type":"HARD","duration_minutes":60}
 - time: 24-hour HH:MM
-- days: empty for one-time, else comma list of weekdays (0=Sun,1=Mon,...,6=Sat)
-- type: MEDIUM or HARD or CRITICAL
-- duration_minutes: only for HARD/CRITICAL (minutes). Set 0 for MEDIUM.
+- days: empty for one-time, or comma list of weekday numbers for repeat
+- type: MEDIUM, HARD, or CRITICAL
+- duration_minutes: minutes (use 0 for MEDIUM)
 
-2) Create an alarm:
-{"action":"create_alarm","label":"...","time":"HH:MM","days":""}
-- days: empty for one-time, else comma list of weekdays (0=Sun,...,6=Sat)
+Create alarm:
+{"action":"create_alarm","label":"Gym","time":"06:30","days":""}
+- days: empty for one-time, or comma list of weekday numbers for repeat
 
-3) Normal chat (question, greeting, unclear request):
-{"action":"chat","reply":"..."}
+If a required field is missing or the user is just chatting:
+{"action":"chat","reply":"a short natural question in plain English"}
+
+Examples:
+
+User: Study math tomorrow at 7 PM for 1 hour, hard
+Output: {"action":"create_task","title":"Study math","time":"19:00","days":"","type":"HARD","duration_minutes":60}
+
+User: Wake me at 6:30 AM on weekdays
+Output: {"action":"create_alarm","label":"Wake up","time":"06:30","days":"1,2,3,4,5"}
+
+User: Remind me to code every Monday and Friday at 5 PM for 90 minutes, hard
+Output: {"action":"create_task","title":"Code","time":"17:00","days":"1,5","type":"HARD","duration_minutes":90}
+
+User: Add a task called read a book
+Output: {"action":"chat","reply":"What time should I set for reading?"}
+
+User: Hi
+Output: {"action":"chat","reply":"Hi. Tell me a task or alarm to create."}
 
 Rules:
-- If a required field is missing, return {"action":"chat","reply":"<one short question>"}.
-- Ask only ONE missing field per turn.
-- Never invent values. Never complete or delete tasks.
-- Only create tasks and alarms.
-- Keep reply text short.
+- Output ONLY the JSON object. No surrounding text.
+- Never write the literal text inside angle brackets. Write a real natural question.
+- Never invent data the user did not provide.
+- If the user has already given enough information, emit create_task or create_alarm directly.
+- Ask at most one short follow-up question when something essential is missing.
 """.trimIndent()
+    }
+
+    @Deprecated("Use buildSystemPrompt()")
+    val SYSTEM: String = ""
 }

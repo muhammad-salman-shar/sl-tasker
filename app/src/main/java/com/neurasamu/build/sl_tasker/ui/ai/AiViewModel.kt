@@ -72,7 +72,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
 
-                val sysMsg = ChatMsg("system", AiPrompt.SYSTEM)
+                val sysMsg = ChatMsg("system", AiPrompt.buildSystemPrompt())
                 val history = _messages.value.map { ChatMsg(it.role, it.text) }
 
                 val raw = try {
@@ -86,8 +86,11 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 val cleaned = stripFences(raw)
                 val json = try {
                     JSONObject(cleaned)
-                } catch (_: Exception) {
-                    _messages.value = _messages.value + AiMessage("assistant", cleaned)
+                } catch (e: Exception) {
+                    _messages.value = _messages.value + AiMessage(
+                        "assistant",
+                        "Model returned invalid JSON. Raw reply:\n\n" + raw.take(400)
+                    )
                     return@launch
                 }
 
@@ -192,14 +195,22 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun stripFences(raw: String): String {
         var s = raw.trim()
+        // Remove markdown code fences
         if (s.startsWith("```")) {
             s = s.removePrefix("```json").removePrefix("```").trim()
             if (s.endsWith("```")) s = s.dropLast(3).trim()
         }
+        // Handle a model that wrapped the JSON in a quoted string
+        if (s.startsWith("\"") && s.endsWith("\"") && s.length > 2) {
+            s = s.substring(1, s.length - 1)
+        }
+        // Extract first {...} block
         val firstBrace = s.indexOf('{')
         val lastBrace = s.lastIndexOf('}')
-        return if (firstBrace >= 0 && lastBrace > firstBrace) {
+        val candidate = if (firstBrace >= 0 && lastBrace > firstBrace) {
             s.substring(firstBrace, lastBrace + 1)
         } else s
+        // If the model returned a JSON *string* containing JSON, try to unescape
+        return candidate
     }
 }
