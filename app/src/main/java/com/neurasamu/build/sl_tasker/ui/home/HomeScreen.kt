@@ -1,5 +1,11 @@
 package com.neurasamu.build.sl_tasker.ui.home
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -151,18 +157,56 @@ private fun StatCircle(
     progress: Float,
     primaryColor: Color
 ) {
+    val transition = rememberInfiniteTransition(label = "circleAnim")
+    val pulse by transition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rot"
+    )
+    val glow by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
     Box(
         modifier = Modifier
             .size(130.dp)
             .clip(CircleShape)
             .background(DarkCard)
-            .border(1.dp, DarkBorder, CircleShape),
+            .border(1.dp, primaryColor.copy(alpha = 0.25f), CircleShape),
         contentAlignment = Alignment.Center
     ) {
+        // Outer breathing halo
+        Canvas(modifier = Modifier.size(130.dp)) {
+            drawCircle(
+                color = primaryColor.copy(alpha = 0.08f * (glow + 0.3f)),
+                radius = (this.size.minDimension / 2f) * pulse
+            )
+        }
+
         Canvas(modifier = Modifier.size(130.dp)) {
             val stroke = 6.dp.toPx()
             val inset = stroke / 2f
             val arcSize = Size(size.width - stroke, size.height - stroke)
+            // Track
             drawArc(
                 color = primaryColor.copy(alpha = 0.15f),
                 startAngle = -90f,
@@ -172,6 +216,7 @@ private fun StatCircle(
                 topLeft = Offset(inset, inset),
                 size = arcSize
             )
+            // Progress
             drawArc(
                 color = primaryColor,
                 startAngle = -90f,
@@ -181,7 +226,42 @@ private fun StatCircle(
                 topLeft = Offset(inset, inset),
                 size = arcSize
             )
+            // Rotating dot on progress tip
+            val angleRad = Math.toRadians((-90f + 360f * progress.coerceIn(0f, 1f)).toDouble())
+            val cx = size.width / 2f + (size.width / 2f - stroke / 2f) * Math.cos(angleRad).toFloat()
+            val cy = size.height / 2f + (size.height / 2f - stroke / 2f) * Math.sin(angleRad).toFloat()
+            drawCircle(
+                color = primaryColor.copy(alpha = glow),
+                radius = stroke * 0.9f,
+                center = Offset(cx, cy)
+            )
         }
+
+        // Rotating outer arc accent
+        Canvas(modifier = Modifier.size(146.dp)) {
+            val stroke = 2.dp.toPx()
+            val inset = stroke / 2f + 6.dp.toPx()
+            val arcSize = Size(size.width - stroke - 12.dp.toPx(), size.height - stroke - 12.dp.toPx())
+            drawArc(
+                color = primaryColor.copy(alpha = 0.5f),
+                startAngle = rotation,
+                sweepAngle = 70f,
+                useCenter = false,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+                topLeft = Offset(inset, inset),
+                size = arcSize
+            )
+            drawArc(
+                color = primaryColor.copy(alpha = 0.5f),
+                startAngle = rotation + 180f,
+                sweepAngle = 40f,
+                useCenter = false,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+                topLeft = Offset(inset, inset),
+                size = arcSize
+            )
+        }
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 imageVector = icon,
