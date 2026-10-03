@@ -145,6 +145,7 @@ fun DashboardScreen(
                     customRepeatDays = daysCsv,
                     durationMinutes = durationMinutes
                 )
+                showCreateDialog = false
             }
         )
     }
