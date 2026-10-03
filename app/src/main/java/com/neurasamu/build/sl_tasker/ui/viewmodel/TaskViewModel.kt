@@ -60,23 +60,32 @@ class TaskViewModel(
     fun createQuest(
         title: String,
         description: String,
-        priority: Priority,
         difficulty: Difficulty,
-        repeatRule: RepeatRule,
+        reminderMinutesOfDay: Int,
         customRepeatDays: String,
-        durationMinutes: Int,
-        scheduledAt: Long,
-        deadlineAt: Long
+        durationMinutes: Int
     ) {
         viewModelScope.launch(Dispatchers.IO) {
+            val cal = java.util.Calendar.getInstance()
+            cal.set(java.util.Calendar.HOUR_OF_DAY, reminderMinutesOfDay / 60)
+            cal.set(java.util.Calendar.MINUTE, reminderMinutesOfDay % 60)
+            cal.set(java.util.Calendar.SECOND, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            var scheduledAt = cal.timeInMillis
+            if (scheduledAt <= System.currentTimeMillis()) {
+                scheduledAt += 24L * 60 * 60 * 1000
+            }
+            val deadlineAt = scheduledAt + durationMinutes * 60 * 1000L
+
             val task = TaskEntity(
                 title = title,
                 description = description,
-                priority = priority,
+                priority = Priority.MEDIUM,
                 difficulty = difficulty,
-                repeatRule = repeatRule,
+                repeatRule = RepeatRule.CUSTOM,
                 customRepeatDays = customRepeatDays,
-                durationMinutes = durationMinutes
+                durationMinutes = durationMinutes,
+                reminderMinutesOfDay = reminderMinutesOfDay
             )
             val taskId = taskRepository.createTaskWithOccurrence(task, scheduledAt, deadlineAt)
             if (scheduledAt > System.currentTimeMillis()) {

@@ -136,19 +136,14 @@ fun DashboardScreen(
     if (showCreateDialog) {
         CreateQuestDialog(
             onDismiss = { showCreateDialog = false },
-            onConfirm = { title, description, priority, difficulty, repeatRule, durationMinutes ->
-                val now = System.currentTimeMillis()
-                val deadline = now + (durationMinutes * 60 * 1000L)
+            onConfirm = { title, description, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes ->
                 taskViewModel.createQuest(
                     title = title,
                     description = description,
-                    priority = priority,
                     difficulty = difficulty,
-                    repeatRule = repeatRule,
-                    customRepeatDays = "",
-                    durationMinutes = durationMinutes,
-                    scheduledAt = now,
-                    deadlineAt = deadline
+                    reminderMinutesOfDay = reminderMinutesOfDay,
+                    customRepeatDays = daysCsv,
+                    durationMinutes = durationMinutes
                 )
             }
         )

@@ -7,23 +7,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,18 +33,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.data.model.Difficulty
-import com.neurasamu.build.sl_tasker.data.model.Priority
-import com.neurasamu.build.sl_tasker.data.model.RepeatRule
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
-import com.neurasamu.build.sl_tasker.ui.theme.GoldWarning
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.RankA
 import com.neurasamu.build.sl_tasker.ui.theme.RankC
@@ -51,24 +48,34 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 
+private val DayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateQuestDialog(
     onDismiss: () -> Unit,
     onConfirm: (
         title: String,
         description: String,
-        priority: Priority,
         difficulty: Difficulty,
-        repeatRule: RepeatRule,
+        reminderMinutesOfDay: Int,
+        daysOfWeekCsv: String,
         durationMinutes: Int
     ) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var difficulty by remember { mutableStateOf(Difficulty.MEDIUM) }
     var durationText by remember { mutableStateOf("30") }
-    var selectedPriority by remember { mutableStateOf(Priority.MEDIUM) }
-    var selectedDifficulty by remember { mutableStateOf(Difficulty.MEDIUM) }
-    var selectedRepeatRule by remember { mutableStateOf<RepeatRule>(RepeatRule.ONCE) }
+    val timeState = rememberTimePickerState(initialHour = 7, initialMinute = 0, is24Hour = false)
+    var selectedDays by remember { mutableStateOf(setOf<Int>()) }
+
+    val difficultyColor = when (difficulty) {
+        Difficulty.MEDIUM -> RankC
+        Difficulty.HARD -> RankA
+        Difficulty.CRITICAL -> DangerPenaltyRed
+    }
+    val requiresTimer = difficulty != Difficulty.MEDIUM
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -76,215 +83,168 @@ fun CreateQuestDialog(
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
-                text = "NEW SYSTEM QUEST",
-                style = MaterialTheme.typography.titleLarge,
-                color = PrimaryManaBlue
+                text = "NEW TASK",
+                style = MaterialTheme.typography.titleMedium,
+                color = PrimaryManaBlue,
+                fontSize = 15.sp
             )
         },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Quest Title", color = TextSecondary) },
+                    onValueChange = { if (it.length <= 50) title = it },
+                    label = { Text("Title (max 50)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PrimaryManaBlue,
                         unfocusedBorderColor = DarkBorder,
                         focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        unfocusedTextColor = TextPrimary,
+                        focusedLabelColor = PrimaryManaBlue,
+                        unfocusedLabelColor = TextMuted
                     )
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 OutlinedTextField(
                     value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description (Optional)", color = TextSecondary) },
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 3,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryManaBlue,
-                        unfocusedBorderColor = DarkBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = durationText,
-                    onValueChange = { if (it.all { char -> char.isDigit() }) durationText = it },
-                    label = { Text("Duration (Minutes)", color = TextSecondary) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
+                    onValueChange = { if (it.length <= 100) description = it },
+                    label = { Text("Description (max 100)") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = PrimaryManaBlue,
                         unfocusedBorderColor = DarkBorder,
                         focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        unfocusedTextColor = TextPrimary,
+                        focusedLabelColor = PrimaryManaBlue,
+                        unfocusedLabelColor = TextMuted
                     )
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "PRIORITY",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+                SectionLabel("TASK TYPE")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Priority.entries.forEach { priority ->
-                        val isSelected = selectedPriority == priority
-                        val pColor = when (priority) {
-                            Priority.CRITICAL -> DangerPenaltyRed
-                            Priority.HIGH -> GoldWarning
-                            Priority.MEDIUM -> PrimaryManaBlue
-                            Priority.LOW -> TextMuted
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) pColor.copy(alpha = 0.2f) else DarkSurface)
-                                .border(1.dp, if (isSelected) pColor else DarkBorder, RoundedCornerShape(6.dp))
-                                .clickable { selectedPriority = priority }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = priority.name.take(4),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) pColor else TextSecondary,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "DIFFICULTY",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Difficulty.entries.forEach { difficulty ->
-                        val isSelected = selectedDifficulty == difficulty
-                        val dColor = when (difficulty) {
-                            Difficulty.CRITICAL -> DangerPenaltyRed
-                            Difficulty.HARD -> RankA
+                    Difficulty.entries.forEach { d ->
+                        val isSel = difficulty == d
+                        val c = when (d) {
                             Difficulty.MEDIUM -> RankC
+                            Difficulty.HARD -> RankA
+                            Difficulty.CRITICAL -> DangerPenaltyRed
                         }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) dColor.copy(alpha = 0.2f) else DarkSurface)
-                                .border(1.dp, if (isSelected) dColor else DarkBorder, RoundedCornerShape(6.dp))
-                                .clickable { selectedDifficulty = difficulty }
+                                .background(if (isSel) c.copy(alpha = 0.2f) else DarkSurface)
+                                .border(1.dp, if (isSel) c else DarkBorder, RoundedCornerShape(6.dp))
+                                .clickable { difficulty = d }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = difficulty.name.take(4),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) dColor else TextSecondary,
-                                fontSize = 10.sp
+                                text = d.name,
+                                color = if (isSel) c else TextMuted,
+                                fontSize = 11.sp,
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "REPEAT SCHEDULE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+                SectionLabel("DAYS (pick one or more)")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    RepeatRule.entries.forEach { rule ->
-                        val isSelected = selectedRepeatRule == rule
+                    DayShort.forEachIndexed { index, label ->
+                        val isSel = index in selectedDays
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
-                                .border(1.dp, if (isSelected) PrimaryManaBlue else DarkBorder, RoundedCornerShape(6.dp))
-                                .clickable { selectedRepeatRule = rule }
+                                .clip(CircleShape)
+                                .background(if (isSel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                .border(1.dp, if (isSel) PrimaryManaBlue else DarkBorder, CircleShape)
+                                .clickable {
+                                    selectedDays = if (isSel) selectedDays - index else selectedDays + index
+                                }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = rule.name,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) PrimaryManaBlue else TextSecondary,
-                                fontSize = 10.sp
+                                text = label,
+                                color = if (isSel) PrimaryManaBlue else TextMuted,
+                                fontSize = 11.sp
                             )
                         }
                     }
+                }
+
+                SectionLabel("TIME")
+                TimeInput(state = timeState)
+
+                if (requiresTimer) {
+                    SectionLabel("TIMER (MINUTES)")
+                    OutlinedTextField(
+                        value = durationText,
+                        onValueChange = { durationText = it.filter { ch -> ch.isDigit() }.take(4) },
+                        label = { Text("e.g. 60") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = difficultyColor,
+                            unfocusedBorderColor = DarkBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedLabelColor = difficultyColor,
+                            unfocusedLabelColor = TextMuted
+                        )
+                    )
                 }
             }
         },
         confirmButton = {
+            val valid = title.isNotBlank() &&
+                selectedDays.isNotEmpty() &&
+                (!requiresTimer || (durationText.toIntOrNull() ?: 0) > 0)
             Button(
                 onClick = {
-                    if (title.isNotBlank()) {
-                        val duration = durationText.toIntOrNull() ?: 30
-                        onConfirm(
-                            title.trim(),
-                            description.trim(),
-                            selectedPriority,
-                            selectedDifficulty,
-                            selectedRepeatRule,
-                            duration
-                        )
-                        onDismiss()
-                    }
+                    val minutes = timeState.hour * 60 + timeState.minute
+                    val csv = selectedDays.sorted().joinToString(",")
+                    val dur = if (requiresTimer) durationText.toIntOrNull() ?: 0 else 0
+                    onConfirm(title, description, difficulty, minutes, csv, dur)
                 },
+                enabled = valid,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryManaBlue,
+                    containerColor = difficultyColor,
                     contentColor = DarkCard
-                ),
-                shape = RoundedCornerShape(6.dp)
-            ) {
-                Text(
-                    text = "INITIALIZE",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = DarkCard
                 )
+            ) {
+                Text("CREATE", fontSize = 12.sp)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(
-                    text = "CANCEL",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = TextMuted
-                )
+                Text("CANCEL", color = TextMuted, fontSize = 12.sp)
             }
         }
+    )
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = TextSecondary,
+        fontSize = 10.sp
     )
 }
