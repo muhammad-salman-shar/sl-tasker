@@ -59,6 +59,14 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 import com.neurasamu.build.sl_tasker.ui.viewmodel.AlarmViewModel
 import java.util.Locale
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun AlarmScreen(
@@ -162,7 +170,7 @@ fun AlarmScreen(
         AddAlarmDialog(
             initialAlarm = alarm,
             onDismiss = { editingAlarm = null },
-            onConfirm = { hour, minute, label, method, pin, isRepeat, csv, snoozeOn, snoozeMin, vib ->
+            onConfirm = { hour, minute, label, method, pin, isRepeat, csv, snoozeOn, snoozeMin, vib, snd ->
                 alarmViewModel.updateAlarm(
                     alarmId = alarm.id,
                     hour = hour,
@@ -174,7 +182,8 @@ fun AlarmScreen(
                     isRepeat = isRepeat,
                     snoozeEnabled = snoozeOn,
                     snoozeMinutes = snoozeMin,
-                    vibrate = vib
+                    vibrate = vib,
+                    soundUri = snd
                 )
             }
         )
@@ -183,7 +192,7 @@ fun AlarmScreen(
     if (showAddDialog) {
         AddAlarmDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { hour, minute, label, method, pin, isRepeat, csv, snoozeOn, snoozeMin, vib ->
+            onConfirm = { hour, minute, label, method, pin, isRepeat, csv, snoozeOn, snoozeMin, vib, snd ->
                 alarmViewModel.addAlarm(
                     hour = hour,
                     minute = minute,
@@ -194,7 +203,8 @@ fun AlarmScreen(
                     isRepeat = isRepeat,
                     snoozeEnabled = snoozeOn,
                     snoozeMinutes = snoozeMin,
-                    vibrate = vib
+                    vibrate = vib,
+                    soundUri = snd
                 )
             }
         )
@@ -317,7 +327,8 @@ private fun AddAlarmDialog(
         daysCsv: String,
         snoozeEnabled: Boolean,
         snoozeMinutes: Int,
-        vibrate: Boolean
+        vibrate: Boolean,
+        soundUri: String
     ) -> Unit
 ) {
     val isEdit = initialAlarm != null
@@ -344,6 +355,20 @@ private fun AddAlarmDialog(
     var snoozeText by remember { mutableStateOf((initialAlarm?.snoozeMinutes ?: 10).toString()) }
     var vibrate by remember { mutableStateOf(initialAlarm?.vibrate ?: true) }
     var pinError by remember { mutableStateOf("") }
+    val ctx = LocalContext.current
+    var soundUri by remember { mutableStateOf(initialAlarm?.soundUri ?: "") }
+    val ringtoneLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null) {
+                soundUri = uri.toString()
+            } else if (result.data?.getBooleanExtra("picked_none", false) == true) {
+                soundUri = ""
+            }
+        }
+    }
     val dayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
     AlertDialog(
@@ -587,6 +612,38 @@ private fun AddAlarmDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                Text("SOUND", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (soundUri.isBlank()) "Default alarm tone" else "Custom tone",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = {
+                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Pick alarm sound")
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                if (soundUri.isNotBlank()) {
+                                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(soundUri))
+                                }
+                            }
+                            ringtoneLauncher.launch(intent)
+                        }
+                    ) {
+                        Text("PICK", color = PrimaryManaBlue, fontSize = 11.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 Text("DISMISS METHOD", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
@@ -677,7 +734,8 @@ private fun AddAlarmDialog(
                         csv,
                         snoozeEnabled,
                         (snoozeText.toIntOrNull() ?: 10).coerceAtLeast(1),
-                        vibrate
+                        vibrate,
+                        soundUri
                     )
                     onDismiss()
                 },

@@ -58,6 +58,11 @@ import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.width
 
 @Composable
 fun HomeScreen(
@@ -140,8 +145,8 @@ fun HomeScreen(
                 items(items = upcoming, key = { it.occurrence.id }) { item ->
                     UpcomingRow(
                         title = item.task.title,
-                        timeMillis = item.occurrence.deadlineAt,
-                        difficulty = item.task.difficulty.name
+                        timeMillis = item.occurrence.scheduledAt,
+                        difficulty = item.task.difficulty
                     )
                 }
             }
@@ -289,10 +294,36 @@ private fun StatCircle(
 private fun UpcomingRow(
     title: String,
     timeMillis: Long,
-    difficulty: String
+    difficulty: com.neurasamu.build.sl_tasker.data.model.Difficulty
 ) {
-    val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
+    val timeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
     val timeStr = timeFormat.format(Date(timeMillis))
+
+    // Live countdown (updates every minute; we re-tick every 30s)
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(timeMillis) {
+        while (true) {
+            nowMs = System.currentTimeMillis()
+            kotlinx.coroutines.delay(30_000L)
+        }
+    }
+    val diffMs = timeMillis - nowMs
+    val countdownStr = when {
+        diffMs <= 0L -> "NOW"
+        diffMs < 60_000L -> "<1 min"
+        diffMs < 60L * 60_000L -> "${diffMs / 60_000L} min"
+        diffMs < 24L * 60L * 60_000L -> "${diffMs / (60L * 60_000L)} h"
+        else -> "${diffMs / (24L * 60L * 60_000L)} d"
+    }
+
+    val (diffColor, diffLabel) = when (difficulty) {
+        com.neurasamu.build.sl_tasker.data.model.Difficulty.MEDIUM ->
+            com.neurasamu.build.sl_tasker.ui.theme.RankC to "MEDIUM"
+        com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD ->
+            com.neurasamu.build.sl_tasker.ui.theme.RankA to "HARD"
+        com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL ->
+            com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed to "CRITICAL"
+    }
 
     Row(
         modifier = Modifier
@@ -310,18 +341,41 @@ private fun UpcomingRow(
                 color = TextPrimary,
                 maxLines = 1
             )
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(3.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(diffColor.copy(alpha = 0.15f))
+                        .border(1.dp, diffColor, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                ) {
+                    Text(
+                        text = diffLabel,
+                        color = diffColor,
+                        fontSize = 9.sp,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = timeStr,
+                    color = TextMuted,
+                    fontSize = 10.sp
+                )
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = difficulty,
-                style = MaterialTheme.typography.labelSmall,
+                text = countdownStr,
+                style = MaterialTheme.typography.labelLarge,
+                color = PrimaryManaBlue
+            )
+            Text(
+                text = "remaining",
                 color = TextMuted,
-                fontSize = 10.sp
+                fontSize = 9.sp
             )
         }
-        Text(
-            text = timeStr,
-            style = MaterialTheme.typography.labelMedium,
-            color = PrimaryManaBlue
-        )
     }
 }

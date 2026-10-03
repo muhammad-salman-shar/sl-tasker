@@ -216,6 +216,13 @@ class TaskRepository(private val database: AppDatabase) {
         }
     }
 
+    suspend fun getPendingOccurrencesForTask(taskId: Long): List<OccurrenceEntity> =
+        withContext(Dispatchers.IO) { occurrenceDao.getPendingByTask(taskId) }
+
+    suspend fun deleteOccurrence(id: Long) = withContext(Dispatchers.IO) {
+        occurrenceDao.deleteOccurrenceById(id)
+    }
+
     suspend fun archiveTask(taskId: Long) = withContext(Dispatchers.IO) {
         taskDao.archiveTask(taskId)
     }

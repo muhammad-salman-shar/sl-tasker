@@ -57,9 +57,10 @@ class AlarmService : Service() {
         val snoozeEnabled = intent?.getBooleanExtra("SNOOZE_ENABLED", true) ?: true
         val snoozeMinutes = intent?.getIntExtra("SNOOZE_MINUTES", 10) ?: 10
         val vibrate = intent?.getBooleanExtra("VIBRATE", true) ?: true
+        val soundUri = intent?.getStringExtra("SOUND_URI") ?: ""
 
         startForeground(NOTIFICATION_ID, buildNotification(alarmLabel, alarmId, dismissMethod, pinCode))
-        playAlarm(vibrate)
+        playAlarm(vibrate, soundUri)
 
         val ringIntent = Intent(this, AlarmRingActivity::class.java).apply {
             this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -75,10 +76,14 @@ class AlarmService : Service() {
         return START_STICKY
     }
 
-    private fun playAlarm(vibrate: Boolean = true) {
+    private fun playAlarm(vibrate: Boolean = true, soundUri: String = "") {
         try {
-            val alertUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val alertUri = if (soundUri.isNotBlank()) {
+                android.net.Uri.parse(soundUri)
+            } else {
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            }
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(this@AlarmService, alertUri)
                 setAudioAttributes(

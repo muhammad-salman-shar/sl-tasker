@@ -38,4 +38,7 @@ interface OccurrenceDao {
 
     @Query("SELECT * FROM occurrences ORDER BY scheduledAt DESC")
     fun getAllOccurrences(): Flow<List<OccurrenceEntity>>
+
+    @Query("SELECT * FROM occurrences WHERE taskId = :taskId AND status = 'PENDING'")
+    suspend fun getPendingByTask(taskId: Long): List<com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity>
 }

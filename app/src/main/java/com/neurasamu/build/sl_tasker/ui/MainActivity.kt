@@ -75,6 +75,7 @@ import com.neurasamu.build.sl_tasker.ui.viewmodel.AlarmViewModel
 import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
 import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
 import kotlinx.coroutines.delay
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
 
@@ -154,6 +155,8 @@ fun MainAppScaffold(
     var showSettings by remember { mutableStateOf(false) }
     val blockPrefs = remember { BlockPrefs(context) }
     val criticalActive by blockPrefs.criticalActive.collectAsState(initial = false)
+    val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
+    val locked = criticalActive || (playerStats?.health ?: 100) <= 30
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -174,8 +177,9 @@ fun MainAppScaffold(
                     if (selectedTabIndex == 3) {
                         IconButton(
                             onClick = {
-                                if (criticalActive) {
-                                    Toast.makeText(context, "Critical task in progress", Toast.LENGTH_SHORT).show()
+                                if (locked) {
+                                    val msg = if (criticalActive) "Critical task in progress" else "Health too low — recover first"
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 } else {
                                     showSettings = true
                                 }
@@ -187,7 +191,7 @@ fun MainAppScaffold(
                             Icon(
                                 imageVector = Icons.Rounded.Settings,
                                 contentDescription = "Block System Settings",
-                                tint = if (criticalActive) com.neurasamu.build.sl_tasker.ui.theme.TextMuted else PrimaryManaBlue,
+                                tint = if (locked) com.neurasamu.build.sl_tasker.ui.theme.TextMuted else PrimaryManaBlue,
                                 modifier = Modifier.size(24.dp)
                             )
                         }

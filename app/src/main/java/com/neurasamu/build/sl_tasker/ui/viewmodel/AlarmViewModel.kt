@@ -40,7 +40,8 @@ class AlarmViewModel(
         isRepeat: Boolean,
         snoozeEnabled: Boolean,
         snoozeMinutes: Int,
-        vibrate: Boolean
+        vibrate: Boolean,
+        soundUri: String
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val newAlarm = AlarmEntity(
@@ -54,6 +55,7 @@ class AlarmViewModel(
                 snoozeEnabled = snoozeEnabled,
                 snoozeMinutes = snoozeMinutes,
                 vibrate = vibrate,
+                soundUri = soundUri,
                 enabled = true
             )
             val id = alarmRepository.insertAlarm(newAlarm)
@@ -73,7 +75,8 @@ class AlarmViewModel(
         isRepeat: Boolean,
         snoozeEnabled: Boolean,
         snoozeMinutes: Int,
-        vibrate: Boolean
+        vibrate: Boolean,
+        soundUri: String
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val existing = alarmRepository.getAlarmById(alarmId) ?: return@launch
@@ -88,7 +91,8 @@ class AlarmViewModel(
                 repeatRule = if (isRepeat || daysCsv.isNotBlank()) RepeatRule.CUSTOM else RepeatRule.ONCE,
                 snoozeEnabled = snoozeEnabled,
                 snoozeMinutes = snoozeMinutes,
-                vibrate = vibrate
+                vibrate = vibrate,
+                soundUri = soundUri
             )
             alarmRepository.updateAlarm(updated)
             if (updated.enabled) alarmScheduler.scheduleAlarm(updated)
