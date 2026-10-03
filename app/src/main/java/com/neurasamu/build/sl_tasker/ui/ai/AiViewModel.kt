@@ -192,11 +192,41 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 val label = json.optString("label", "Alarm").trim().ifBlank { "Alarm" }
                 val timeStr = json.optString("time").trim()
                 val days = json.optString("days").trim()
+                val methodStr = json.optString("dismiss_method", "EASY").uppercase()
+                val pinIn = json.optString("pin_code", "").trim()
+                val snoozeOn = json.optBoolean("snooze_enabled", true)
+                val snoozeMin = json.optInt("snooze_minutes", 10).coerceAtLeast(1)
+                val vib = json.optBoolean("vibrate", true)
+
                 val time = parseHm(timeStr)
                 if (time == null) {
                     _messages.value = _messages.value + AiMessage("assistant",
                         "Need alarm time (HH:MM).")
                     return
+                }
+                val method = when (methodStr) {
+                    "PIN" -> DismissMethod.PIN
+                    "MATH" -> DismissMethod.MATH
+                    else -> DismissMethod.EASY
+                }
+                var pin = ""
+                if (method == DismissMethod.PIN) {
+                    if (pinIn.length != 8 || !pinIn.all { it.isDigit() }) {
+                        _messages.value = _messages.value + AiMessage("assistant",
+                            "PIN must be exactly 8 digits.")
+                        return
+                    }
+                    if (pinIn.startsWith("12345")) {
+                        _messages.value = _messages.value + AiMessage("assistant",
+                            "PIN cannot start with 12345.")
+                        return
+                    }
+                    if (pinIn.toSet().size == 1) {
+                        _messages.value = _messages.value + AiMessage("assistant",
+                            "PIN cannot be all same digit.")
+                        return
+                    }
+                    pin = pinIn
                 }
                 val (hh, mm) = time
                 val alarm = AlarmEntity(
@@ -205,12 +235,21 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     label = label,
                     repeatRule = if (days.isBlank()) RepeatRule.ONCE else RepeatRule.CUSTOM,
                     customDays = days,
+                    dismissMethod = method,
+                    pinCode = pin,
+                    snoozeEnabled = snoozeOn,
+                    snoozeMinutes = snoozeMin,
+                    vibrate = vib,
                     enabled = true
                 )
                 val id = alarmRepo.insertAlarm(alarm)
                 scheduler.scheduleAlarm(alarm.copy(id = id))
+                val extra = buildString {
+                    if (method != DismissMethod.EASY) append(" • ${method.name}")
+                    if (snoozeOn) append(" • snooze ${snoozeMin}m")
+                }
                 _messages.value = _messages.value + AiMessage("info",
-                    "Alarm set: \"$label\" at $timeStr.")
+                    "Alarm set: \"$label\" at $timeStr$extra.")
             }
             else -> {
                 val reply = json.optString("reply").trim().ifBlank { "…" }
