@@ -210,7 +210,36 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.height(10.dp))
 
-            Text("APP LIST", color = PrimaryManaBlue, fontSize = 11.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "APP LIST",
+                    color = PrimaryManaBlue,
+                    fontSize = 11.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(DarkCard)
+                        .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
+                        .clickable {
+                            scope.launch {
+                                val all = allApps
+                                    .filter { it.pkg != "com.neurasamu.build.sl_tasker" }
+                                    .filterNot { it.pkg in PROTECTED_PACKAGES }
+                                    .map { it.pkg }
+                                    .toSet()
+                                prefs.setSelected(all)
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text("SELECT ALL", color = PrimaryManaBlue, fontSize = 10.sp)
+                }
+            }
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = query,
@@ -246,7 +275,8 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 items(items = filtered, key = { it.pkg }) { row ->
-                    val isChecked = row.pkg in s.selectedPackages
+                    val isSelf = row.pkg == "com.neurasamu.build.sl_tasker"
+                    val isChecked = isSelf || row.pkg in s.selectedPackages
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -257,13 +287,18 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(row.label, color = TextPrimary, fontSize = 12.sp)
+                            Text(
+                                if (isSelf) "SL Tasker (LOCKED)" else row.label,
+                                color = if (isSelf) PrimaryManaBlue else TextPrimary,
+                                fontSize = 12.sp
+                            )
                             Text(row.pkg, color = TextMuted, fontSize = 9.sp, maxLines = 1)
                         }
                         Switch(
                             checked = isChecked,
+                            enabled = !isSelf,
                             onCheckedChange = { on ->
-                                scope.launch { prefs.togglePackage(row.pkg, on) }
+                                if (!isSelf) scope.launch { prefs.togglePackage(row.pkg, on) }
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = DarkCard,
@@ -299,11 +334,13 @@ private fun loadInstalledApps(context: Context): List<AppRow> {
     return list
         .mapNotNull { info ->
             val pkg = info.activityInfo?.packageName ?: return@mapNotNull null
-            if (pkg in PROTECTED_PACKAGES) return@mapNotNull null
             AppRow(pkg = pkg, label = info.loadLabel(pm).toString())
         }
         .distinctBy { it.pkg }
-        .sortedBy { it.label.lowercase() }
+        .sortedBy {
+            // SL Tasker always first
+            if (it.pkg == "com.neurasamu.build.sl_tasker") "" else it.label.lowercase()
+        }
 }
 
 private fun isAccessibilityEnabled(context: Context): Boolean {

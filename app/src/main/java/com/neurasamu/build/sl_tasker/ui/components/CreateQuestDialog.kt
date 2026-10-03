@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,8 +71,10 @@ fun CreateQuestDialog(
     }
     val initHour = (initialTask?.reminderMinutesOfDay ?: 420) / 60
     val initMinute = (initialTask?.reminderMinutesOfDay ?: 420) % 60
-    var hourText by remember { mutableStateOf("%02d".format(initHour)) }
+    var hourText by remember { mutableStateOf("%02d".format(if (initHour % 12 == 0) 12 else initHour % 12)) }
     var minuteText by remember { mutableStateOf("%02d".format(initMinute)) }
+    var is24h by remember { mutableStateOf(false) }
+    var amPm by remember { mutableStateOf(if (initHour < 12) "AM" else "PM") }
     var selectedDays by remember {
         mutableStateOf(
             initialTask?.customRepeatDays
@@ -232,7 +235,37 @@ fun CreateQuestDialog(
                 }
                 }
 
-                SectionLabel("TIME (24h)")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionLabel("TIME")
+                    Spacer(Modifier.width(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(DarkSurface)
+                            .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
+                    ) {
+                        listOf(false to "12h", true to "24h").forEach { (flag, label) ->
+                            val sel = is24h == flag
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                    .clickable { is24h = flag }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    label,
+                                    color = if (sel) PrimaryManaBlue else TextMuted,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -241,10 +274,9 @@ fun CreateQuestDialog(
                     OutlinedTextField(
                         value = hourText,
                         onValueChange = { v ->
-                            val digits = v.filter { it.isDigit() }.take(2)
-                            hourText = digits
+                            hourText = v.filter { it.isDigit() }.take(2)
                         },
-                        label = { Text("HH") },
+                        label = { Text(if (is24h) "HH" else "HH (1-12)") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
@@ -261,8 +293,7 @@ fun CreateQuestDialog(
                     OutlinedTextField(
                         value = minuteText,
                         onValueChange = { v ->
-                            val digits = v.filter { it.isDigit() }.take(2)
-                            minuteText = digits
+                            minuteText = v.filter { it.isDigit() }.take(2)
                         },
                         label = { Text("MM") },
                         singleLine = true,
@@ -277,6 +308,31 @@ fun CreateQuestDialog(
                             unfocusedLabelColor = TextMuted
                         )
                     )
+                    if (!is24h) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(DarkSurface)
+                                .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
+                        ) {
+                            listOf("AM", "PM").forEach { label ->
+                                val sel = amPm == label
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                        .clickable { amPm = label }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        label,
+                                        color = if (sel) PrimaryManaBlue else TextMuted,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if (requiresTimer) {
@@ -306,8 +362,18 @@ fun CreateQuestDialog(
                 (!requiresTimer || (durationText.toIntOrNull() ?: 0) > 0)
             Button(
                 onClick = {
-                    val hh = (hourText.toIntOrNull() ?: 0).coerceIn(0, 23)
+                    val rawH = (hourText.toIntOrNull() ?: 0)
                     val mm = (minuteText.toIntOrNull() ?: 0).coerceIn(0, 59)
+                    val hh = if (is24h) {
+                        rawH.coerceIn(0, 23)
+                    } else {
+                        val h12 = if (rawH == 0) 12 else rawH.coerceIn(1, 12)
+                        when {
+                            amPm == "AM" && h12 == 12 -> 0
+                            amPm == "PM" && h12 != 12 -> h12 + 12
+                            else -> h12
+                        }
+                    }
                     val minutes = hh * 60 + mm
                     val csv = if (isRepeat) selectedDays.sorted().joinToString(",") else ""
                     val dur = if (requiresTimer) durationText.toIntOrNull() ?: 0 else 0

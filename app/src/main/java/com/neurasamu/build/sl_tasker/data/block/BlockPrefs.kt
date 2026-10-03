@@ -32,6 +32,7 @@ data class BlockState(
 class BlockPrefs(private val context: Context) {
 
     private val keyMode = stringPreferencesKey("mode")
+    private val keyCritical = booleanPreferencesKey("critical_active")
     private val keySelected = stringPreferencesKey("selected")
 
     val state: Flow<BlockState> = context.blockDataStore.data.map { p ->
@@ -40,8 +41,14 @@ class BlockPrefs(private val context: Context) {
         BlockState(mode, pkgs)
     }
 
+    val criticalActive: Flow<Boolean> = context.blockDataStore.data.map { it[keyCritical] ?: false }
+
     suspend fun setMode(mode: BlockMode) {
         context.blockDataStore.edit { it[keyMode] = mode.name }
+    }
+
+    suspend fun setCriticalActive(on: Boolean) {
+        context.blockDataStore.edit { it[keyCritical] = on }
     }
 
     suspend fun setSelected(packages: Set<String>) {

@@ -39,6 +39,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -62,6 +63,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
+import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
 import com.neurasamu.build.sl_tasker.ui.theme.SoloLevelingTheme
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.viewmodel.AlarmViewModel
@@ -127,6 +129,8 @@ fun MainAppScaffold(
     )
     val context = LocalContext.current
     var showSettings by remember { mutableStateOf(false) }
+    val blockPrefs = remember { BlockPrefs(context) }
+    val criticalActive by blockPrefs.criticalActive.collectAsState(initial = false)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -143,7 +147,13 @@ fun MainAppScaffold(
                 actions = {
                     if (selectedTabIndex == 3) {
                         IconButton(
-                            onClick = { showSettings = true },
+                            onClick = {
+                                if (criticalActive) {
+                                    Toast.makeText(context, "Critical task in progress", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    showSettings = true
+                                }
+                            },
                             modifier = Modifier
                                 .padding(end = 4.dp)
                                 .size(44.dp)
@@ -151,7 +161,7 @@ fun MainAppScaffold(
                             Icon(
                                 imageVector = Icons.Rounded.Settings,
                                 contentDescription = "Block System Settings",
-                                tint = PrimaryManaBlue,
+                                tint = if (criticalActive) com.neurasamu.build.sl_tasker.ui.theme.TextMuted else PrimaryManaBlue,
                                 modifier = Modifier.size(24.dp)
                             )
                         }

@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,9 +30,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
 import com.neurasamu.build.sl_tasker.ui.components.CreateQuestDialog
 import com.neurasamu.build.sl_tasker.ui.components.HunterHud
 import com.neurasamu.build.sl_tasker.ui.components.QuestCard
@@ -55,6 +58,9 @@ fun DashboardScreen(
     var editingTask by remember { mutableStateOf<com.neurasamu.build.sl_tasker.data.model.TaskEntity?>(null) }
     var timerItem by remember { mutableStateOf<com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem?>(null) }
     var subTab by remember { mutableStateOf(0) }
+    val ctx = LocalContext.current
+    val blockPrefs = remember { BlockPrefs(ctx) }
+    val scope = rememberCoroutineScope()
     val completedQuests by taskViewModel.completedQuests.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -161,7 +167,12 @@ fun DashboardScreen(
                             onComplete = {
                                 taskViewModel.completeQuest(item.occurrence.id)
                             },
-                            onStart = { timerItem = item },
+                            onStart = {
+                                timerItem = item
+                                if (item.task.difficulty == com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL) {
+                                    scope.launch { blockPrefs.setCriticalActive(true) }
+                                }
+                            },
                             onEdit = { editingTask = item.task },
                             onDelete = { taskViewModel.deleteTask(item.task.id) }
                         )
@@ -200,9 +211,17 @@ fun DashboardScreen(
             accentColor = accent,
             onFinish = {
                 taskViewModel.completeQuest(item.occurrence.id)
+                if (item.task.difficulty == com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL) {
+                    scope.launch { blockPrefs.setCriticalActive(false) }
+                }
                 timerItem = null
             },
-            onCancel = { timerItem = null }
+            onCancel = {
+                if (item.task.difficulty == com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL) {
+                    scope.launch { blockPrefs.setCriticalActive(false) }
+                }
+                timerItem = null
+            }
         )
     }
 

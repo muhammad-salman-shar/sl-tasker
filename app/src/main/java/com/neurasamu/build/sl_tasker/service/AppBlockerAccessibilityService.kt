@@ -6,6 +6,7 @@ import android.view.accessibility.AccessibilityEvent
 import com.neurasamu.build.sl_tasker.data.block.BlockMode
 import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
 import com.neurasamu.build.sl_tasker.data.block.PROTECTED_PACKAGES
+import com.neurasamu.build.sl_tasker.data.db.AppDatabase
 import com.neurasamu.build.sl_tasker.ui.block.BlockOverlayActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,49 +19,66 @@ class AppBlockerAccessibilityService : AccessibilityService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var blockPrefs: BlockPrefs
-    private var lastBlockedAt = 0L
+    private lateinit var database: AppDatabase
+
+    private var lastCheckAt = 0L
     private var lastBlockedPkg: String? = null
+    private var lastBlockedAt = 0L
 
     override fun onCreate() {
         super.onCreate()
         blockPrefs = BlockPrefs(applicationContext)
+        database = AppDatabase.getInstance(applicationContext)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            event.eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
+        val type = event.eventType
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
 
-        val targetPackage = event.packageName?.toString() ?: return
-        if (targetPackage == packageName) return
-        if (targetPackage in PROTECTED_PACKAGES) return
+        val pkg = event.packageName?.toString() ?: return
+        if (pkg == packageName) return
+        if (pkg in PROTECTED_PACKAGES) return
+
+        val now = System.currentTimeMillis()
+        if (now - lastCheckAt < 250L) return
+        lastCheckAt = now
 
         serviceScope.launch {
             try {
                 val state = blockPrefs.state.first()
-                val shouldBlock = when (state.mode) {
-                    BlockMode.OFF -> false
-                    BlockMode.TEST -> targetPackage in state.selectedPackages
-                    BlockMode.STRICT -> true
+                val criticalActive = blockPrefs.criticalActive.first()
+                val stats = database.playerStatsDao().getPlayerStats()
+                val healthLow = (stats?.health ?: 100) <= 30
+
+                val testOn = state.mode == BlockMode.TEST
+                val strictOn = state.mode == BlockMode.STRICT
+
+                val triggered = criticalActive || healthLow || testOn
+                if (!triggered) return@launch
+
+                val shouldBlock = when {
+                    testOn -> pkg in state.selectedPackages
+                    strictOn -> true
+                    else -> pkg in state.selectedPackages
                 }
                 if (!shouldBlock) return@launch
 
-                val now = System.currentTimeMillis()
-                if (targetPackage == lastBlockedPkg && now - lastBlockedAt < 400L) return@launch
-                lastBlockedPkg = targetPackage
-                lastBlockedAt = now
+                val t = System.currentTimeMillis()
+                if (pkg == lastBlockedPkg && t - lastBlockedAt < 600L) return@launch
+                lastBlockedPkg = pkg
+                lastBlockedAt = t
 
-                performGlobalAction(GLOBAL_ACTION_HOME)
-
-                val intent = Intent(applicationContext, BlockOverlayActivity::class.java)
-                    .addFlags(
-                        Intent.FLAG_ACTIVITY_NEW_TASK
-                            or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                            or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    )
-                    .putExtra("blocked_pkg", targetPackage)
+                val intent = Intent(applicationContext, BlockOverlayActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                    putExtra("blocked_pkg", pkg)
+                }
                 applicationContext.startActivity(intent)
-            } catch (_: Exception) {
+            } catch (_: Throwable) {
             }
         }
     }
