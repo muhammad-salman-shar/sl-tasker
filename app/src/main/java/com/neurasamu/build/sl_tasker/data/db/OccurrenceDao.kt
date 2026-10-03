@@ -41,4 +41,7 @@ interface OccurrenceDao {
 
     @Query("SELECT * FROM occurrences WHERE taskId = :taskId AND status = 'PENDING'")
     suspend fun getPendingByTask(taskId: Long): List<com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity>
+
+    @Query("DELETE FROM occurrences WHERE id = :id")
+    suspend fun deleteOccurrenceById(id: Long)
 }
