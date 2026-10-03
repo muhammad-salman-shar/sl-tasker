@@ -1,6 +1,8 @@
 package com.neurasamu.build.sl_tasker.ui.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -49,6 +52,8 @@ fun DashboardScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var editingTask by remember { mutableStateOf<com.neurasamu.build.sl_tasker.data.model.TaskEntity?>(null) }
     var timerItem by remember { mutableStateOf<com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem?>(null) }
+    var subTab by remember { mutableStateOf(0) }
+    val completedQuests by taskViewModel.completedQuests.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -81,15 +86,41 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "ACTIVE QUEST LOG",
-                style = MaterialTheme.typography.labelLarge,
-                color = PrimaryManaBlue
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                    .background(DarkCard)
+                    .border(1.dp, com.neurasamu.build.sl_tasker.ui.theme.DarkBorder, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf("ALL TASKS", "COMPLETED").forEachIndexed { idx, label ->
+                    val sel = subTab == idx
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .background(if (sel) PrimaryManaBlue.copy(alpha = 0.15f) else DarkCard)
+                            .border(1.dp, if (sel) PrimaryManaBlue else com.neurasamu.build.sl_tasker.ui.theme.DarkBorder, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .clickable { subTab = idx }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (sel) PrimaryManaBlue else TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            if (activeQuests.isEmpty()) {
+            val currentList = if (subTab == 0) activeQuests else completedQuests
+            if (currentList.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -119,7 +150,7 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(
-                        items = activeQuests,
+                        items = currentList,
                         key = { it.occurrence.id }
                     ) { item ->
                         QuestCard(

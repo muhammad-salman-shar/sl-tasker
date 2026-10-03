@@ -34,4 +34,7 @@ interface TaskDao {
 
     @Query("DELETE FROM occurrences WHERE taskId = :taskId")
     suspend fun deleteOccurrencesForTask(taskId: Long)
+
+    @Query("DELETE FROM occurrences WHERE id = :occurrenceId")
+    suspend fun deleteOccurrenceById(occurrenceId: Long)
 }

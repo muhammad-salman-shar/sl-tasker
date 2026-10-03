@@ -32,6 +32,21 @@ class TaskViewModel(
     private val alarmScheduler: AlarmScheduler
 ) : AndroidViewModel(application) {
 
+    val completedQuests: StateFlow<List<TaskOccurrenceItem>> = combine(
+        taskRepository.observeOccurrencesByStatus(listOf(OccurrenceStatus.COMPLETED)),
+        taskRepository.getAllTasks()
+    ) { occurrences, tasks ->
+        val taskMap = tasks.associateBy { it.id }
+        occurrences.mapNotNull { occurrence ->
+            val task = taskMap[occurrence.taskId] ?: return@mapNotNull null
+            TaskOccurrenceItem(task = task, occurrence = occurrence)
+        }.sortedByDescending { it.occurrence.completedAt }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
     val activeQuests: StateFlow<List<TaskOccurrenceItem>> = combine(
         taskRepository.observeOccurrencesByStatus(listOf(OccurrenceStatus.PENDING)),
         taskRepository.getAllActiveTasks()
@@ -100,10 +115,7 @@ class TaskViewModel(
             cal.set(java.util.Calendar.MINUTE, reminderMinutesOfDay % 60)
             cal.set(java.util.Calendar.SECOND, 0)
             cal.set(java.util.Calendar.MILLISECOND, 0)
-            var scheduledAt = cal.timeInMillis
-            if (scheduledAt <= System.currentTimeMillis()) {
-                scheduledAt += 24L * 60 * 60 * 1000
-            }
+            val scheduledAt = cal.timeInMillis
             val deadlineAt = scheduledAt + durationMinutes * 60 * 1000L
 
             val task = TaskEntity(
@@ -111,7 +123,7 @@ class TaskViewModel(
                 description = description,
                 priority = Priority.MEDIUM,
                 difficulty = difficulty,
-                repeatRule = RepeatRule.CUSTOM,
+                repeatRule = if (customRepeatDays.isBlank()) RepeatRule.ONCE else RepeatRule.CUSTOM,
                 customRepeatDays = customRepeatDays,
                 durationMinutes = durationMinutes,
                 reminderMinutesOfDay = reminderMinutesOfDay

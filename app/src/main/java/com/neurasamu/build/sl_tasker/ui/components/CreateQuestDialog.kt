@@ -82,6 +82,9 @@ fun CreateQuestDialog(
                 ?.toSet() ?: emptySet()
         )
     }
+    var isRepeat by remember {
+        mutableStateOf(initialTask?.repeatRule != com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE)
+    }
 
     val difficultyColor = when (difficulty) {
         Difficulty.MEDIUM -> RankC
@@ -172,6 +175,34 @@ fun CreateQuestDialog(
                     }
                 }
 
+                SectionLabel("SCHEDULE")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(false to "Single", true to "Repeat").forEach { (flag, label) ->
+                        val isSel = isRepeat == flag
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                .border(1.dp, if (isSel) PrimaryManaBlue else DarkBorder, RoundedCornerShape(6.dp))
+                                .clickable { isRepeat = flag }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSel) PrimaryManaBlue else TextMuted,
+                                fontSize = 11.sp,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+
+                if (isRepeat) {
                 SectionLabel("DAYS (pick one or more)")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -198,6 +229,7 @@ fun CreateQuestDialog(
                             )
                         }
                     }
+                }
                 }
 
                 SectionLabel("TIME")
@@ -226,12 +258,12 @@ fun CreateQuestDialog(
         },
         confirmButton = {
             val valid = title.isNotBlank() &&
-                selectedDays.isNotEmpty() &&
+                (!isRepeat || selectedDays.isNotEmpty()) &&
                 (!requiresTimer || (durationText.toIntOrNull() ?: 0) > 0)
             Button(
                 onClick = {
                     val minutes = timeState.hour * 60 + timeState.minute
-                    val csv = selectedDays.sorted().joinToString(",")
+                    val csv = if (isRepeat) selectedDays.sorted().joinToString(",") else ""
                     val dur = if (requiresTimer) durationText.toIntOrNull() ?: 0 else 0
                     onConfirm(title, description, difficulty, minutes, csv, dur)
                 },

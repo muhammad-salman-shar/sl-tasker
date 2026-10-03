@@ -56,6 +56,7 @@ class TaskRepository(private val database: AppDatabase) {
     suspend fun completeOccurrence(occurrenceId: Long): Boolean = withContext(Dispatchers.IO) {
         database.withTransaction {
             val occurrence = occurrenceDao.getOccurrenceById(occurrenceId) ?: return@withTransaction false
+            if (occurrence.scheduledAt > System.currentTimeMillis()) return@withTransaction false
             val task = taskDao.getTaskById(occurrence.taskId) ?: return@withTransaction false
             val currentStats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
 
@@ -94,21 +95,25 @@ class TaskRepository(private val database: AppDatabase) {
 
             taskDebtDao.resolveDebt(occurrenceId)
 
-            val nextScheduled = RecurrenceHelper.calculateNextOccurrence(
-                baseScheduledAt = occurrence.scheduledAt,
-                repeatRule = task.repeatRule,
-                customRepeatDays = task.customRepeatDays
-            )
-            if (nextScheduled != null) {
-                val durationMillis = task.durationMinutes * 60 * 1000L
-                occurrenceDao.insertOccurrence(
-                    OccurrenceEntity(
-                        taskId = task.id,
-                        scheduledAt = nextScheduled,
-                        deadlineAt = nextScheduled + durationMillis,
-                        durationMinutes = task.durationMinutes
-                    )
+            if (task.repeatRule == com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE) {
+                taskDao.archiveTask(task.id)
+            } else {
+                val nextScheduled = RecurrenceHelper.calculateNextOccurrence(
+                    baseScheduledAt = occurrence.scheduledAt,
+                    repeatRule = task.repeatRule,
+                    customRepeatDays = task.customRepeatDays
                 )
+                if (nextScheduled != null) {
+                    val durationMillis = task.durationMinutes * 60 * 1000L
+                    occurrenceDao.insertOccurrence(
+                        OccurrenceEntity(
+                            taskId = task.id,
+                            scheduledAt = nextScheduled,
+                            deadlineAt = nextScheduled + durationMillis,
+                            durationMinutes = task.durationMinutes
+                        )
+                    )
+                }
             }
 
             if (task.priority == Priority.CRITICAL && currentStats.criticalActiveOccurrenceId == occurrenceId) {
