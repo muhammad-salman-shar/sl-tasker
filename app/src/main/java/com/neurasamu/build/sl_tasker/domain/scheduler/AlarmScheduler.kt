@@ -60,21 +60,63 @@ class AlarmScheduler(private val context: Context) {
     }
 
     fun scheduleReminder(occurrenceId: Long, triggerAtMillis: Long, taskTitle: String) {
-        if (triggerAtMillis <= System.currentTimeMillis()) return
+        // Allow trigger up to 5 seconds in the past (race condition when user creates task)
+        if (triggerAtMillis + 5_000L < System.currentTimeMillis()) return
 
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra("OCCURRENCE_ID", occurrenceId)
             putExtra("TASK_TITLE", taskTitle)
         }
 
+        val requestCode = (occurrenceId + 100_000).toInt()
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            (occurrenceId + 100_000).toInt(),
+            requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Cancel any existing first
+        alarmManager.cancel(pendingIntent)
+
+        val showIntent = Intent(context, com.neurasamu.build.sl_tasker.ui.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("OCCURRENCE_ID", occurrenceId)
+        }
+        val showPending = PendingIntent.getActivity(
+            context,
+            requestCode + 1,
+            showIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Primary: setAlarmClock — strongest mode, bypasses Doze, shows status bar icon
+        try {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(triggerAtMillis, showPending),
+                pendingIntent
+            )
+            return
+        } catch (_: SecurityException) {
+        } catch (_: Throwable) {
+        }
+
+        // Fallback
         scheduleExact(triggerAtMillis, pendingIntent)
+    }
+
+    fun cancelReminder(occurrenceId: Long) {
+        val intent = Intent(context, ReminderReceiver::class.java)
+        val pi = PendingIntent.getBroadcast(
+            context,
+            (occurrenceId + 100_000).toInt(),
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (pi != null) {
+            alarmManager.cancel(pi)
+            pi.cancel()
+        }
     }
 
     private fun scheduleExact(triggerAtMillis: Long, pendingIntent: PendingIntent) {
