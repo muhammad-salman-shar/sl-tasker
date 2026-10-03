@@ -76,6 +76,8 @@ import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
 import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
 import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.neurasamu.build.sl_tasker.ui.ai.AiSheet
+import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
 
@@ -153,6 +155,7 @@ fun MainAppScaffold(
         }
     }
     var showSettings by remember { mutableStateOf(false) }
+    var showAiSheet by remember { mutableStateOf(false) }
     val blockPrefs = remember { BlockPrefs(context) }
     val criticalActive by blockPrefs.criticalActive.collectAsState(initial = false)
     val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
@@ -203,9 +206,7 @@ fun MainAppScaffold(
                             .clip(CircleShape)
                             .background(DarkCard)
                             .border(1.dp, DarkBorder, CircleShape)
-                            .clickable {
-                                Toast.makeText(context, "AI Hub coming soon", Toast.LENGTH_SHORT).show()
-                            },
+                            .clickable { showAiSheet = true },
                         contentAlignment = Alignment.Center
                     ) {
                         AiHubLogo(size = 34.dp)
@@ -296,6 +297,25 @@ fun MainAppScaffold(
 
     if (showSettings) {
         PlayerSettingsScreen(onClose = { showSettings = false })
+    }
+
+    if (showAiSheet) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable { showAiSheet = false },
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+                    .clickable(enabled = false) { }
+            ) {
+                AiSheet(onClose = { showAiSheet = false })
+            }
+        }
     }
 }
 
