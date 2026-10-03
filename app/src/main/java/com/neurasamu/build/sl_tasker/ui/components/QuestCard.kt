@@ -68,7 +68,7 @@ fun QuestCard(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val dateFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    val deadlineStr = dateFormat.format(Date(occurrence.deadlineAt))
+    val scheduledStr = dateFormat.format(Date(occurrence.scheduledAt))
 
     val priorityColor = when (task.priority) {
         Priority.CRITICAL -> DangerPenaltyRed
@@ -151,7 +151,7 @@ fun QuestCard(
                 }
 
                 Text(
-                    text = "DUE: $deadlineStr",
+                    text = "AT: $scheduledStr",
                     style = MaterialTheme.typography.labelSmall,
                     color = TextMuted
                 )

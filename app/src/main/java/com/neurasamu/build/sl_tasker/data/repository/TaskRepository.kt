@@ -39,7 +39,7 @@ class TaskRepository(private val database: AppDatabase) {
         task: TaskEntity,
         scheduledAt: Long,
         deadlineAt: Long
-    ): Long = withContext(Dispatchers.IO) {
+    ): Pair<Long, Long> = withContext(Dispatchers.IO) {
         database.withTransaction {
             val taskId = taskDao.insertTask(task)
             val occurrence = OccurrenceEntity(
@@ -48,8 +48,8 @@ class TaskRepository(private val database: AppDatabase) {
                 deadlineAt = deadlineAt,
                 durationMinutes = task.durationMinutes
             )
-            occurrenceDao.insertOccurrence(occurrence)
-            taskId
+            val occId = occurrenceDao.insertOccurrence(occurrence)
+            Pair(taskId, occId)
         }
     }
 

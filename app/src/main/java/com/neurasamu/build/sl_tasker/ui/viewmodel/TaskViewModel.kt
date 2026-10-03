@@ -115,7 +115,10 @@ class TaskViewModel(
             cal.set(java.util.Calendar.MINUTE, reminderMinutesOfDay % 60)
             cal.set(java.util.Calendar.SECOND, 0)
             cal.set(java.util.Calendar.MILLISECOND, 0)
-            val scheduledAt = cal.timeInMillis
+            var scheduledAt = cal.timeInMillis
+            if (scheduledAt <= System.currentTimeMillis()) {
+                scheduledAt += 24L * 60 * 60 * 1000
+            }
             val deadlineAt = scheduledAt + durationMinutes * 60 * 1000L
 
             val task = TaskEntity(
@@ -128,10 +131,8 @@ class TaskViewModel(
                 durationMinutes = durationMinutes,
                 reminderMinutesOfDay = reminderMinutesOfDay
             )
-            val taskId = taskRepository.createTaskWithOccurrence(task, scheduledAt, deadlineAt)
-            if (scheduledAt > System.currentTimeMillis()) {
-                alarmScheduler.scheduleReminder(taskId, scheduledAt, title)
-            }
+            val (_, occurrenceId) = taskRepository.createTaskWithOccurrence(task, scheduledAt, deadlineAt)
+            alarmScheduler.scheduleReminder(occurrenceId, scheduledAt, title)
         }
     }
 

@@ -1,6 +1,10 @@
 package com.neurasamu.build.sl_tasker.ui
 
 import android.Manifest
+import android.app.AlarmManager
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -38,6 +42,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +74,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.viewmodel.AlarmViewModel
 import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
 import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
@@ -105,6 +111,17 @@ class MainActivity : ComponentActivity() {
                 requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val am = getSystemService(AlarmManager::class.java)
+            if (am != null && !am.canScheduleExactAlarms()) {
+                try {
+                    val i = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                    i.data = Uri.parse("package:$packageName")
+                    startActivity(i)
+                } catch (_: Exception) {
+                }
+            }
+        }
     }
 }
 
@@ -128,6 +145,10 @@ fun MainAppScaffold(
         TabItem("Player", Icons.Rounded.MilitaryTech),
     )
     val context = LocalContext.current
+    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) { nowMillis = System.currentTimeMillis(); delay(1000L) }
+    }
     var showSettings by remember { mutableStateOf(false) }
     val blockPrefs = remember { BlockPrefs(context) }
     val criticalActive by blockPrefs.criticalActive.collectAsState(initial = false)
@@ -138,11 +159,22 @@ fun MainAppScaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = tabs[selectedTabIndex].title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = PrimaryManaBlue
-                    )
+                    val sdf = java.text.SimpleDateFormat("hh:mm:ss a", java.util.Locale.getDefault())
+                    val sdfDate = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+                    val now = java.util.Date(nowMillis)
+                    Column {
+                        Text(
+                            text = tabs[selectedTabIndex].title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = PrimaryManaBlue
+                        )
+                        Text(
+                            text = "${sdf.format(now)}  |  ${sdfDate.format(now)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
+                            fontSize = 10.sp
+                        )
+                    }
                 },
                 actions = {
                     if (selectedTabIndex == 3) {
