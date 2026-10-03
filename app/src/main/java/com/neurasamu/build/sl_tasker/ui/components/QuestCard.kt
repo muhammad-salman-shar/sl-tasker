@@ -62,7 +62,6 @@ fun QuestCard(
         Difficulty.CRITICAL -> DangerPenaltyRed
         Difficulty.HARD -> RankA
         Difficulty.MEDIUM -> RankC
-        Difficulty.MEDIUM -> RankD
     }
 
     Box(
@@ -107,7 +106,7 @@ fun QuestCard(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "${task.difficulty.name} (+${task.difficulty.baseEp} EP)",
+                            text = "${task.difficulty.name} (+${when(task.difficulty){ com.neurasamu.build.sl_tasker.data.model.Difficulty.MEDIUM -> 10; com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> 30; com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> 50 }} EP)",
                             style = MaterialTheme.typography.labelSmall,
                             color = difficultyColor,
                             fontSize = 9.sp
