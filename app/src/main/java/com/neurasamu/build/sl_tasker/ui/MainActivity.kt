@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.neurasamu.build.sl_tasker.ui.alarm.AlarmScreen
 import com.neurasamu.build.sl_tasker.ui.components.AiHubLogo
-import com.neurasamu.build.sl_tasker.ui.dashboard.DashboardScreen
+import com.neurasamu.build.sl_tasker.ui.components.HeartWebView
 import com.neurasamu.build.sl_tasker.ui.stats.StatsScreen
 import com.neurasamu.build.sl_tasker.ui.tasks.TasksScreen
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
@@ -215,11 +215,11 @@ fun MainAppScaffold(
                 .padding(innerPadding)
         ) {
             when (selectedTabIndex) {
-                0 -> DashboardScreen(
+                0 -> HeartWebView()
+                1 -> TasksScreen(
                     taskViewModel = taskViewModel,
                     statsViewModel = statsViewModel
                 )
-                1 -> TasksScreen()
                 2 -> AlarmScreen(
                     alarmViewModel = alarmViewModel
                 )

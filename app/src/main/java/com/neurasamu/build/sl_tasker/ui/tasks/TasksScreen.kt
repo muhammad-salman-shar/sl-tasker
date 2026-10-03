@@ -1,24 +1,20 @@
 package com.neurasamu.build.sl_tasker.ui.tasks
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
+import com.neurasamu.build.sl_tasker.ui.dashboard.DashboardScreen
+import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
+import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
 
 @Composable
-fun TasksScreen(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Tasks — coming soon",
-            style = MaterialTheme.typography.bodyLarge,
-            color = TextMuted
-        )
-    }
+fun TasksScreen(
+    taskViewModel: TaskViewModel,
+    statsViewModel: StatsViewModel,
+    modifier: Modifier = Modifier
+) {
+    DashboardScreen(
+        taskViewModel = taskViewModel,
+        statsViewModel = statsViewModel,
+        modifier = modifier
+    )
 }
