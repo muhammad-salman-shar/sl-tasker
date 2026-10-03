@@ -1,5 +1,13 @@
 package com.neurasamu.build.sl_tasker.ui.stats
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,11 +20,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,13 +33,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.neurasamu.build.sl_tasker.data.model.EventEntity
-import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
-import com.neurasamu.build.sl_tasker.data.model.RecoveryQuestEntity
-import com.neurasamu.build.sl_tasker.data.model.TaskDebtEntity
+import com.neurasamu.build.sl_tasker.data.model.EventType
+import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
@@ -38,6 +51,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.GoldWarning
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
+import com.neurasamu.build.sl_tasker.ui.theme.RankA
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
@@ -54,8 +68,10 @@ fun StatsScreen(
 ) {
     val stats by statsViewModel.playerStats.collectAsStateWithLifecycle()
     val events by statsViewModel.recentEvents.collectAsStateWithLifecycle()
-    val recoveryQuests by statsViewModel.recoveryQuests.collectAsStateWithLifecycle()
-    val debts by statsViewModel.unresolvedDebts.collectAsStateWithLifecycle()
+
+    val healthProgress = (stats.health.coerceIn(0, 100)) / 100f
+    val epProgress = (stats.ep.coerceIn(0, GamificationEngine.EP_PER_LEVEL)).toFloat() /
+            GamificationEngine.EP_PER_LEVEL.toFloat()
 
     LazyColumn(
         modifier = modifier
@@ -63,59 +79,84 @@ fun StatsScreen(
             .background(DarkBackground)
             .padding(horizontal = 16.dp),
         contentPadding = PaddingValues(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
             Text(
-                text = "HUNTER STATUS WINDOW",
+                text = "HUNTER PROFILE",
                 style = MaterialTheme.typography.titleLarge,
-                color = PrimaryManaBlue
+                color = PrimaryManaBlue,
+                letterSpacing = 2.sp
             )
             Text(
-                text = "Permanent progression records and disciplinary debt audit",
+                text = "Permanent progression record",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextMuted
             )
         }
 
         item {
-            StatsOverviewCard(stats = stats)
+            RankBanner(
+                level = stats.level,
+                streak = stats.streak
+            )
         }
 
-        if (recoveryQuests.isNotEmpty()) {
-            item {
-                Text(
-                    text = "REDEMPTION QUESTS",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = DangerPenaltyRed
-                )
-            }
-            items(recoveryQuests, key = { it.id }) { quest ->
-                RecoveryQuestCard(
-                    quest = quest,
-                    onComplete = { statsViewModel.completeRecovery(quest.id) }
-                )
-            }
+        item {
+            ProgressCard(
+                label = "HEALTH",
+                value = "${stats.health} / 100",
+                progress = healthProgress,
+                color = when {
+                    stats.health <= 30 -> DangerPenaltyRed
+                    stats.health <= 70 -> GoldWarning
+                    else -> SuccessGreen
+                }
+            )
         }
 
-        if (debts.isNotEmpty()) {
-            item {
-                Text(
-                    text = "ACCUMULATED TASK DEBTS",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = GoldWarning
+        item {
+            ProgressCard(
+                label = "ENERGY",
+                value = "${stats.ep} / ${GamificationEngine.EP_PER_LEVEL} EP",
+                progress = epProgress,
+                color = PrimaryManaBlue
+            )
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StatTile(
+                    label = "COMPLETED",
+                    value = "${stats.totalCompleted}",
+                    color = SuccessGreen,
+                    modifier = Modifier.weight(1f)
                 )
-            }
-            items(debts, key = { it.id }) { debt ->
-                DebtCard(debt = debt)
+                StatTile(
+                    label = "MISSED",
+                    value = "${stats.totalMissed}",
+                    color = DangerPenaltyRed,
+                    modifier = Modifier.weight(1f)
+                )
+                StatTile(
+                    label = "RECOVERIES",
+                    value = "${stats.totalRecoveries}",
+                    color = RankA,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
         item {
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = "SYSTEM AUDIT LOG",
+                text = "RECENT ACTIVITY",
                 style = MaterialTheme.typography.labelLarge,
-                color = PrimaryManaBlue
+                color = PrimaryManaBlue,
+                fontSize = 12.sp
             )
         }
 
@@ -124,154 +165,282 @@ fun StatsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(DarkCard)
+                        .border(1.dp, DarkBorder, RoundedCornerShape(10.dp))
                         .padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No system events logged yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextMuted
+                        text = "No activity yet. Complete a quest to begin.",
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
         } else {
-            items(events, key = { it.id }) { event ->
-                EventLogCard(event = event)
+            items(items = events.take(15), key = { it.id }) { event ->
+                EventRow(event)
             }
         }
     }
 }
 
 @Composable
-private fun StatsOverviewCard(stats: PlayerStatsEntity) {
-    Box(
+private fun RankBanner(level: Int, streak: Int) {
+    val rank = when {
+        level >= 20 -> "S"
+        level >= 15 -> "A"
+        level >= 10 -> "B"
+        level >= 5 -> "C"
+        level >= 3 -> "D"
+        else -> "E"
+    }
+    val rankColor = when (rank) {
+        "S" -> com.neurasamu.build.sl_tasker.ui.theme.RankS
+        "A" -> RankA
+        "B" -> com.neurasamu.build.sl_tasker.ui.theme.RankB
+        "C" -> com.neurasamu.build.sl_tasker.ui.theme.RankC
+        "D" -> com.neurasamu.build.sl_tasker.ui.theme.RankD
+        else -> com.neurasamu.build.sl_tasker.ui.theme.RankE
+    }
+
+    val transition = rememberInfiniteTransition(label = "rank")
+    val glow by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "rankGlow"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(DarkCard)
+            .border(1.dp, rankColor.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(64.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(64.dp)) {
+                drawCircle(
+                    color = rankColor.copy(alpha = 0.15f * (glow + 0.3f)),
+                    radius = size.minDimension / 2f
+                )
+                drawCircle(
+                    color = rankColor,
+                    radius = size.minDimension / 2f - 2.dp.toPx(),
+                    style = Stroke(width = 2.dp.toPx())
+                )
+            }
+            Text(
+                text = rank,
+                color = rankColor,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black
+            )
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "LEVEL $level",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "RANK $rank HUNTER",
+                color = rankColor,
+                style = MaterialTheme.typography.labelMedium,
+                letterSpacing = 1.sp
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "STREAK",
+                color = TextMuted,
+                fontSize = 10.sp
+            )
+            Text(
+                text = "$streak",
+                color = GoldWarning,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressCard(
+    label: String,
+    value: String,
+    progress: Float,
+    color: Color
+) {
+    val smooth by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(600),
+        label = "progress_$label"
+    )
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(DarkCard)
             .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
-            .padding(16.dp)
+            .padding(14.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                StatMetric(label = "COMPLETED", value = stats.totalCompleted.toString(), color = SuccessGreen)
-                StatMetric(label = "MISSED", value = stats.totalMissed.toString(), color = DangerPenaltyRed)
-                StatMetric(label = "RECOVERIES", value = stats.totalRecoveries.toString(), color = PrimaryManaBlue)
-                StatMetric(label = "STREAK", value = stats.streak.toString(), color = GoldWarning)
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                color = TextSecondary,
+                style = MaterialTheme.typography.labelMedium,
+                letterSpacing = 1.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = value,
+                color = color,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(DarkSurface)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(smooth)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(color)
+            )
         }
     }
 }
 
 @Composable
-private fun StatMetric(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = value, style = MaterialTheme.typography.titleLarge, color = color)
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = TextMuted, fontSize = 9.sp)
+private fun StatTile(
+    label: String,
+    value: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(DarkCard)
+            .border(1.dp, DarkBorder, RoundedCornerShape(10.dp))
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            color = color,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label,
+            color = TextMuted,
+            fontSize = 9.sp,
+            letterSpacing = 0.5.sp
+        )
     }
 }
 
 @Composable
-private fun RecoveryQuestCard(quest: RecoveryQuestEntity, onComplete: () -> Unit) {
-    Box(
+private fun EventRow(event: com.neurasamu.build.sl_tasker.data.model.EventEntity) {
+    val (icon, color, title) = when (event.type) {
+        EventType.OCCURRENCE_COMPLETED -> Triple("+", SuccessGreen, "Quest Completed")
+        EventType.OCCURRENCE_MISSED -> Triple("-", DangerPenaltyRed, "Quest Missed")
+        EventType.PENALTY_APPLIED -> Triple("-", DangerPenaltyRed, "Penalty Applied")
+        EventType.RECOVERY_COMPLETED -> Triple("*", RankA, "Recovery Completed")
+        EventType.LEVEL_UP -> Triple("^", PrimaryManaBlue, "Level Up!")
+    }
+
+    val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(DarkCard)
-            .border(1.dp, DangerPenaltyRed, RoundedCornerShape(10.dp))
-            .padding(12.dp)
+            .border(1.dp, DarkBorder, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = icon,
+                color = color,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1
+            )
+            if (event.note.isNotBlank()) {
                 Text(
-                    text = "RECOVERY PROTOCOL #${quest.id}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DangerPenaltyRed
+                    text = event.note,
+                    color = TextMuted,
+                    fontSize = 10.sp,
+                    maxLines = 1
                 )
-                Text(
-                    text = "Clear to restore +20 HP and escape critical vulnerability status",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-            }
-            Button(
-                onClick = onComplete,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DangerPenaltyRed,
-                    contentColor = TextPrimary
-                ),
-                shape = RoundedCornerShape(6.dp)
-            ) {
-                Text(text = "RESTORE", style = MaterialTheme.typography.labelSmall)
             }
         }
-    }
-}
-
-@Composable
-private fun DebtCard(debt: TaskDebtEntity) {
-    val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
-    val dateStr = dateFormat.format(Date(debt.originalDeadline))
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(DarkCard)
-            .border(1.dp, GoldWarning, RoundedCornerShape(8.dp))
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(text = "UNFULFILLED OBLIGATION", style = MaterialTheme.typography.labelSmall, color = GoldWarning)
-                Text(text = "Original Deadline: $dateStr", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        Column(horizontalAlignment = Alignment.End) {
+            if (event.epDelta != 0) {
+                Text(
+                    text = if (event.epDelta > 0) "+${event.epDelta} EP" else "${event.epDelta} EP",
+                    color = if (event.epDelta > 0) SuccessGreen else DangerPenaltyRed,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-            Text(text = "DEBT ACTIVE", style = MaterialTheme.typography.labelSmall, color = DangerPenaltyRed)
-        }
-    }
-}
-
-@Composable
-private fun EventLogCard(event: EventEntity) {
-    val dateFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    val timeStr = dateFormat.format(Date(event.timestamp))
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(DarkSurface)
-            .border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
-            .padding(10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = event.type.name, style = MaterialTheme.typography.labelSmall, color = PrimaryManaBlue)
-                Text(text = event.note, style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+            if (event.healthDelta != 0) {
+                Text(
+                    text = if (event.healthDelta > 0) "+${event.healthDelta} HP" else "${event.healthDelta} HP",
+                    color = if (event.healthDelta > 0) SuccessGreen else DangerPenaltyRed,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(text = timeStr, style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                if (event.healthDelta != 0) {
-                    val hpColor = if (event.healthDelta > 0) SuccessGreen else DangerPenaltyRed
-                    val sign = if (event.healthDelta > 0) "+" else ""
-                    Text(text = "$sign${event.healthDelta} HP", style = MaterialTheme.typography.labelSmall, color = hpColor)
-                }
-            }
+            Text(
+                text = dateFormat.format(Date(event.timestamp)),
+                color = TextMuted,
+                fontSize = 9.sp
+            )
         }
     }
 }
