@@ -67,6 +67,7 @@ fun AlarmScreen(
 ) {
     val alarms by alarmViewModel.alarms.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingAlarm by remember { mutableStateOf<AlarmEntity?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -146,6 +147,7 @@ fun AlarmScreen(
                             onToggle = { enabled ->
                                 alarmViewModel.toggleAlarm(alarm, enabled)
                             },
+                            onEdit = { editingAlarm = alarm },
                             onDelete = {
                                 alarmViewModel.deleteAlarm(alarm)
                             }
@@ -154,6 +156,28 @@ fun AlarmScreen(
                 }
             }
         }
+    }
+
+    editingAlarm?.let { alarm ->
+        AddAlarmDialog(
+            initialAlarm = alarm,
+            onDismiss = { editingAlarm = null },
+            onConfirm = { hour, minute, label, method, pin, isRepeat, csv, snoozeOn, snoozeMin, vib ->
+                alarmViewModel.updateAlarm(
+                    alarmId = alarm.id,
+                    hour = hour,
+                    minute = minute,
+                    label = label,
+                    dismissMethod = method,
+                    pinCode = pin,
+                    daysCsv = csv,
+                    isRepeat = isRepeat,
+                    snoozeEnabled = snoozeOn,
+                    snoozeMinutes = snoozeMin,
+                    vibrate = vib
+                )
+            }
+        )
     }
 
     if (showAddDialog) {
@@ -181,6 +205,7 @@ fun AlarmScreen(
 private fun AlarmCard(
     alarm: AlarmEntity,
     onToggle: (Boolean) -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val displayHour = if (alarm.hour == 0) 12 else if (alarm.hour > 12) alarm.hour - 12 else alarm.hour
@@ -259,6 +284,13 @@ private fun AlarmCard(
                     )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
+                TextButton(onClick = onEdit) {
+                    Text(
+                        text = "EDIT",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = PrimaryManaBlue
+                    )
+                }
                 TextButton(onClick = onDelete) {
                     Text(
                         text = "DEL",
@@ -273,6 +305,7 @@ private fun AlarmCard(
 
 @Composable
 private fun AddAlarmDialog(
+    initialAlarm: AlarmEntity? = null,
     onDismiss: () -> Unit,
     onConfirm: (
         hour: Int,
@@ -287,18 +320,30 @@ private fun AddAlarmDialog(
         vibrate: Boolean
     ) -> Unit
 ) {
-    var hourText by remember { mutableStateOf("07") }
-    var minuteText by remember { mutableStateOf("00") }
-    var amPm by remember { mutableStateOf("AM") }
+    val isEdit = initialAlarm != null
+    var hourText by remember {
+        val h = initialAlarm?.hour ?: 7
+        mutableStateOf("%02d".format(if (!is24hInitial(initialAlarm)) (if (h % 12 == 0) 12 else h % 12) else h))
+    }
+    var minuteText by remember { mutableStateOf("%02d".format(initialAlarm?.minute ?: 0)) }
+    var amPm by remember { mutableStateOf(if ((initialAlarm?.hour ?: 7) < 12) "AM" else "PM") }
     var is24h by remember { mutableStateOf(false) }
-    var label by remember { mutableStateOf("Wake Up Hunter") }
-    var selectedMethod by remember { mutableStateOf(DismissMethod.EASY) }
-    var pinCode by remember { mutableStateOf("") }
-    var isRepeat by remember { mutableStateOf(false) }
-    var selectedDays by remember { mutableStateOf(setOf<Int>()) }
-    var snoozeEnabled by remember { mutableStateOf(true) }
-    var snoozeText by remember { mutableStateOf("10") }
-    var vibrate by remember { mutableStateOf(true) }
+    var label by remember { mutableStateOf(initialAlarm?.label ?: "Wake Up Hunter") }
+    var selectedMethod by remember { mutableStateOf(initialAlarm?.dismissMethod ?: DismissMethod.EASY) }
+    var pinCode by remember { mutableStateOf(initialAlarm?.pinCode ?: "") }
+    var isRepeat by remember { mutableStateOf(initialAlarm?.repeatRule != RepeatRule.ONCE) }
+    var selectedDays by remember {
+        mutableStateOf(
+            initialAlarm?.customDays
+                ?.split(",")
+                ?.mapNotNull { it.trim().toIntOrNull() }
+                ?.toSet() ?: emptySet()
+        )
+    }
+    var snoozeEnabled by remember { mutableStateOf(initialAlarm?.snoozeEnabled ?: true) }
+    var snoozeText by remember { mutableStateOf((initialAlarm?.snoozeMinutes ?: 10).toString()) }
+    var vibrate by remember { mutableStateOf(initialAlarm?.vibrate ?: true) }
+    var pinError by remember { mutableStateOf("") }
     val dayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
     AlertDialog(
@@ -307,7 +352,7 @@ private fun AddAlarmDialog(
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
-                text = "NEW ALARM",
+                text = if (isEdit) "EDIT ALARM" else "NEW ALARM",
                 style = MaterialTheme.typography.titleLarge,
                 color = PrimaryManaBlue
             )
@@ -574,8 +619,12 @@ private fun AddAlarmDialog(
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = pinCode,
-                        onValueChange = { if (it.all { c -> c.isDigit() }) pinCode = it },
-                        label = { Text("Set 4-Digit PIN", color = TextSecondary) },
+                        onValueChange = {
+                            val digits = it.filter { c -> c.isDigit() }.take(8)
+                            pinCode = digits
+                            pinError = if (digits.isEmpty()) "" else validatePin(digits) ?: ""
+                        },
+                        label = { Text("PIN (8 digits)", color = TextSecondary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -586,12 +635,25 @@ private fun AddAlarmDialog(
                             unfocusedTextColor = TextPrimary
                         )
                     )
+                    if (pinError.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(pinError, color = DangerPenaltyRed, fontSize = 10.sp)
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
+                    // Validate PIN if method == PIN
+                    if (selectedMethod == DismissMethod.PIN) {
+                        val err = validatePin(pinCode)
+                        if (err != null) {
+                            pinError = err
+                            return@Button
+                        }
+                    }
+                    pinError = ""
                     val rawH = hourText.toIntOrNull() ?: 7
                     val minute = (minuteText.toIntOrNull() ?: 0).coerceIn(0, 59)
                     val hour24 = if (is24h) {
@@ -634,4 +696,13 @@ private fun AddAlarmDialog(
             }
         }
     )
+}
+
+private fun is24hInitial(a: com.neurasamu.build.sl_tasker.data.model.AlarmEntity?): Boolean = false
+
+private fun validatePin(pin: String): String? {
+    if (pin.length < 8) return "PIN must be 8 digits"
+    if (pin.startsWith("12345")) return "PIN cannot start with 12345"
+    if (pin.toSet().size == 1) return "PIN cannot be all same digit"
+    return null
 }

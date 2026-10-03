@@ -147,6 +147,7 @@ fun AlarmRingContent(
     var inputVal by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var showChallenge by remember { mutableStateOf(false) }
+    var pendingAction by remember { mutableStateOf("") } // "dismiss" or "snooze"
 
     val num1 by remember { mutableIntStateOf((12..49).random()) }
     val num2 by remember { mutableIntStateOf((11..49).random()) }
@@ -160,23 +161,47 @@ fun AlarmRingContent(
 
     val dragThreshold = 260f
 
+    fun executePendingAction(action: String) {
+        when (action) {
+            "dismiss" -> onDismissConfirmed()
+            "snooze" -> if (snoozeEnabled) onSnoozeConfirmed() else errorMessage = "Snooze disabled."
+        }
+    }
+
+    fun verifyChallenge(): Boolean {
+        return when {
+            dismissMethod.contains("PIN", ignoreCase = true) -> inputVal == requiredPin || requiredPin.isBlank()
+            dismissMethod.contains("MATH", ignoreCase = true) -> inputVal.toIntOrNull() == expectedAnswer
+            else -> true
+        }
+    }
+
     fun attemptDismiss() {
         when {
-            dismissMethod.contains("PIN", ignoreCase = true) -> {
-                if (inputVal == requiredPin || requiredPin.isBlank()) onDismissConfirmed()
-                else errorMessage = "Incorrect PIN. Focus Hunter."
-            }
-            dismissMethod.contains("MATH", ignoreCase = true) -> {
-                if (inputVal.toIntOrNull() == expectedAnswer) onDismissConfirmed()
-                else errorMessage = "Incorrect calculation. Try again."
+            needsChallenge -> {
+                pendingAction = "dismiss"
+                inputVal = ""
+                errorMessage = ""
+                showChallenge = true
             }
             else -> onDismissConfirmed()
         }
     }
 
     fun attemptSnooze() {
-        if (snoozeEnabled) onSnoozeConfirmed()
-        else errorMessage = "Snooze disabled for this alarm."
+        if (!snoozeEnabled) {
+            errorMessage = "Snooze disabled for this alarm."
+            return
+        }
+        when {
+            needsChallenge -> {
+                pendingAction = "snooze"
+                inputVal = ""
+                errorMessage = ""
+                showChallenge = true
+            }
+            else -> onSnoozeConfirmed()
+        }
     }
 
     Box(
@@ -187,12 +212,7 @@ fun AlarmRingContent(
                 detectDragGestures(
                     onDragEnd = {
                         if (dragY < -dragThreshold) {
-                            // swipe up → dismiss (challenge if needed)
-                            if (needsChallenge) {
-                                showChallenge = true
-                            } else {
-                                attemptDismiss()
-                            }
+                            attemptDismiss()
                         } else if (abs(dragX) > dragThreshold) {
                             attemptSnooze()
                         }
@@ -256,6 +276,11 @@ fun AlarmRingContent(
                         .padding(20.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = if (pendingAction == "snooze") "SNOOZE REQUEST" else "DISMISS REQUEST",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
                         if (dismissMethod.contains("MATH", ignoreCase = true)) {
                             Text(
                                 text = "SOLVE: $num1 + $num2 = ?",
@@ -288,14 +313,22 @@ fun AlarmRingContent(
                         )
                         Spacer(Modifier.height(12.dp))
                         Button(
-                            onClick = { attemptDismiss() },
+                            onClick = {
+                                if (verifyChallenge()) {
+                                    executePendingAction(pendingAction)
+                                } else {
+                                    errorMessage = if (dismissMethod.contains("MATH", ignoreCase = true))
+                                        "Incorrect calculation. Try again."
+                                    else "Incorrect PIN. Focus Hunter."
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = SuccessGreen,
                                 contentColor = DarkBackground
                             )
                         ) {
-                            Text("CONFIRM & DISMISS")
+                            Text(if (pendingAction == "snooze") "CONFIRM & SNOOZE" else "CONFIRM & DISMISS")
                         }
                     }
                 }

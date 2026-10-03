@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -139,6 +142,30 @@ fun TaskTimerScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextMuted
             )
+
+            Spacer(Modifier.height(24.dp))
+
+            // Smooth animated progress bar (sweeps across based on elapsed time)
+            val smoothProgress by animateFloatAsState(
+                targetValue = progress,
+                animationSpec = tween(durationMillis = 950, easing = LinearEasing),
+                label = "smoothProgress"
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(DarkBorder)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(smoothProgress.coerceIn(0f, 1f))
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(accentColor)
+                )
+            }
 
             Spacer(Modifier.height(32.dp))
 

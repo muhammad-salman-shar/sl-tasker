@@ -62,6 +62,39 @@ class AlarmViewModel(
         }
     }
 
+    fun updateAlarm(
+        alarmId: Long,
+        hour: Int,
+        minute: Int,
+        label: String,
+        dismissMethod: DismissMethod,
+        pinCode: String,
+        daysCsv: String,
+        isRepeat: Boolean,
+        snoozeEnabled: Boolean,
+        snoozeMinutes: Int,
+        vibrate: Boolean
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val existing = alarmRepository.getAlarmById(alarmId) ?: return@launch
+            alarmScheduler.cancelAlarm(alarmId)
+            val updated = existing.copy(
+                hour = hour,
+                minute = minute,
+                label = label,
+                dismissMethod = dismissMethod,
+                pinCode = pinCode,
+                customDays = daysCsv,
+                repeatRule = if (isRepeat || daysCsv.isNotBlank()) RepeatRule.CUSTOM else RepeatRule.ONCE,
+                snoozeEnabled = snoozeEnabled,
+                snoozeMinutes = snoozeMinutes,
+                vibrate = vibrate
+            )
+            alarmRepository.updateAlarm(updated)
+            if (updated.enabled) alarmScheduler.scheduleAlarm(updated)
+        }
+    }
+
     fun toggleAlarm(alarm: AlarmEntity, enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             alarmRepository.toggleAlarm(alarm.id, enabled)
