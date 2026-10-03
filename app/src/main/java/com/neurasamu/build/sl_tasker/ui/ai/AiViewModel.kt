@@ -62,6 +62,12 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissError() { _error.value = null }
 
+    fun setChatMode(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            settings.setChatMode(enabled)
+        }
+    }
+
     fun saveConfig(
         baseUrl: String,
         key: String,
@@ -94,9 +100,19 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
 
-                val sysMsg = ChatMsg("system", AiPrompt.buildSystemPrompt())
-                // Send ONLY the current message. No history.
-                val history = listOf(ChatMsg("user", trimmed))
+                val sysMsg = ChatMsg("system", AiPrompt.buildSystemPrompt(cfg.chatMode))
+                // Chat mode: send full history (user + assistant raw JSON). Agent mode: single message.
+                val history: List<ChatMsg> = if (cfg.chatMode) {
+                    _messages.value.mapNotNull { m ->
+                        when (m.role) {
+                            "user" -> ChatMsg("user", m.text)
+                            "assistant" -> ChatMsg("assistant", m.raw ?: m.text)
+                            else -> null
+                        }
+                    }
+                } else {
+                    listOf(ChatMsg("user", trimmed))
+                }
 
                 _lastRawRequest.value = buildString {
                     append("URL: ").append(cfg.baseUrl).append('\n')

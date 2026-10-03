@@ -18,7 +18,8 @@ data class AiConfig(
     val timeoutSec: Int = 30,
     val useStream: Boolean = true,
     val useJsonFormat: Boolean = true,
-    val showRawDebug: Boolean = false
+    val showRawDebug: Boolean = false,
+    val chatMode: Boolean = false
 ) {
     val isConfigured: Boolean
         get() = baseUrl.isNotBlank() && model.isNotBlank()
@@ -33,6 +34,7 @@ class AiSettings(private val context: Context) {
     private val kStream = booleanPreferencesKey("ai_stream")
     private val kJson = booleanPreferencesKey("ai_json_format")
     private val kRaw = booleanPreferencesKey("ai_raw_debug")
+    private val kChatMode = booleanPreferencesKey("ai_chat_mode")
 
     val config: Flow<AiConfig> = context.aiDataStore.data.map { p ->
         AiConfig(
@@ -42,7 +44,8 @@ class AiSettings(private val context: Context) {
             timeoutSec = p[kTimeout] ?: 30,
             useStream = p[kStream] ?: true,
             useJsonFormat = p[kJson] ?: true,
-            showRawDebug = p[kRaw] ?: false
+            showRawDebug = p[kRaw] ?: false,
+            chatMode = p[kChatMode] ?: false
         )
     }
 
@@ -66,5 +69,9 @@ class AiSettings(private val context: Context) {
 
     suspend fun setShowRawDebug(value: Boolean) {
         context.aiDataStore.edit { it[kRaw] = value }
+    }
+
+    suspend fun setChatMode(value: Boolean) {
+        context.aiDataStore.edit { it[kChatMode] = value }
     }
 }

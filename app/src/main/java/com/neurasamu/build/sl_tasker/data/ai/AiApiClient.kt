@@ -181,7 +181,7 @@ class AiApiClient {
 
 object AiPrompt {
 
-    fun buildSystemPrompt(): String {
+    fun buildSystemPrompt(chatMode: Boolean = false): String {
         val now = java.util.Calendar.getInstance()
         val h = now.get(java.util.Calendar.HOUR_OF_DAY)
         val mi = now.get(java.util.Calendar.MINUTE)
@@ -213,6 +213,13 @@ Rules:
 - If user did not specify a field, use the default.
 - If time is missing for a task/alarm, use CHAT and ask for time in one short sentence.
 - Output JSON only. No markdown. No explanation.
+
+${if (chatMode) """
+CONVERSATION MODE:
+- You have context of previous turns. Remember what the user already told you.
+- If they give a missing field later ("make it 6 AM"), combine it with previous intent.
+- Stay conversational but still return JSON only.
+""" else ""}
 
 Examples:
 

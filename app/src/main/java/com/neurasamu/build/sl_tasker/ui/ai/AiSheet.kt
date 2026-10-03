@@ -111,6 +111,31 @@ fun AiSheet(
                     maxLines = 1
                 )
             }
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(DarkSurface)
+                    .border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
+            ) {
+                listOf(false to "AGENT", true to "CHAT").forEach { (flag, label) ->
+                    val sel = config.chatMode == flag
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                            .clickable { vm.setChatMode(flag) }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            label,
+                            color = if (sel) PrimaryManaBlue else TextMuted,
+                            fontSize = 9.sp,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(6.dp))
             IconButton(onClick = { showRaw = !showRaw }) {
                 Icon(
                     Icons.Rounded.BugReport,
