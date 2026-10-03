@@ -149,6 +149,12 @@ fun MainAppScaffold(
     LaunchedEffect(Unit) {
         while (true) { nowMillis = System.currentTimeMillis(); delay(1000L) }
     }
+    LaunchedEffect(Unit) {
+        while (true) {
+            taskViewModel.applyOverduePenalties()
+            delay(10_000L)
+        }
+    }
     var showSettings by remember { mutableStateOf(false) }
     val blockPrefs = remember { BlockPrefs(context) }
     val criticalActive by blockPrefs.criticalActive.collectAsState(initial = false)

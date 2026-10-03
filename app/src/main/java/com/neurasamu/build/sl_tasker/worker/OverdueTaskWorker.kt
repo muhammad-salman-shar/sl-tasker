@@ -17,10 +17,7 @@ class OverdueTaskWorker(
             val repository = TaskRepository(database)
             val now = System.currentTimeMillis()
 
-            val overdueOccurrences = repository.getOverdueOccurrences(now)
-            overdueOccurrences.forEach { occurrence ->
-                repository.markOccurrenceMissed(occurrence.id)
-            }
+            repository.applyOverduePenalties(now)
 
             Result.success()
         } catch (e: Exception) {

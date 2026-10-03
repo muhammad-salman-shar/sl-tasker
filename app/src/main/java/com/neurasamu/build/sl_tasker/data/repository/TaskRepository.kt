@@ -182,6 +182,40 @@ class TaskRepository(private val database: AppDatabase) {
         }
     }
 
+    suspend fun applyOverduePenalties(now: Long): Boolean = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            val overdue = taskDao.getPendingOverdueOccurrences(now)
+            if (overdue.isEmpty()) return@withTransaction false
+            var stats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
+            var changed = false
+            for (occ in overdue) {
+                val task = taskDao.getTaskById(occ.taskId) ?: continue
+                val since = if (occ.lastPenaltyAt == 0L) occ.scheduledAt else occ.lastPenaltyAt
+                val elapsedMin = ((now - since) / 60_000L).toInt()
+                if (elapsedMin <= 0) continue
+                val perMin = PenaltyEngine.penaltyPerMinute(task.difficulty)
+                val damage = perMin * elapsedMin
+                val newHealth = (stats.health - damage).coerceAtLeast(0)
+                stats = stats.copy(
+                    health = newHealth,
+                    totalMissed = stats.totalMissed + 1,
+                    recoveryModeActive = newHealth < 50 || stats.recoveryModeActive
+                )
+                occurrenceDao.updateOccurrence(
+                    occ.copy(
+                        lastPenaltyAt = since + elapsedMin * 60_000L,
+                        penaltyAppliedCount = occ.penaltyAppliedCount + elapsedMin
+                    )
+                )
+                changed = true
+            }
+            if (changed) {
+                playerStatsDao.insertOrUpdate(stats)
+            }
+            changed
+        }
+    }
+
     suspend fun archiveTask(taskId: Long) = withContext(Dispatchers.IO) {
         taskDao.archiveTask(taskId)
     }

@@ -66,6 +66,12 @@ class TaskViewModel(
         initialValue = emptyList()
     )
 
+    fun applyOverduePenalties() {
+        viewModelScope.launch(Dispatchers.IO) {
+            taskRepository.applyOverduePenalties(System.currentTimeMillis())
+        }
+    }
+
     fun completeQuest(occurrenceId: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             taskRepository.completeOccurrence(occurrenceId)

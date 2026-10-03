@@ -17,6 +17,12 @@ object PenaltyEngine {
     const val MIN_HEALTH = 0
     const val RECOVERY_THRESHOLD = 50
 
+    fun penaltyPerMinute(difficulty: Difficulty): Int = when (difficulty) {
+        Difficulty.MEDIUM -> 10
+        Difficulty.HARD -> 15
+        Difficulty.CRITICAL -> 20
+    }
+
     fun processMissedTask(
         currentStats: PlayerStatsEntity,
         priority: Priority,

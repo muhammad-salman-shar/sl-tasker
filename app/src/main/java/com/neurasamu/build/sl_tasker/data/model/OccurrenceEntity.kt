@@ -19,6 +19,7 @@ data class OccurrenceEntity(
     val completedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val penaltyAppliedCount: Int = 0,
+    val lastPenaltyAt: Long = 0L,
     val startedAt: Long? = null,
     val criticalEndsAt: Long? = null
 )
