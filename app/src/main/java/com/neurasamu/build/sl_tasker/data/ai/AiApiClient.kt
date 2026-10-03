@@ -22,6 +22,7 @@ class AiApiClient {
                 put("model", config.model)
                 put("temperature", 0.2)
                 put("max_tokens", 512)
+                put("stream", true)
                 put("messages", JSONArray().apply {
                     messages.forEach { m ->
                         put(JSONObject().apply {
@@ -38,6 +39,7 @@ class AiApiClient {
                 readTimeout = config.timeoutSec * 1000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Accept", "text/event-stream, application/json")
                 if (config.apiKey.isNotBlank()) {
                     setRequestProperty("Authorization", "Bearer ${config.apiKey}")
                 }
@@ -51,26 +53,64 @@ class AiApiClient {
 
                 val code = conn.responseCode
                 val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-                val text = BufferedReader(InputStreamReader(stream, "UTF-8")).use { it.readText() }
 
                 if (code !in 200..299) {
-                    throw RuntimeException("HTTP $code: ${text.take(200)}")
+                    val errText = BufferedReader(InputStreamReader(stream, "UTF-8"))
+                        .use { it.readText() }
+                    throw RuntimeException("HTTP $code: ${errText.take(200)}")
                 }
 
-                val root = JSONObject(text)
-                val choices = root.optJSONArray("choices")
-                    ?: throw RuntimeException("No choices in response")
-                val first = choices.optJSONObject(0)
-                    ?: throw RuntimeException("Empty choices")
-                val msg = first.optJSONObject("message")
-                    ?: throw RuntimeException("No message")
-                msg.optString("content", "").ifBlank {
-                    throw RuntimeException("Empty content")
+                val contentType = (conn.contentType ?: "").lowercase()
+                val reader = BufferedReader(InputStreamReader(stream, "UTF-8"))
+
+                val result = if (contentType.contains("text/event-stream")) {
+                    readSse(reader)
+                } else {
+                    readJsonResponse(reader)
                 }
+
+                if (result.isBlank()) throw RuntimeException("Empty response")
+                result
             } finally {
                 conn.disconnect()
             }
         }
+
+    private fun readSse(reader: BufferedReader): String {
+        val sb = StringBuilder()
+        var line: String? = reader.readLine()
+        while (line != null) {
+            val l = line.trim()
+            if (l.startsWith("data:")) {
+                val data = l.removePrefix("data:").trim()
+                if (data == "[DONE]") break
+                if (data.isNotEmpty()) {
+                    try {
+                        val obj = JSONObject(data)
+                        val delta = obj.optJSONArray("choices")
+                            ?.optJSONObject(0)
+                            ?.optJSONObject("delta")
+                            ?.optString("content", "")
+                        if (!delta.isNullOrEmpty()) sb.append(delta)
+                    } catch (_: Exception) {}
+                }
+            }
+            line = reader.readLine()
+        }
+        return sb.toString()
+    }
+
+    private fun readJsonResponse(reader: BufferedReader): String {
+        val text = reader.readText()
+        val root = JSONObject(text)
+        val choices = root.optJSONArray("choices")
+            ?: throw RuntimeException("No choices in response")
+        val first = choices.optJSONObject(0)
+            ?: throw RuntimeException("Empty choices")
+        val msg = first.optJSONObject("message")
+            ?: throw RuntimeException("No message")
+        return msg.optString("content", "")
+    }
 
     /**
      * Normalizes user-supplied base URL into a full /chat/completions endpoint.
