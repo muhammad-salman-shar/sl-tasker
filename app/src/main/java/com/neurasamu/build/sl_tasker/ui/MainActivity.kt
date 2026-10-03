@@ -27,8 +27,10 @@ import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.ChecklistRtl
 import androidx.compose.material.icons.rounded.Cottage
 import androidx.compose.material.icons.rounded.MilitaryTech
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -37,6 +39,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +55,7 @@ import com.neurasamu.build.sl_tasker.ui.alarm.AlarmScreen
 import com.neurasamu.build.sl_tasker.ui.components.AiHubLogo
 import com.neurasamu.build.sl_tasker.ui.home.HomeScreen
 import com.neurasamu.build.sl_tasker.ui.stats.StatsScreen
+import com.neurasamu.build.sl_tasker.ui.player.PlayerSettingsScreen
 import com.neurasamu.build.sl_tasker.ui.tasks.TasksScreen
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
@@ -121,6 +126,7 @@ fun MainAppScaffold(
         TabItem("Player", Icons.Rounded.MilitaryTech),
     )
     val context = LocalContext.current
+    var showSettings by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -135,6 +141,21 @@ fun MainAppScaffold(
                     )
                 },
                 actions = {
+                    if (selectedTabIndex == 3) {
+                        IconButton(
+                            onClick = { showSettings = true },
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = "Block System Settings",
+                                tint = PrimaryManaBlue,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                     Box(
                         modifier = Modifier
                             .padding(end = 12.dp)
@@ -231,5 +252,9 @@ fun MainAppScaffold(
                 )
             }
         }
+    }
+
+    if (showSettings) {
+        PlayerSettingsScreen(onClose = { showSettings = false })
     }
 }

@@ -12,10 +12,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material3.Button
+import androidx.compose.material3.IconDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.data.model.Difficulty
 import com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity
+import com.neurasamu.build.sl_tasker.data.model.OccurrenceStatus
 import com.neurasamu.build.sl_tasker.data.model.Priority
 import com.neurasamu.build.sl_tasker.data.model.TaskEntity
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
@@ -44,6 +52,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.RankA
 import com.neurasamu.build.sl_tasker.ui.theme.RankC
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
+import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -181,20 +190,39 @@ fun QuestCard(
                     color = TextMuted
                 )
 
-                val needsTimer = task.difficulty != Difficulty.MEDIUM
-                Button(
-                    onClick = if (needsTimer) onStart else onComplete,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (needsTimer) difficultyColor else PrimaryManaBlue,
-                        contentColor = DarkCard
-                    ),
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text(
-                        text = if (needsTimer) "START" else "COMPLETE QUEST",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = DarkCard
-                    )
+                val isCompleted = occurrence.status == OccurrenceStatus.COMPLETED
+                if (isCompleted) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            tint = SuccessGreen.copy(alpha = 0.75f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "COMPLETED",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = SuccessGreen.copy(alpha = 0.75f),
+                            fontSize = 11.sp
+                        )
+                    }
+                } else {
+                    val needsTimer = task.difficulty != Difficulty.MEDIUM
+                    Button(
+                        onClick = if (needsTimer) onStart else onComplete,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (needsTimer) difficultyColor else PrimaryManaBlue,
+                            contentColor = DarkCard
+                        ),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = if (needsTimer) "START" else "COMPLETE QUEST",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = DarkCard
+                        )
+                    }
                 }
             }
         }
