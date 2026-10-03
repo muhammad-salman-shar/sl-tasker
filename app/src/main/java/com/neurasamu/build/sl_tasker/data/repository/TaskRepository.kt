@@ -181,6 +181,17 @@ class TaskRepository(private val database: AppDatabase) {
         taskDao.archiveTask(taskId)
     }
 
+    suspend fun deleteTask(taskId: Long) = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            taskDao.deleteOccurrencesForTask(taskId)
+            taskDao.deleteTask(taskId)
+        }
+    }
+
+    suspend fun updateTaskFields(task: TaskEntity) = withContext(Dispatchers.IO) {
+        taskDao.updateTask(task)
+    }
+
     fun observeOccurrencesByStatus(statuses: List<OccurrenceStatus>): Flow<List<OccurrenceEntity>> =
         occurrenceDao.getOccurrencesByStatus(statuses)
 

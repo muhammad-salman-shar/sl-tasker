@@ -57,6 +57,35 @@ class TaskViewModel(
         }
     }
 
+    fun deleteTask(taskId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            taskRepository.deleteTask(taskId)
+        }
+    }
+
+    fun updateTaskFields(
+        taskId: Long,
+        title: String,
+        description: String,
+        difficulty: Difficulty,
+        reminderMinutesOfDay: Int,
+        customRepeatDays: String,
+        durationMinutes: Int
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val existing = taskRepository.getTaskById(taskId) ?: return@launch
+            val updated = existing.copy(
+                title = title,
+                description = description,
+                difficulty = difficulty,
+                reminderMinutesOfDay = reminderMinutesOfDay,
+                customRepeatDays = customRepeatDays,
+                durationMinutes = durationMinutes
+            )
+            taskRepository.updateTaskFields(updated)
+        }
+    }
+
     fun createQuest(
         title: String,
         description: String,

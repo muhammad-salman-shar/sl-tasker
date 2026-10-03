@@ -2,6 +2,8 @@ package com.neurasamu.build.sl_tasker.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,10 +15,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,13 +51,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QuestCard(
     task: TaskEntity,
     occurrence: OccurrenceEntity,
     onComplete: () -> Unit,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     val dateFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     val deadlineStr = dateFormat.format(Date(occurrence.deadlineAt))
 
@@ -74,8 +88,25 @@ fun QuestCard(
                 if (task.priority == Priority.CRITICAL) DangerPenaltyRed else DarkBorder,
                 RoundedCornerShape(12.dp)
             )
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { menuOpen = true }
+            )
             .padding(14.dp)
     ) {
+        DropdownMenu(
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Edit", color = TextPrimary) },
+                onClick = { menuOpen = false; onEdit() }
+            )
+            DropdownMenuItem(
+                text = { Text("Delete", color = DangerPenaltyRed) },
+                onClick = { menuOpen = false; onDelete() }
+            )
+        }
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

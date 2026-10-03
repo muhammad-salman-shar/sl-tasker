@@ -28,4 +28,10 @@ interface TaskDao {
 
     @Query("SELECT * FROM tasks ORDER BY createdAt DESC")
     fun getAllTasks(): Flow<List<TaskEntity>>
+
+    @Query("DELETE FROM tasks WHERE id = :taskId")
+    suspend fun deleteTask(taskId: Long)
+
+    @Query("DELETE FROM occurrences WHERE taskId = :taskId")
+    suspend fun deleteOccurrencesForTask(taskId: Long)
 }

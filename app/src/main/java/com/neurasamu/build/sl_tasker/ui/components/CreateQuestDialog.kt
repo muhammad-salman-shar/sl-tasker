@@ -54,6 +54,7 @@ private val DayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 @Composable
 fun CreateQuestDialog(
     onDismiss: () -> Unit,
+    initialTask: com.neurasamu.build.sl_tasker.data.model.TaskEntity? = null,
     onConfirm: (
         title: String,
         description: String,
@@ -63,12 +64,24 @@ fun CreateQuestDialog(
         durationMinutes: Int
     ) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var difficulty by remember { mutableStateOf(Difficulty.MEDIUM) }
-    var durationText by remember { mutableStateOf("30") }
-    val timeState = rememberTimePickerState(initialHour = 7, initialMinute = 0, is24Hour = false)
-    var selectedDays by remember { mutableStateOf(setOf<Int>()) }
+    val isEdit = initialTask != null
+    var title by remember { mutableStateOf(initialTask?.title ?: "") }
+    var description by remember { mutableStateOf(initialTask?.description ?: "") }
+    var difficulty by remember { mutableStateOf(initialTask?.difficulty ?: Difficulty.MEDIUM) }
+    var durationText by remember {
+        mutableStateOf(if ((initialTask?.durationMinutes ?: 0) > 0) initialTask!!.durationMinutes.toString() else "30")
+    }
+    val initHour = (initialTask?.reminderMinutesOfDay ?: 420) / 60
+    val initMinute = (initialTask?.reminderMinutesOfDay ?: 420) % 60
+    val timeState = rememberTimePickerState(initialHour = initHour, initialMinute = initMinute, is24Hour = false)
+    var selectedDays by remember {
+        mutableStateOf(
+            initialTask?.customRepeatDays
+                ?.split(",")
+                ?.mapNotNull { it.trim().toIntOrNull() }
+                ?.toSet() ?: emptySet()
+        )
+    }
 
     val difficultyColor = when (difficulty) {
         Difficulty.MEDIUM -> RankC
@@ -83,7 +96,7 @@ fun CreateQuestDialog(
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
-                text = "NEW TASK",
+                text = if (isEdit) "EDIT TASK" else "NEW TASK",
                 style = MaterialTheme.typography.titleMedium,
                 color = PrimaryManaBlue,
                 fontSize = 15.sp
@@ -228,7 +241,7 @@ fun CreateQuestDialog(
                     contentColor = DarkCard
                 )
             ) {
-                Text("CREATE", fontSize = 12.sp)
+                Text(if (isEdit) "SAVE" else "CREATE", fontSize = 12.sp)
             }
         },
         dismissButton = {

@@ -47,6 +47,7 @@ fun DashboardScreen(
     val activeQuests by taskViewModel.activeQuests.collectAsStateWithLifecycle()
     val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var editingTask by remember { mutableStateOf<com.neurasamu.build.sl_tasker.data.model.TaskEntity?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -125,7 +126,9 @@ fun DashboardScreen(
                             occurrence = item.occurrence,
                             onComplete = {
                                 taskViewModel.completeQuest(item.occurrence.id)
-                            }
+                            },
+                            onEdit = { editingTask = item.task },
+                            onDelete = { taskViewModel.deleteTask(item.task.id) }
                         )
                     }
                 }
@@ -146,6 +149,25 @@ fun DashboardScreen(
                     durationMinutes = durationMinutes
                 )
                 showCreateDialog = false
+            }
+        )
+    }
+
+    editingTask?.let { task ->
+        CreateQuestDialog(
+            onDismiss = { editingTask = null },
+            initialTask = task,
+            onConfirm = { title, description, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes ->
+                taskViewModel.updateTaskFields(
+                    taskId = task.id,
+                    title = title,
+                    description = description,
+                    difficulty = difficulty,
+                    reminderMinutesOfDay = reminderMinutesOfDay,
+                    customRepeatDays = daysCsv,
+                    durationMinutes = durationMinutes
+                )
+                editingTask = null
             }
         )
     }
