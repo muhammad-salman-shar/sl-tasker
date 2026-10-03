@@ -48,6 +48,7 @@ fun DashboardScreen(
     val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
     var editingTask by remember { mutableStateOf<com.neurasamu.build.sl_tasker.data.model.TaskEntity?>(null) }
+    var timerItem by remember { mutableStateOf<com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -127,6 +128,7 @@ fun DashboardScreen(
                             onComplete = {
                                 taskViewModel.completeQuest(item.occurrence.id)
                             },
+                            onStart = { timerItem = item },
                             onEdit = { editingTask = item.task },
                             onDelete = { taskViewModel.deleteTask(item.task.id) }
                         )
@@ -150,6 +152,24 @@ fun DashboardScreen(
                 )
                 showCreateDialog = false
             }
+        )
+    }
+
+    timerItem?.let { item ->
+        val accent = when (item.task.difficulty) {
+            com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
+            com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> com.neurasamu.build.sl_tasker.ui.theme.RankA
+            else -> com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
+        }
+        com.neurasamu.build.sl_tasker.ui.timer.TaskTimerScreen(
+            title = item.task.title,
+            durationMinutes = item.task.durationMinutes.coerceAtLeast(1),
+            accentColor = accent,
+            onFinish = {
+                taskViewModel.completeQuest(item.occurrence.id)
+                timerItem = null
+            },
+            onCancel = { timerItem = null }
         )
     }
 

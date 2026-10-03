@@ -57,6 +57,7 @@ fun QuestCard(
     task: TaskEntity,
     occurrence: OccurrenceEntity,
     onComplete: () -> Unit,
+    onStart: () -> Unit = {},
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -182,16 +183,17 @@ fun QuestCard(
                     color = TextMuted
                 )
 
+                val needsTimer = task.difficulty != Difficulty.MEDIUM
                 Button(
-                    onClick = onComplete,
+                    onClick = if (needsTimer) onStart else onComplete,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryManaBlue,
+                        containerColor = if (needsTimer) difficultyColor else PrimaryManaBlue,
                         contentColor = DarkCard
                     ),
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
-                        text = "COMPLETE QUEST",
+                        text = if (needsTimer) "START" else "COMPLETE QUEST",
                         style = MaterialTheme.typography.labelLarge,
                         color = DarkCard
                     )
