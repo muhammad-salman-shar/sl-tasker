@@ -117,15 +117,15 @@ class TaskViewModel(
         durationMinutes: Int
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            val cal = java.util.Calendar.getInstance()
-            cal.set(java.util.Calendar.HOUR_OF_DAY, reminderMinutesOfDay / 60)
-            cal.set(java.util.Calendar.MINUTE, reminderMinutesOfDay % 60)
-            cal.set(java.util.Calendar.SECOND, 0)
-            cal.set(java.util.Calendar.MILLISECOND, 0)
-            var scheduledAt = cal.timeInMillis
-            if (scheduledAt <= System.currentTimeMillis()) {
-                scheduledAt += 24L * 60 * 60 * 1000
-            }
+            val isRepeatTask = customRepeatDays.isNotBlank()
+            val repeatRuleVal = if (isRepeatTask) RepeatRule.CUSTOM else RepeatRule.ONCE
+            val nextTrigger = com.neurasamu.build.sl_tasker.domain.scheduler.ScheduleHelper.nextTrigger(
+                hour = reminderMinutesOfDay / 60,
+                minute = reminderMinutesOfDay % 60,
+                daysCsv = customRepeatDays,
+                repeat = repeatRuleVal
+            ) ?: (System.currentTimeMillis() + 60_000L)
+            val scheduledAt = nextTrigger
             val deadlineAt = scheduledAt + durationMinutes * 60 * 1000L
 
             val task = TaskEntity(
@@ -133,7 +133,7 @@ class TaskViewModel(
                 description = description,
                 priority = Priority.MEDIUM,
                 difficulty = difficulty,
-                repeatRule = if (customRepeatDays.isBlank()) RepeatRule.ONCE else RepeatRule.CUSTOM,
+                repeatRule = repeatRuleVal,
                 customRepeatDays = customRepeatDays,
                 durationMinutes = durationMinutes,
                 reminderMinutesOfDay = reminderMinutesOfDay

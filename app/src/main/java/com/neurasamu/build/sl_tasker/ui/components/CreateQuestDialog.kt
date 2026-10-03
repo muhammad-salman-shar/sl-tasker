@@ -206,8 +206,8 @@ fun CreateQuestDialog(
                     }
                 }
 
-                if (isRepeat) {
-                SectionLabel("DAYS (pick one or more)")
+                SectionLabel(if (isRepeat) "DAYS (pick one or more)" else "PICK A DAY (optional)")
+                if (true) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -376,7 +376,7 @@ fun CreateQuestDialog(
                         }
                     }
                     val minutes = hh * 60 + mm
-                    val csv = if (isRepeat) selectedDays.sorted().joinToString(",") else ""
+                    val csv = selectedDays.sorted().joinToString(",")
                     val dur = if (requiresTimer) durationText.toIntOrNull() ?: 0 else 0
                     onConfirm(title, description, difficulty, minutes, csv, dur)
                 },
