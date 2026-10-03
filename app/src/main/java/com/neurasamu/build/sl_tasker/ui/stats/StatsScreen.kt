@@ -60,6 +60,10 @@ import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun StatsScreen(
@@ -182,6 +186,63 @@ fun StatsScreen(
             items(items = events.take(15), key = { it.id }) { event ->
                 EventRow(event)
             }
+        }
+
+        item {
+            Spacer(Modifier.height(10.dp))
+            OwnerCard()
+        }
+    }
+}
+
+@Composable
+private fun OwnerCard() {
+    val ctx = LocalContext.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(DarkCard)
+            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+            .padding(14.dp)
+    ) {
+        Text(
+            text = "NEURASAMU",
+            color = PrimaryManaBlue,
+            fontSize = 11.sp,
+            style = MaterialTheme.typography.labelLarge,
+            letterSpacing = 2.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "Built by NeuraSamu. Visit our site for more apps and tools.",
+            color = TextMuted,
+            fontSize = 11.sp
+        )
+        Spacer(Modifier.height(10.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(PrimaryManaBlue.copy(alpha = 0.15f))
+                .border(1.dp, PrimaryManaBlue.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                .clickable {
+                    try {
+                        val i = Intent(Intent.ACTION_VIEW, Uri.parse("https://neurasamu.com"))
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        ctx.startActivity(i)
+                    } catch (_: Throwable) {}
+                }
+                .padding(vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "VISIT NEURASAMU.COM",
+                color = PrimaryManaBlue,
+                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
