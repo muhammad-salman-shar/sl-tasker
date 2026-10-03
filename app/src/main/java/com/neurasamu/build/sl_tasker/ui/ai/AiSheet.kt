@@ -268,6 +268,23 @@ private fun MessageBubble(msg: AiMessage) {
     val ctx = LocalContext.current
     val isUser = msg.role == "user"
     val isError = msg.role == "error"
+    val isInfo = msg.role == "info"
+
+    if (isInfo) {
+        // small centered system line
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = msg.text,
+                color = SuccessGreen,
+                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+        return
+    }
 
     val bgColor = when {
         isError -> DangerPenaltyRed.copy(alpha = 0.15f)
@@ -305,7 +322,7 @@ private fun MessageBubble(msg: AiMessage) {
                 color = textColor,
                 fontSize = 12.sp
             )
-            if (msg.raw != null) {
+            if (msg.raw != null && isError) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = "raw: " + msg.raw,

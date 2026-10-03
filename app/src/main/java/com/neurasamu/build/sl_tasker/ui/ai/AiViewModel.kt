@@ -96,9 +96,15 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
 
                 val sysMsg = ChatMsg("system", AiPrompt.buildSystemPrompt())
                 // Only real user + assistant messages — never "error" entries
-                val history = _messages.value
-                    .filter { it.role == "user" || it.role == "assistant" }
-                    .map { ChatMsg(it.role, it.text) }
+                // For assistant turns, feed the ORIGINAL JSON reply back to the model,
+                // never the friendly text — otherwise small models copy the friendly text.
+                val history = _messages.value.mapNotNull { m ->
+                    when (m.role) {
+                        "user" -> ChatMsg("user", m.text)
+                        "assistant" -> ChatMsg("assistant", m.raw ?: m.text)
+                        else -> null
+                    }
+                }
 
                 _lastRawRequest.value = buildString {
                     append("URL: ").append(cfg.baseUrl).append('\n')
@@ -187,7 +193,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 scheduler.scheduleReminder(occId, next, title)
 
                 val durText = if (dur > 0) ", ${dur} min" else ""
-                _messages.value = _messages.value + AiMessage("assistant",
+                _messages.value = _messages.value + AiMessage("info",
                     "Task created: \"$title\" at $timeStr ($difficulty$durText).")
             }
             "create_alarm" -> {
@@ -211,12 +217,12 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 val id = alarmRepo.insertAlarm(alarm)
                 scheduler.scheduleAlarm(alarm.copy(id = id))
-                _messages.value = _messages.value + AiMessage("assistant",
+                _messages.value = _messages.value + AiMessage("info",
                     "Alarm set: \"$label\" at $timeStr.")
             }
             else -> {
                 val reply = json.optString("reply").trim().ifBlank { "…" }
-                _messages.value = _messages.value + AiMessage("assistant", reply)
+                _messages.value = _messages.value + AiMessage("assistant", reply, raw = json.toString())
             }
         }
     }

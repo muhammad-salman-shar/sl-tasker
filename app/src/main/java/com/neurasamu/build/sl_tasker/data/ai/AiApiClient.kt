@@ -191,7 +191,7 @@ object AiPrompt {
         val nowTime = "%02d:%02d".format(h, mi)
 
         return """
-You are a JSON-only API. Given one English sentence, return ONE JSON object. No prose.
+JSON-only API. Given one English sentence, return ONE JSON object. No prose.
 
 Now: $d/$mo/$y $nowTime. Days 0=Sun..6=Sat.
 
@@ -200,20 +200,14 @@ Task  {"action":"create_task","title":"T","time":"HH:MM","days":"","type":"MEDIU
 Alarm {"action":"create_alarm","label":"L","time":"HH:MM","days":""}
 Chat  {"action":"chat","reply":"your sentence"}
 
-Rules: time is 24h HH:MM. days "" or "1,3,5". type MEDIUM|HARD|CRITICAL. duration_minutes 0 for MEDIUM. Reply with JSON only. If info is missing, use chat and ask one short question.
+Rules: time is 24h HH:MM. days "" or weekday list like "1,3,5". type MEDIUM|HARD|CRITICAL. duration_minutes 0 for MEDIUM. Reply with ONLY JSON. If info missing, use chat and ask one short question.
 
-Examples:
+Two examples:
 IN: Study math tomorrow 7pm 1 hour hard
 OUT: {"action":"create_task","title":"Study math","time":"19:00","days":"","type":"HARD","duration_minutes":60}
 
-IN: Wake me 6:30 weekdays
-OUT: {"action":"create_alarm","label":"Wake up","time":"06:30","days":"1,2,3,4,5"}
-
 IN: Hi
 OUT: {"action":"chat","reply":"Hi. Tell me a task or alarm."}
-
-IN: Add task read a book
-OUT: {"action":"chat","reply":"What time should I set?"}
 """.trimIndent()
     }
 
