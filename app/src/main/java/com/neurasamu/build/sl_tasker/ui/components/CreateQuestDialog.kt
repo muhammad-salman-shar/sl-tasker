@@ -47,7 +47,6 @@ import com.neurasamu.build.sl_tasker.ui.theme.GoldWarning
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.RankA
 import com.neurasamu.build.sl_tasker.ui.theme.RankC
-import com.neurasamu.build.sl_tasker.ui.theme.RankD
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
@@ -68,7 +67,7 @@ fun CreateQuestDialog(
     var description by remember { mutableStateOf("") }
     var durationText by remember { mutableStateOf("30") }
     var selectedPriority by remember { mutableStateOf(Priority.MEDIUM) }
-    var selectedDifficulty by remember { mutableStateOf(Difficulty.NORMAL) }
+    var selectedDifficulty by remember { mutableStateOf(Difficulty.MEDIUM) }
     var selectedRepeatRule by remember { mutableStateOf<RepeatRule>(RepeatRule.ONCE) }
 
     AlertDialog(
@@ -190,10 +189,9 @@ fun CreateQuestDialog(
                     Difficulty.entries.forEach { difficulty ->
                         val isSelected = selectedDifficulty == difficulty
                         val dColor = when (difficulty) {
-                            Difficulty.EXTREME -> DangerPenaltyRed
+                            Difficulty.CRITICAL -> DangerPenaltyRed
                             Difficulty.HARD -> RankA
-                            Difficulty.NORMAL -> RankC
-                            Difficulty.EASY -> RankD
+                            Difficulty.MEDIUM -> RankC
                         }
                         Box(
                             modifier = Modifier

@@ -34,7 +34,6 @@ import com.neurasamu.build.sl_tasker.ui.theme.GoldWarning
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.RankA
 import com.neurasamu.build.sl_tasker.ui.theme.RankC
-import com.neurasamu.build.sl_tasker.ui.theme.RankD
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
@@ -60,10 +59,10 @@ fun QuestCard(
     }
 
     val difficultyColor = when (task.difficulty) {
-        Difficulty.EXTREME -> DangerPenaltyRed
+        Difficulty.CRITICAL -> DangerPenaltyRed
         Difficulty.HARD -> RankA
-        Difficulty.NORMAL -> RankC
-        Difficulty.EASY -> RankD
+        Difficulty.MEDIUM -> RankC
+        Difficulty.MEDIUM -> RankD
     }
 
     Box(

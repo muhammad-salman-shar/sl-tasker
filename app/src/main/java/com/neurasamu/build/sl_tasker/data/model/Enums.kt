@@ -13,11 +13,10 @@ enum class TaskType {
     DEADLINE
 }
 
-enum class Difficulty(val baseEp: Int) {
-    EASY(5),
-    NORMAL(10),
-    HARD(15),
-    EXTREME(20)
+enum class Difficulty {
+    MEDIUM,
+    HARD,
+    CRITICAL
 }
 
 enum class RepeatRule {

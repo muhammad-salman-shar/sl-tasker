@@ -23,10 +23,9 @@ object PenaltyEngine {
         difficulty: Difficulty
     ): PenaltyResult {
         val baseDamage = when (difficulty) {
-            Difficulty.EASY -> 5
-            Difficulty.NORMAL -> 10
-            Difficulty.HARD -> 15
-            Difficulty.EXTREME -> 25
+            Difficulty.MEDIUM -> 5
+            Difficulty.HARD -> 10
+            Difficulty.CRITICAL -> 20
         }
 
         val multiplier = when (priority) {

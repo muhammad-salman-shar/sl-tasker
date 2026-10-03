@@ -29,7 +29,7 @@ class Converters {
     fun fromDifficulty(value: Difficulty): String = value.name
 
     @TypeConverter
-    fun toDifficulty(value: String): Difficulty = runCatching { Difficulty.valueOf(value) }.getOrDefault(Difficulty.NORMAL)
+    fun toDifficulty(value: String): Difficulty = runCatching { Difficulty.valueOf(value) }.getOrDefault(Difficulty.MEDIUM)
 
     @TypeConverter
     fun fromRepeatRule(value: RepeatRule): String = value.name

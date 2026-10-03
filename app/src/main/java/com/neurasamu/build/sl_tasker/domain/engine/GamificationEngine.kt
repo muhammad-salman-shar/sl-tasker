@@ -22,7 +22,11 @@ object GamificationEngine {
         difficulty: Difficulty,
         streakBonusActive: Boolean = false
     ): GamificationResult {
-        val baseEp = difficulty.baseEp
+        val baseEp = when (difficulty) {
+            Difficulty.MEDIUM -> 10
+            Difficulty.HARD -> 30
+            Difficulty.CRITICAL -> 50
+        }
         val streakBonus = if (streakBonusActive && currentStats.streak >= 3) 2 else 0
         val totalEpGained = baseEp + streakBonus
 
@@ -33,10 +37,9 @@ object GamificationEngine {
         val leveledUp = levelsGained > 0
 
         val healthRestored = when (difficulty) {
-            Difficulty.EASY -> 2
-            Difficulty.NORMAL -> 5
-            Difficulty.HARD -> 10
-            Difficulty.EXTREME -> 15
+            Difficulty.MEDIUM -> 10
+            Difficulty.HARD -> 30
+            Difficulty.CRITICAL -> 50
         }
         val newHealth = min(MAX_HEALTH, currentStats.health + healthRestored)
 
@@ -68,7 +71,6 @@ object GamificationEngine {
             totalRecoveries = currentStats.totalRecoveries + 1,
             recoveryModeActive = if (newHealth >= 50) false else currentStats.recoveryModeActive
         )
-
         return GamificationResult(
             updatedStats = updatedStats,
             epGained = 0,
