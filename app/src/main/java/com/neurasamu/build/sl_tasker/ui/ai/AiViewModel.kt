@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-data class AiMessage(val role: String, val text: String)
+data class AiMessage(val role: String, val text: String, val raw: String? = null)
 
 class AiViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -45,13 +45,33 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    private val _lastRawRequest = MutableStateFlow<String?>(null)
+    val lastRawRequest: StateFlow<String?> = _lastRawRequest
+
+    private val _lastRawResponse = MutableStateFlow<String?>(null)
+    val lastRawResponse: StateFlow<String?> = _lastRawResponse
+
+    fun clearChat() {
+        _messages.value = emptyList()
+        _error.value = null
+        _lastRawRequest.value = null
+        _lastRawResponse.value = null
+    }
+
     val config = settings.config
 
     fun dismissError() { _error.value = null }
 
-    fun saveConfig(baseUrl: String, key: String, model: String, timeoutSec: Int) {
+    fun saveConfig(
+        baseUrl: String,
+        key: String,
+        model: String,
+        timeoutSec: Int,
+        useStream: Boolean,
+        useJsonFormat: Boolean
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
-            settings.save(baseUrl, key, model, timeoutSec)
+            settings.save(baseUrl, key, model, timeoutSec, useStream, useJsonFormat)
         }
     }
 
@@ -62,34 +82,51 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
         _messages.value = _messages.value + AiMessage("user", trimmed)
         _busy.value = true
         _error.value = null
+        _lastRawRequest.value = null
+        _lastRawResponse.value = null
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val cfg = settings.config.first()
                 if (!cfg.isConfigured) {
-                    _messages.value = _messages.value + AiMessage("assistant",
+                    _messages.value = _messages.value + AiMessage("error",
                         "Configure API URL + Model in settings (top-right).")
                     return@launch
                 }
 
                 val sysMsg = ChatMsg("system", AiPrompt.buildSystemPrompt())
-                val history = _messages.value.map { ChatMsg(it.role, it.text) }
+                // Only real user + assistant messages — never "error" entries
+                val history = _messages.value
+                    .filter { it.role == "user" || it.role == "assistant" }
+                    .map { ChatMsg(it.role, it.text) }
+
+                _lastRawRequest.value = buildString {
+                    append("URL: ").append(cfg.baseUrl).append('\n')
+                    append("Model: ").append(cfg.model).append('\n')
+                    append("Stream: ").append(cfg.useStream).append('\n')
+                    append("JSON mode: ").append(cfg.useJsonFormat).append('\n')
+                    append("System prompt length: ").append(AiPrompt.buildSystemPrompt().length).append(" chars\n")
+                    append("Messages sent: ").append(history.size)
+                }
 
                 val raw = try {
                     client.chat(cfg, listOf(sysMsg) + history)
                 } catch (e: Exception) {
-                    _messages.value = _messages.value + AiMessage("assistant",
+                    _lastRawResponse.value = "NETWORK ERROR: ${e.message ?: "unknown"}"
+                    _messages.value = _messages.value + AiMessage("error",
                         "Network error: ${e.message ?: "unknown"}")
                     return@launch
                 }
 
+                _lastRawResponse.value = raw
+
                 val cleaned = stripFences(raw)
                 val json = try {
                     JSONObject(cleaned)
-                } catch (e: Exception) {
-                    _messages.value = _messages.value + AiMessage(
-                        "assistant",
-                        "Model returned invalid JSON. Raw reply:\n\n" + raw.take(400)
+                } catch (_: Exception) {
+                    _messages.value = _messages.value + AiMessage("error",
+                        "Model did not return JSON.",
+                        raw = raw.take(600)
                     )
                     return@launch
                 }

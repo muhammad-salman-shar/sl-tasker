@@ -56,6 +56,16 @@ import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun AiSheet(
@@ -68,6 +78,11 @@ fun AiSheet(
     val config by vm.config.collectAsState(initial = com.neurasamu.build.sl_tasker.data.ai.AiConfig())
     var input by remember { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
+    var showRaw by remember { mutableStateOf(false) }
+    val rawReq by vm.lastRawRequest.collectAsState()
+    val rawRes by vm.lastRawResponse.collectAsState()
+    val ctx = LocalContext.current
+
 
     Column(
         modifier = modifier
@@ -96,6 +111,16 @@ fun AiSheet(
                     maxLines = 1
                 )
             }
+            IconButton(onClick = { showRaw = !showRaw }) {
+                Icon(
+                    Icons.Rounded.BugReport,
+                    contentDescription = "Raw debug",
+                    tint = if (showRaw) PrimaryManaBlue else TextMuted
+                )
+            }
+            IconButton(onClick = { vm.clearChat() }) {
+                Icon(Icons.Rounded.Delete, contentDescription = "Clear chat", tint = TextMuted)
+            }
             IconButton(onClick = { showSettings = true }) {
                 Icon(Icons.Rounded.Settings, contentDescription = "Settings", tint = PrimaryManaBlue)
             }
@@ -110,6 +135,27 @@ fun AiSheet(
                 .height(1.dp)
                 .background(DarkBorder)
         )
+
+        if (showRaw) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(DarkSurface)
+                    .padding(10.dp)
+            ) {
+                Text("REQUEST", color = PrimaryManaBlue, fontSize = 10.sp)
+                Text(rawReq ?: "—", color = TextMuted, fontSize = 10.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("RESPONSE", color = PrimaryManaBlue, fontSize = 10.sp)
+                Text(rawRes ?: "—", color = TextMuted, fontSize = 10.sp)
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(DarkBorder)
+            )
+        }
 
         // Messages
         LazyColumn(
@@ -205,39 +251,68 @@ fun AiSheet(
             initialKey = config.apiKey,
             initialModel = config.model,
             initialTimeout = config.timeoutSec,
+            initialStream = config.useStream,
+            initialJson = config.useJsonFormat,
             onDismiss = { showSettings = false },
-            onSave = { url, key, model, timeout ->
-                vm.saveConfig(url, key, model, timeout)
+            onSave = { url, key, model, timeout, streamOn, jsonOn ->
+                vm.saveConfig(url, key, model, timeout, streamOn, jsonOn)
                 showSettings = false
             }
         )
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(msg: AiMessage) {
+    val ctx = LocalContext.current
     val isUser = msg.role == "user"
+    val isError = msg.role == "error"
+
+    val bgColor = when {
+        isError -> DangerPenaltyRed.copy(alpha = 0.15f)
+        isUser -> PrimaryManaBlue.copy(alpha = 0.18f)
+        else -> DarkSurface
+    }
+    val borderColor = when {
+        isError -> DangerPenaltyRed.copy(alpha = 0.6f)
+        isUser -> PrimaryManaBlue.copy(alpha = 0.4f)
+        else -> DarkBorder
+    }
+    val textColor = if (isError) DangerPenaltyRed else TextPrimary
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (isUser) PrimaryManaBlue.copy(alpha = 0.18f) else DarkSurface)
-                .border(
-                    1.dp,
-                    if (isUser) PrimaryManaBlue.copy(alpha = 0.4f) else DarkBorder,
-                    RoundedCornerShape(12.dp)
+                .background(bgColor)
+                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = {
+                        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("ai_msg", msg.text))
+                    }
                 )
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Text(
                 text = msg.text,
-                color = if (isUser) TextPrimary else TextPrimary,
+                color = textColor,
                 fontSize = 12.sp
             )
+            if (msg.raw != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "raw: " + msg.raw,
+                    color = TextMuted,
+                    fontSize = 10.sp
+                )
+            }
         }
     }
 }
@@ -248,13 +323,17 @@ private fun AiSettingsDialog(
     initialKey: String,
     initialModel: String,
     initialTimeout: Int,
+    initialStream: Boolean,
+    initialJson: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, Int) -> Unit
+    onSave: (String, String, String, Int, Boolean, Boolean) -> Unit
 ) {
     var url by remember { mutableStateOf(initialUrl) }
     var key by remember { mutableStateOf(initialKey) }
     var model by remember { mutableStateOf(initialModel) }
     var timeout by remember { mutableStateOf(initialTimeout.toString()) }
+    var useStream by remember { mutableStateOf(initialStream) }
+    var useJson by remember { mutableStateOf(initialJson) }
 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
@@ -272,9 +351,39 @@ private fun AiSettingsDialog(
                 Field("Model", model, { model = it }, "gpt-4o-mini")
                 Spacer(Modifier.height(8.dp))
                 Field("Timeout (sec)", timeout, { v -> timeout = v.filter { it.isDigit() }.take(3) }, "30")
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Streaming (SSE)", color = TextPrimary, fontSize = 11.sp)
+                        Text("Disable if local server errors", color = TextMuted, fontSize = 9.sp)
+                    }
+                    Switch(
+                        checked = useStream,
+                        onCheckedChange = { useStream = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DarkBackground,
+                            checkedTrackColor = PrimaryManaBlue
+                        )
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Force JSON mode", color = TextPrimary, fontSize = 11.sp)
+                        Text("response_format: json_object", color = TextMuted, fontSize = 9.sp)
+                    }
+                    Switch(
+                        checked = useJson,
+                        onCheckedChange = { useJson = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DarkBackground,
+                            checkedTrackColor = PrimaryManaBlue
+                        )
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Anything OpenAI-compatible works (OpenRouter, Groq, LM Studio, Ollama).",
+                    "Anything OpenAI-compatible works (OpenRouter, Groq, LM Studio, Ollama, SaMu Lab).",
                     color = TextMuted,
                     fontSize = 10.sp
                 )
@@ -287,7 +396,9 @@ private fun AiSettingsDialog(
                         url,
                         key,
                         model,
-                        (timeout.toIntOrNull() ?: 30)
+                        (timeout.toIntOrNull() ?: 30),
+                        useStream,
+                        useJson
                     )
                 },
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(

@@ -22,8 +22,10 @@ class AiApiClient {
                 put("model", config.model)
                 put("temperature", 0.1)
                 put("max_tokens", 512)
-                put("stream", true)
-                put("response_format", JSONObject().apply { put("type", "json_object") })
+                if (config.useStream) put("stream", true)
+                if (config.useJsonFormat) {
+                    put("response_format", JSONObject().apply { put("type", "json_object") })
+                }
                 put("messages", JSONArray().apply {
                     messages.forEach { m ->
                         put(JSONObject().apply {
@@ -64,10 +66,18 @@ class AiApiClient {
                 val contentType = (conn.contentType ?: "").lowercase()
                 val reader = BufferedReader(InputStreamReader(stream, "UTF-8"))
 
-                val result = if (contentType.contains("text/event-stream")) {
+                val result = if (config.useStream && contentType.contains("text/event-stream")) {
                     readSse(reader)
                 } else {
-                    readJsonResponse(reader)
+                    // Even if stream was requested, some servers ignore it and send JSON.
+                    val whole = reader.readText()
+                    val trimmed = whole.trimStart()
+                    if (trimmed.startsWith("data:")) {
+                        // It's actually SSE in a single blob
+                        parseSseBlob(whole)
+                    } else {
+                        parseJsonWhole(whole)
+                    }
                 }
 
                 if (result.isBlank()) throw RuntimeException("Empty response")
@@ -101,16 +111,41 @@ class AiApiClient {
         return sb.toString()
     }
 
-    private fun readJsonResponse(reader: BufferedReader): String {
-        val text = reader.readText()
+    private fun parseJsonWhole(text: String): String {
         val root = JSONObject(text)
+        // Some servers return {"error": {...}}
+        root.optJSONObject("error")?.let { err ->
+            throw RuntimeException("Server error: ${err.optString("message", "unknown")}")
+        }
         val choices = root.optJSONArray("choices")
-            ?: throw RuntimeException("No choices in response")
+            ?: throw RuntimeException("No choices in response: ${text.take(200)}")
         val first = choices.optJSONObject(0)
             ?: throw RuntimeException("Empty choices")
         val msg = first.optJSONObject("message")
             ?: throw RuntimeException("No message")
         return msg.optString("content", "")
+    }
+
+    private fun parseSseBlob(blob: String): String {
+        val sb = StringBuilder()
+        blob.split("\n").forEach { rawLine ->
+            val l = rawLine.trim()
+            if (l.startsWith("data:")) {
+                val data = l.removePrefix("data:").trim()
+                if (data == "[DONE]") return@forEach
+                if (data.isNotEmpty()) {
+                    try {
+                        val obj = JSONObject(data)
+                        val delta = obj.optJSONArray("choices")
+                            ?.optJSONObject(0)
+                            ?.optJSONObject("delta")
+                            ?.optString("content", "")
+                        if (!delta.isNullOrEmpty()) sb.append(delta)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+        return sb.toString()
     }
 
     /**
@@ -153,60 +188,32 @@ object AiPrompt {
         val d = now.get(java.util.Calendar.DAY_OF_MONTH)
         val h = now.get(java.util.Calendar.HOUR_OF_DAY)
         val mi = now.get(java.util.Calendar.MINUTE)
-        val dow = when (now.get(java.util.Calendar.DAY_OF_WEEK)) {
-            java.util.Calendar.SUNDAY -> "Sunday"
-            java.util.Calendar.MONDAY -> "Monday"
-            java.util.Calendar.TUESDAY -> "Tuesday"
-            java.util.Calendar.WEDNESDAY -> "Wednesday"
-            java.util.Calendar.THURSDAY -> "Thursday"
-            java.util.Calendar.FRIDAY -> "Friday"
-            else -> "Saturday"
-        }
         val nowTime = "%02d:%02d".format(h, mi)
 
         return """
-You are a JSON API. You receive one English sentence and return one JSON object. Nothing else.
+You are a JSON-only API. Given one English sentence, return ONE JSON object. No prose.
 
-Current: $d/$mo/$y ($dow) at $nowTime. Days: 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat.
+Now: $d/$mo/$y $nowTime. Days 0=Sun..6=Sat.
 
-Return one of these exactly:
+Formats:
+Task  {"action":"create_task","title":"T","time":"HH:MM","days":"","type":"MEDIUM","duration_minutes":0}
+Alarm {"action":"create_alarm","label":"L","time":"HH:MM","days":""}
+Chat  {"action":"chat","reply":"your sentence"}
 
-Task:  {"action":"create_task","title":"TITLE","time":"HH:MM","days":"","type":"MEDIUM","duration_minutes":0}
-Alarm: {"action":"create_alarm","label":"LABEL","time":"HH:MM","days":""}
-Chat:  {"action":"chat","reply":"YOUR REPLY TEXT"}
+Rules: time is 24h HH:MM. days "" or "1,3,5". type MEDIUM|HARD|CRITICAL. duration_minutes 0 for MEDIUM. Reply with JSON only. If info is missing, use chat and ask one short question.
 
-Field rules:
-- time: 24-hour HH:MM
-- days: "" for one-time. For repeat use weekday numbers like "1,2,3,4,5"
-- type: MEDIUM | HARD | CRITICAL
-- duration_minutes: 0 for MEDIUM, otherwise minutes
+Examples:
+IN: Study math tomorrow 7pm 1 hour hard
+OUT: {"action":"create_task","title":"Study math","time":"19:00","days":"","type":"HARD","duration_minutes":60}
 
-Follow these examples exactly:
+IN: Wake me 6:30 weekdays
+OUT: {"action":"create_alarm","label":"Wake up","time":"06:30","days":"1,2,3,4,5"}
 
-Input: Study math tomorrow at 7 PM for 1 hour, hard
-Output: {"action":"create_task","title":"Study math","time":"19:00","days":"","type":"HARD","duration_minutes":60}
+IN: Hi
+OUT: {"action":"chat","reply":"Hi. Tell me a task or alarm."}
 
-Input: Wake me at 6:30 AM on weekdays
-Output: {"action":"create_alarm","label":"Wake up","time":"06:30","days":"1,2,3,4,5"}
-
-Input: Code every Monday and Friday at 5 PM for 90 min, hard
-Output: {"action":"create_task","title":"Code","time":"17:00","days":"1,5","type":"HARD","duration_minutes":90}
-
-Input: Add a task called read a book
-Output: {"action":"chat","reply":"What time should I set for reading?"}
-
-Input: Hi
-Output: {"action":"chat","reply":"Hi. Tell me a task or alarm to create."}
-
-Input: Create an alarm for 10 min
-Output: {"action":"chat","reply":"What time should the alarm ring?"}
-
-Hard rules:
-- Reply with ONLY the JSON. No text before or after.
-- Do not write the words "a short natural question" or anything in angle brackets.
-- In the "reply" field, write a real natural sentence of your own.
-- Never invent user data. If something is missing, ask for it in "reply".
-- Ask one short question at most.
+IN: Add task read a book
+OUT: {"action":"chat","reply":"What time should I set?"}
 """.trimIndent()
     }
 
