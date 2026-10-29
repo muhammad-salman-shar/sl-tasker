@@ -44,4 +44,7 @@ interface OccurrenceDao {
 
     @Query("DELETE FROM occurrences WHERE id = :id")
     suspend fun deleteOccurrenceById(id: Long)
+
+    @Query("SELECT * FROM occurrences WHERE status = 'PENDING' AND taskId IN (SELECT id FROM tasks WHERE difficulty = 'CRITICAL' AND archived = 0)")
+    suspend fun getActiveCriticalOccurrences(): List<OccurrenceEntity>
 }

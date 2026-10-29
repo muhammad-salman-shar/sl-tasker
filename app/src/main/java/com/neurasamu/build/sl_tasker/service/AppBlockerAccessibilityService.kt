@@ -48,7 +48,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         serviceScope.launch {
             try {
                 val state = blockPrefs.state.first()
-                val criticalActive = blockPrefs.criticalActive.first()
+                val criticalActive = try { database.occurrenceDao().getActiveCriticalOccurrences().isNotEmpty() } catch (e: Exception) { false }
                 val stats = database.playerStatsDao().getPlayerStats()
                 val healthLow = (stats?.health ?: 100) <= 30
 

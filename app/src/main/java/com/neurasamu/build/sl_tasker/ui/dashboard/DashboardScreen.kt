@@ -168,12 +168,7 @@ fun DashboardScreen(
                             onComplete = {
                                 taskViewModel.completeQuest(item.occurrence.id)
                             },
-                            onStart = {
-                                timerItem = item
-                                if (item.task.difficulty == com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL) {
-                                    scope.launch { blockPrefs.setCriticalActive(true) }
-                                }
-                            },
+                            onStart = { timerItem = item },
                             onEdit = { editingTask = item.task },
                             onDelete = { taskViewModel.deleteTask(item.task.id) }
                         )
@@ -212,17 +207,9 @@ fun DashboardScreen(
             accentColor = accent,
             onFinish = {
                 taskViewModel.completeQuest(item.occurrence.id)
-                if (item.task.difficulty == com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL) {
-                    scope.launch { blockPrefs.setCriticalActive(false) }
-                }
                 timerItem = null
             },
-            onCancel = {
-                if (item.task.difficulty == com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL) {
-                    scope.launch { blockPrefs.setCriticalActive(false) }
-                }
-                timerItem = null
-            }
+            onCancel = { timerItem = null }
         )
     }
 

@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class TaskOccurrenceItem(
     val task: TaskEntity,
@@ -75,7 +76,18 @@ class TaskViewModel(
 
     fun completeQuest(occurrenceId: Long) {
         viewModelScope.launch(Dispatchers.IO) {
-            taskRepository.completeOccurrence(occurrenceId)
+            try {
+                val success = taskRepository.completeOccurrence(occurrenceId)
+                if (!success) {
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(getApplication(), "Task could not be completed right now.", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(getApplication(), "Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 

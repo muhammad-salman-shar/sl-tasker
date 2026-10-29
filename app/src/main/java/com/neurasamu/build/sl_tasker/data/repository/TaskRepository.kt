@@ -56,7 +56,6 @@ class TaskRepository(private val database: AppDatabase) {
     suspend fun completeOccurrence(occurrenceId: Long): Boolean = withContext(Dispatchers.IO) {
         database.withTransaction {
             val occurrence = occurrenceDao.getOccurrenceById(occurrenceId) ?: return@withTransaction false
-            if (occurrence.scheduledAt > System.currentTimeMillis()) return@withTransaction false
             val task = taskDao.getTaskById(occurrence.taskId) ?: return@withTransaction false
             val currentStats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
 
