@@ -48,20 +48,21 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         serviceScope.launch {
             try {
                 val state = blockPrefs.state.first()
-                val criticalActive = try { database.occurrenceDao().getActiveCriticalOccurrences().isNotEmpty() } catch (e: Exception) { false }
                 val stats = database.playerStatsDao().getPlayerStats()
-                val healthLow = (stats?.health ?: 100) <= 30
+                val health = stats?.health ?: 100
 
+                // Blocking rules (stable):
+                //   - TEST mode ON        -> block selected apps (manual testing)
+                //   - Health < 40         -> block selected apps (or all apps if STRICT)
+                //   - Otherwise           -> no blocking
                 val testOn = state.mode == BlockMode.TEST
                 val strictOn = state.mode == BlockMode.STRICT
+                val healthLow = health < 40
 
-                val triggered = criticalActive || healthLow || testOn
-                if (!triggered) return@launch
-
-                val shouldBlock = when {
+                val shouldBlock: Boolean = when {
                     testOn -> pkg in state.selectedPackages
-                    strictOn -> true
-                    else -> pkg in state.selectedPackages
+                    healthLow -> if (strictOn) true else pkg in state.selectedPackages
+                    else -> false
                 }
                 if (!shouldBlock) return@launch
 

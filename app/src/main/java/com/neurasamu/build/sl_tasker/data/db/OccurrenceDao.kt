@@ -47,4 +47,7 @@ interface OccurrenceDao {
 
     @Query("SELECT * FROM occurrences WHERE status = 'PENDING' AND taskId IN (SELECT id FROM tasks WHERE difficulty = 'CRITICAL' AND archived = 0)")
     suspend fun getActiveCriticalOccurrences(): List<OccurrenceEntity>
+
+    @Query("SELECT * FROM occurrences WHERE taskId = :taskId AND status = 'PENDING' AND scheduledAt > :now LIMIT 1")
+    suspend fun getNextPendingOccurrence(taskId: Long, now: Long): OccurrenceEntity?
 }

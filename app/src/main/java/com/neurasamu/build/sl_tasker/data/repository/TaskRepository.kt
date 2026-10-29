@@ -95,23 +95,31 @@ class TaskRepository(private val database: AppDatabase) {
             taskDebtDao.resolveDebt(occurrenceId)
 
             if (task.repeatRule == com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE) {
+                // One-time task: archive it so it disappears from active lists
                 taskDao.archiveTask(task.id)
             } else {
-                val nextScheduled = RecurrenceHelper.calculateNextOccurrence(
-                    baseScheduledAt = occurrence.scheduledAt,
-                    repeatRule = task.repeatRule,
-                    customRepeatDays = task.customRepeatDays
-                )
-                if (nextScheduled != null) {
-                    val durationMillis = task.durationMinutes * 60 * 1000L
-                    occurrenceDao.insertOccurrence(
-                        OccurrenceEntity(
-                            taskId = task.id,
-                            scheduledAt = nextScheduled,
-                            deadlineAt = nextScheduled + durationMillis,
-                            durationMinutes = task.durationMinutes
-                        )
+                // Repeat task: only create a next occurrence if none exists AND the
+                // calculated next time is strictly in the future (prevents duplicates
+                // and phantom same-time occurrences).
+                val now = System.currentTimeMillis()
+                val existingNext = occurrenceDao.getNextPendingOccurrence(task.id, now)
+                if (existingNext == null) {
+                    val nextScheduled = RecurrenceHelper.calculateNextOccurrence(
+                        baseScheduledAt = occurrence.scheduledAt,
+                        repeatRule = task.repeatRule,
+                        customRepeatDays = task.customRepeatDays
                     )
+                    if (nextScheduled != null && nextScheduled > now) {
+                        val durationMillis = task.durationMinutes * 60 * 1000L
+                        occurrenceDao.insertOccurrence(
+                            OccurrenceEntity(
+                                taskId = task.id,
+                                scheduledAt = nextScheduled,
+                                deadlineAt = nextScheduled + durationMillis,
+                                durationMinutes = task.durationMinutes
+                            )
+                        )
+                    }
                 }
             }
 
