@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.lifecycleScope
 import com.neurasamu.build.sl_tasker.data.player.PlayerProfileStore
 import com.neurasamu.build.sl_tasker.ui.intro.IntroActivity
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
