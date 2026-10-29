@@ -78,6 +78,9 @@ import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.neurasamu.build.sl_tasker.ui.ai.AiSheet
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.lifecycleScope
+import com.neurasamu.build.sl_tasker.data.player.PlayerProfileStore
+import com.neurasamu.build.sl_tasker.ui.intro.IntroActivity
 
 class MainActivity : ComponentActivity() {
 
@@ -93,13 +96,27 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         checkAndRequestPermissions()
 
-        setContent {
-            SoloLevelingTheme {
-                MainAppScaffold(
-                    taskViewModel = taskViewModel,
-                    statsViewModel = statsViewModel,
-                    alarmViewModel = alarmViewModel
-                )
+        lifecycleScope.launch {
+            val completed = try {
+                PlayerProfileStore(applicationContext).isCompleted()
+            } catch (_: Throwable) {
+                false
+            }
+
+            if (!completed) {
+                startActivity(Intent(this@MainActivity, IntroActivity::class.java))
+                finish()
+                return@launch
+            }
+
+            setContent {
+                SoloLevelingTheme {
+                    MainAppScaffold(
+                        taskViewModel = taskViewModel,
+                        statsViewModel = statsViewModel,
+                        alarmViewModel = alarmViewModel
+                    )
+                }
             }
         }
     }

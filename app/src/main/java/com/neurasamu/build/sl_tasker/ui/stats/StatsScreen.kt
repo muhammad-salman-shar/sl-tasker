@@ -64,6 +64,12 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
+import com.neurasamu.build.sl_tasker.data.player.PlayerProfile
+import com.neurasamu.build.sl_tasker.data.player.PlayerProfileStore
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 @Composable
 fun StatsScreen(
@@ -72,6 +78,14 @@ fun StatsScreen(
 ) {
     val stats by statsViewModel.playerStats.collectAsStateWithLifecycle()
     val events by statsViewModel.recentEvents.collectAsStateWithLifecycle()
+
+    val ctx = LocalContext.current
+    var profile by remember { mutableStateOf<PlayerProfile?>(null) }
+    LaunchedEffect(Unit) {
+        try {
+            PlayerProfileStore(ctx).profile.collect { p -> profile = p }
+        } catch (_: Throwable) { }
+    }
 
     val healthProgress = (stats.health.coerceIn(0, 100)) / 100f
     val epProgress = (stats.ep.coerceIn(0, GamificationEngine.EP_PER_LEVEL)).toFloat() /
@@ -85,6 +99,12 @@ fun StatsScreen(
         contentPadding = PaddingValues(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        profile?.let { p ->
+            if (p.introCompleted) {
+                item { PlayerIdentityCard(p) }
+            }
+        }
+
         item {
             Text(
                 text = "HUNTER PROFILE",
@@ -503,5 +523,53 @@ private fun EventRow(event: com.neurasamu.build.sl_tasker.data.model.EventEntity
                 fontSize = 9.sp
             )
         }
+    }
+}
+
+@Composable
+private fun PlayerIdentityCard(profile: PlayerProfile) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(DarkCard)
+            .border(1.dp, PrimaryManaBlue.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+            .padding(16.dp)
+    ) {
+        Text(
+            "PLAYER IDENTITY",
+            color = PrimaryManaBlue,
+            fontSize = 11.sp,
+            style = MaterialTheme.typography.labelLarge,
+            letterSpacing = 2.sp
+        )
+        Spacer(Modifier.height(10.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                IdentityRow("NAME", profile.name.uppercase())
+                Spacer(Modifier.height(6.dp))
+                IdentityRow("GENDER", if (profile.gender.lowercase() == "male") "MALE" else if (profile.gender.lowercase() == "female") "FEMALE" else profile.gender.uppercase())
+                Spacer(Modifier.height(6.dp))
+                IdentityRow("AGE", profile.age.toString())
+            }
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                Text("PLAYER ID", color = TextMuted, fontSize = 9.sp, letterSpacing = 1.sp)
+                Text(
+                    profile.playerId,
+                    color = PrimaryManaBlue,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun IdentityRow(label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = TextMuted, fontSize = 9.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.width(8.dp))
+        Text(value, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }

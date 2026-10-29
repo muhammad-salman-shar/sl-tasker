@@ -1,0 +1,2244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#04050c">
+<title>SOVEREIGN AWAKENING — System Registration</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   BASE
+   ============================================================ */
+:root{
+  --cyan:#5fe0ff;
+  --blue:#2a7fff;
+  --violet:#9b6bff;
+  --purple:#6a2ce0;
+  --bg:#03040a;
+  --txt:#dfe9ff;
+  --dim:#7d8bb0;
+  --glass: rgba(9,14,30,.82);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{
+  height:100%;margin:0;padding:0;
+  background:var(--bg);
+  color:var(--txt);
+  font-family:'Rajdhani',system-ui,-apple-system,sans-serif;
+  overflow:hidden;
+  overscroll-behavior:none;
+}
+body{position:fixed;inset:0;}
+input,button{font-family:inherit;}
+
+/* ============================================================
+   WEBGL CANVAS + ATMOSPHERE LAYERS
+   ============================================================ */
+#webgl{
+  position:fixed;inset:0;width:100%;height:100%;
+  display:block;z-index:0;
+}
+.fallback-bg{
+  position:fixed;inset:0;z-index:0;display:none;
+  background:
+    radial-gradient(ellipse at 50% 62%, rgba(40,90,190,.28) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(120,60,220,.22) 0%, transparent 60%),
+    radial-gradient(circle at 50% 50%, #0a1226 0%, #05070f 55%, #020308 100%);
+}
+.fallback-bg::after{
+  content:'';position:absolute;inset:0;
+  background-image:
+    radial-gradient(1.6px 1.6px at 20% 30%, rgba(120,210,255,.75), transparent),
+    radial-gradient(1.4px 1.4px at 70% 60%, rgba(170,130,255,.65), transparent),
+    radial-gradient(1.2px 1.2px at 40% 80%, rgba(120,210,255,.55), transparent),
+    radial-gradient(1.8px 1.8px at 85% 20%, rgba(170,130,255,.6), transparent),
+    radial-gradient(1.3px 1.3px at 12% 70%, rgba(120,210,255,.5), transparent);
+  background-size:100% 100%;
+  animation:floatBg 18s ease-in-out infinite alternate;
+}
+@keyframes floatBg{
+  0%{transform:translate3d(0,0,0) scale(1);opacity:.7}
+  100%{transform:translate3d(0,-24px,0) scale(1.06);opacity:1}
+}
+body.no-webgl #webgl{display:none;}
+body.no-webgl .fallback-bg{display:block;}
+
+#vignette{
+  position:fixed;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 50%, transparent 32%, rgba(0,0,0,.55) 78%, rgba(0,0,0,.9) 100%);
+}
+#flash{
+  position:fixed;inset:0;z-index:80;pointer-events:none;
+  background:radial-gradient(circle at 50% 45%, #ffffff 0%, #bfe6ff 35%, #6fa8ff 70%, transparent 100%);
+  opacity:0;mix-blend-mode:screen;
+}
+
+/* ============================================================
+   HUD
+   ============================================================ */
+#hud{
+  position:fixed;top:0;left:0;right:0;z-index:60;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(14px + env(safe-area-inset-top)) 18px 0;
+  pointer-events:none;
+}
+#hud > *{pointer-events:auto;}
+
+#progress{
+  display:flex;gap:9px;align-items:center;
+  opacity:0;transition:opacity .5s ease;
+}
+#progress.show{opacity:1;}
+#progress i{
+  display:block;width:24px;height:3px;border-radius:2px;
+  background:rgba(120,160,255,.16);
+  position:relative;overflow:hidden;
+  transition:background .4s ease, box-shadow .4s ease;
+}
+#progress i.done{
+  background:linear-gradient(90deg,var(--cyan),var(--violet));
+  box-shadow:0 0 10px rgba(95,224,255,.7);
+}
+#progress i.active{
+  background:rgba(95,224,255,.25);
+  box-shadow:0 0 10px rgba(95,224,255,.55);
+}
+#progress i.active::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  animation:pSlide 1.3s linear infinite;
+}
+@keyframes pSlide{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+#mute{
+  width:42px;height:42px;border-radius:50%;
+  display:grid;place-items:center;
+  background:rgba(10,18,38,.65);
+  border:1px solid rgba(95,180,255,.28);
+  color:var(--cyan);
+  font-size:16px;cursor:pointer;
+  backdrop-filter:blur(8px);
+  transition:all .3s ease;
+  box-shadow:0 0 18px rgba(40,110,220,.28);
+}
+#mute:hover{border-color:rgba(95,224,255,.7);box-shadow:0 0 24px rgba(95,224,255,.5);}
+#mute.off{color:#5b6683;border-color:rgba(90,110,150,.25);box-shadow:none;}
+
+/* ============================================================
+   STAGES
+   ============================================================ */
+#ui{position:fixed;inset:0;z-index:20;}
+
+.stage{
+  position:fixed;inset:0;
+  display:flex;
+  padding:76px 18px 40px;
+  opacity:0;
+  pointer-events:none;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+.stage > *{margin:auto;}
+.stage.active{pointer-events:auto;}
+
+/* ============================================================
+   PANEL
+   ============================================================ */
+.panel{
+  position:relative;
+  width:min(94vw,560px);
+  padding:34px 26px 30px;
+  background:linear-gradient(160deg, rgba(11,18,38,.88), rgba(4,7,16,.94));
+  border:1px solid rgba(95,180,255,.20);
+  box-shadow:
+    0 0 0 1px rgba(95,224,255,.05),
+    0 0 70px rgba(40,90,200,.28),
+    0 24px 60px rgba(0,0,0,.75),
+    inset 0 0 70px rgba(30,70,170,.13);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  clip-path:polygon(24px 0,100% 0,100% calc(100% - 24px),calc(100% - 24px) 100%,0 100%,0 24px);
+}
+.panel::before{
+  content:'';position:absolute;top:0;left:24px;width:70px;height:2px;
+  background:linear-gradient(90deg,var(--cyan),transparent);
+  box-shadow:0 0 14px var(--cyan);
+}
+.panel::after{
+  content:'';position:absolute;bottom:0;right:24px;width:70px;height:2px;
+  background:linear-gradient(270deg,var(--violet),transparent);
+  box-shadow:0 0 14px var(--violet);
+}
+
+.step-tag{
+  font-size:12px;letter-spacing:.42em;
+  color:var(--cyan);opacity:.8;margin-bottom:16px;
+  text-transform:uppercase;
+}
+.q{
+  font-family:'Cinzel',serif;
+  font-weight:700;
+  font-size:clamp(22px,5.4vw,32px);
+  line-height:1.22;
+  margin:0 0 26px;
+  letter-spacing:.02em;
+  background:linear-gradient(180deg,#ffffff 0%,#a9d4ff 55%,#6b9de0 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow:0 0 34px rgba(95,180,255,.4);
+}
+.q .accent{
+  background:linear-gradient(180deg,#d9c2ff,#9b6bff);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+/* ============================================================
+   INTRO
+   ============================================================ */
+#stage-intro{text-align:center;}
+.intro-inner{width:min(94vw,760px);}
+
+.sys-tag{
+  font-size:11px;letter-spacing:.44em;color:var(--cyan);
+  opacity:.75;margin-bottom:26px;text-transform:uppercase;
+  text-shadow:0 0 18px rgba(95,224,255,.8);
+}
+.title{
+  font-family:'Cinzel',serif;
+  font-weight:900;
+  margin:0 0 22px;
+  line-height:.98;
+  letter-spacing:.04em;
+}
+.t-mask{display:block;overflow:hidden;padding:2px 0;}
+.t-line{
+  display:block;
+  font-size:clamp(38px,12vw,104px);
+  background:linear-gradient(180deg,#ffffff 0%,#c9e4ff 38%,#5b9fe8 78%,#2c5fb0 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 30px rgba(80,170,255,.65)) drop-shadow(0 0 70px rgba(110,70,255,.35));
+}
+.t-line.alt{
+  font-size:clamp(30px,9vw,80px);
+  letter-spacing:.18em;
+  background:linear-gradient(180deg,#f0e2ff 0%,#b48bff 45%,#6a2ce0 100%);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 30px rgba(150,100,255,.7));
+}
+.subtitle{
+  font-size:clamp(13px,3.4vw,16px);
+  letter-spacing:.18em;
+  color:#8fa6cf;
+  margin:0 0 40px;
+  text-transform:uppercase;
+  line-height:1.7;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn-primary{
+  position:relative;
+  display:inline-flex;align-items:center;justify-content:center;gap:12px;
+  padding:16px 42px;
+  font-family:'Cinzel',serif;
+  font-size:clamp(13px,3.6vw,16px);
+  font-weight:700;letter-spacing:.24em;
+  color:#eaf6ff;
+  background:linear-gradient(135deg, rgba(30,90,200,.55), rgba(90,40,190,.55));
+  border:1px solid rgba(120,200,255,.55);
+  cursor:pointer;
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);
+  transition:all .35s cubic-bezier(.2,.8,.3,1);
+  box-shadow:0 0 30px rgba(50,130,255,.35), inset 0 0 26px rgba(80,160,255,.14);
+  overflow:hidden;
+  text-transform:uppercase;
+}
+.btn-primary::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.4) 50%,transparent 75%);
+  transform:translateX(-130%);
+  transition:transform .8s ease;
+}
+.btn-primary:hover::before{transform:translateX(130%);}
+.btn-primary:hover{
+  border-color:rgba(160,230,255,.95);
+  box-shadow:0 0 52px rgba(90,190,255,.7), inset 0 0 34px rgba(120,200,255,.28);
+  transform:translateY(-2px);
+}
+.btn-primary:active{transform:translateY(0) scale(.98);}
+.btn-primary:disabled{
+  opacity:.32;cursor:not-allowed;filter:saturate(.3);
+  transform:none;box-shadow:none;
+}
+.btn-primary:disabled::before{display:none;}
+
+.btn-ghost{
+  padding:14px 26px;
+  font-size:13px;font-weight:600;letter-spacing:.2em;
+  color:#7f93b8;
+  background:transparent;
+  border:1px solid rgba(110,140,190,.28);
+  cursor:pointer;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  transition:all .3s ease;
+  text-transform:uppercase;
+}
+.btn-ghost:hover{color:var(--cyan);border-color:rgba(95,224,255,.6);box-shadow:0 0 22px rgba(60,140,240,.35);}
+
+.actions{
+  display:flex;gap:14px;justify-content:space-between;align-items:center;
+  margin-top:26px;flex-wrap:wrap;
+}
+.actions .btn-primary{flex:1;min-width:150px;}
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+.field{position:relative;margin-bottom:6px;}
+.field input{
+  width:100%;
+  padding:17px 18px;
+  font-size:18px;
+  font-weight:500;
+  letter-spacing:.1em;
+  color:#e8f4ff;
+  background:rgba(5,10,24,.75);
+  border:1px solid rgba(95,180,255,.28);
+  outline:none;
+  clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);
+  transition:border-color .3s ease, box-shadow .3s ease, background .3s ease;
+  caret-color:var(--cyan);
+}
+.field input::placeholder{color:#4d5c7d;letter-spacing:.12em;font-weight:400;}
+.field input:focus{
+  border-color:rgba(95,224,255,.85);
+  background:rgba(8,16,36,.9);
+  box-shadow:0 0 30px rgba(60,160,255,.4), inset 0 0 24px rgba(50,140,255,.15);
+}
+.field-glow{
+  position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),var(--violet),transparent);
+  opacity:0;transition:opacity .35s ease;
+  pointer-events:none;
+}
+.field input:focus ~ .field-glow{opacity:1;}
+
+.err{
+  min-height:20px;
+  font-size:13px;letter-spacing:.1em;
+  color:#ff6b8a;
+  margin:6px 0 0 4px;
+  opacity:0;
+  transition:opacity .25s ease;
+  text-transform:uppercase;
+}
+.err.show{opacity:1;}
+
+.shake{animation:shakeAnim .42s cubic-bezier(.36,.07,.19,.97);}
+@keyframes shakeAnim{
+  10%,90%{transform:translateX(-2px)}
+  20%,80%{transform:translateX(4px)}
+  30%,50%,70%{transform:translateX(-7px)}
+  40%,60%{transform:translateX(7px)}
+}
+
+/* ============================================================
+   GENDER CARDS
+   ============================================================ */
+.cards{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;
+  perspective:1000px;
+  margin-bottom:8px;
+}
+.card{
+  position:relative;
+  display:flex;flex-direction:column;align-items:center;
+  padding:22px 10px 18px;
+  background:linear-gradient(170deg, rgba(14,22,46,.85), rgba(5,9,20,.92));
+  border:1px solid rgba(95,180,255,.18);
+  cursor:pointer;
+  transform-style:preserve-3d;
+  will-change:transform;
+  clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px);
+  transition:border-color .35s ease, box-shadow .35s ease, background .35s ease;
+  overflow:hidden;
+}
+.card::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at 50% 30%, rgba(95,180,255,.16), transparent 65%);
+  opacity:0;transition:opacity .4s ease;
+}
+.card:hover::after,.card.sel::after{opacity:1;}
+.card:hover,.card.sel{
+  border-color:rgba(95,224,255,.75);
+  box-shadow:0 0 40px rgba(60,150,255,.45), inset 0 0 40px rgba(50,120,240,.16);
+}
+.card.sel{
+  background:linear-gradient(170deg, rgba(30,60,130,.8), rgba(10,18,42,.94));
+}
+.card svg{
+  width:100%;max-width:104px;height:auto;
+  transform:translateZ(28px);
+  filter:drop-shadow(0 0 16px rgba(95,180,255,.55));
+  transition:filter .4s ease;
+}
+.card.sel svg{filter:drop-shadow(0 0 26px rgba(120,220,255,.95));}
+.card-label{
+  margin-top:14px;
+  font-family:'Cinzel',serif;
+  font-size:13px;font-weight:700;letter-spacing:.3em;
+  color:#9fc4ee;
+  transform:translateZ(18px);
+  transition:color .3s ease;
+}
+.card.sel .card-label{color:var(--cyan);text-shadow:0 0 18px rgba(95,224,255,.9);}
+.card-check{
+  position:absolute;top:10px;right:12px;
+  width:22px;height:22px;border-radius:50%;
+  display:grid;place-items:center;
+  font-size:12px;font-weight:700;
+  color:#031018;
+  background:var(--cyan);
+  box-shadow:0 0 18px var(--cyan);
+  transform:scale(0) translateZ(30px);
+  transition:transform .35s cubic-bezier(.34,1.56,.64,1);
+}
+.card.sel .card-check{transform:scale(1) translateZ(30px);}
+
+/* ============================================================
+   AGE
+   ============================================================ */
+.age-wrap{
+  display:flex;align-items:center;justify-content:center;gap:22px;
+  margin:6px 0 18px;
+}
+.age-btn{
+  width:52px;height:52px;border-radius:50%;
+  display:grid;place-items:center;
+  font-size:24px;font-weight:300;line-height:1;
+  color:var(--cyan);
+  background:rgba(10,20,44,.7);
+  border:1px solid rgba(95,180,255,.35);
+  cursor:pointer;
+  transition:all .25s ease;
+  user-select:none;
+}
+.age-btn:hover{border-color:var(--cyan);box-shadow:0 0 26px rgba(95,224,255,.6);}
+.age-btn:active{transform:scale(.92);}
+.age-display{
+  display:flex;align-items:baseline;gap:8px;
+  font-family:'Cinzel',serif;
+  min-width:130px;justify-content:center;
+}
+.age-display #age-val{
+  font-size:60px;font-weight:900;line-height:1;
+  background:linear-gradient(180deg,#ffffff,#7fc2ff 55%,#3a7fe0);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 26px rgba(95,180,255,.7));
+}
+.age-unit{font-size:14px;letter-spacing:.28em;color:#7f93b8;}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--cyan),var(--violet));
+  outline:none;margin:16px 0 6px;
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:22px;height:22px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#ffffff,#5fe0ff 55%,#2a7fff);
+  box-shadow:0 0 22px rgba(95,224,255,.95), 0 0 4px #fff;
+  cursor:pointer;
+  border:none;
+}
+input[type=range]::-moz-range-thumb{
+  width:22px;height:22px;border-radius:50%;border:none;
+  background:radial-gradient(circle at 35% 30%,#ffffff,#5fe0ff 55%,#2a7fff);
+  box-shadow:0 0 22px rgba(95,224,255,.95);
+  cursor:pointer;
+}
+.age-hint{
+  font-size:12px;letter-spacing:.24em;color:#5d6d90;
+  text-align:center;text-transform:uppercase;
+}
+
+/* ============================================================
+   PREVIEW CARD
+   ============================================================ */
+.preview{
+  margin-top:6px;
+  padding:16px 18px;
+  background:linear-gradient(150deg, rgba(12,20,44,.9), rgba(5,9,20,.95));
+  border:1px solid rgba(95,180,255,.22);
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);
+  position:relative;
+  overflow:hidden;
+}
+.preview::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  animation:scan 3.4s linear infinite;
+  opacity:.7;
+}
+@keyframes scan{0%{transform:translateY(0)}100%{transform:translateY(190px)}}
+.pv-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0;
+  font-size:13px;letter-spacing:.18em;
+  border-bottom:1px dashed rgba(95,180,255,.11);
+}
+.pv-row:last-child{border-bottom:none;}
+.pv-row span{color:#66789c;text-transform:uppercase;}
+.pv-row b{color:#cfe6ff;font-weight:600;letter-spacing:.14em;}
+.pv-row.big b{
+  color:var(--cyan);
+  font-family:'Cinzel',serif;
+  font-size:17px;
+  text-shadow:0 0 22px rgba(95,224,255,.9);
+  letter-spacing:.1em;
+}
+
+/* ============================================================
+   AWAKENING
+   ============================================================ */
+#stage-awakening{text-align:center;}
+.awak-inner{width:min(94vw,700px);}
+.awak-label{
+  font-family:'Cinzel',serif;
+  font-size:clamp(26px,7vw,52px);
+  font-weight:900;letter-spacing:.3em;
+  color:#eaf6ff;
+  text-shadow:0 0 40px rgba(95,200,255,.95),0 0 90px rgba(120,60,255,.7);
+  margin:0 0 26px;
+}
+.awak-bar{
+  width:min(78vw,420px);height:3px;margin:0 auto;
+  background:rgba(95,180,255,.14);
+  border-radius:2px;overflow:hidden;
+  position:relative;
+}
+.awak-bar i{
+  display:block;height:100%;width:0%;
+  background:linear-gradient(90deg,var(--cyan),var(--violet));
+  box-shadow:0 0 22px var(--cyan);
+}
+.awak-sub{
+  margin-top:22px;
+  font-size:12px;letter-spacing:.4em;color:#7f93b8;
+  text-transform:uppercase;
+}
+
+/* ============================================================
+   STATUS
+   ============================================================ */
+.status-card{
+  width:min(94vw,620px);
+  position:relative;
+  padding:0;
+  background:linear-gradient(160deg, rgba(11,20,44,.92), rgba(3,6,14,.96));
+  border:1px solid rgba(95,200,255,.32);
+  clip-path:polygon(28px 0,100% 0,100% calc(100% - 28px),calc(100% - 28px) 100%,0 100%,0 28px);
+  box-shadow:0 0 90px rgba(50,120,255,.35), inset 0 0 90px rgba(40,90,200,.16);
+  overflow:hidden;
+}
+.status-card::before{
+  content:'';position:absolute;inset:-2px;
+  background:conic-gradient(from 0deg, transparent 0%, rgba(95,224,255,.5) 12%, transparent 26%, transparent 74%, rgba(155,107,255,.5) 88%, transparent 100%);
+  animation:spinGlow 6s linear infinite;
+  opacity:.4;pointer-events:none;
+  z-index:0;
+}
+@keyframes spinGlow{to{transform:rotate(360deg)}}
+.status-inner{position:relative;z-index:1;padding:32px 26px 30px;background:inherit;}
+
+.status-head{
+  font-family:'Cinzel',serif;
+  text-align:center;
+  font-size:clamp(15px,4vw,20px);
+  font-weight:700;letter-spacing:.42em;
+  color:var(--cyan);
+  text-shadow:0 0 26px rgba(95,224,255,.9);
+  margin-bottom:6px;
+  text-transform:uppercase;
+}
+.status-sub{
+  text-align:center;
+  font-size:11px;letter-spacing:.34em;color:#5d6d90;
+  margin-bottom:26px;text-transform:uppercase;
+}
+.status-grid{display:grid;gap:2px;}
+.stat{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:13px 16px;
+  background:rgba(255,255,255,.022);
+  border-left:2px solid rgba(95,180,255,.5);
+  transition:background .3s ease;
+}
+.stat:nth-child(even){background:rgba(255,255,255,.045);border-left-color:rgba(155,107,255,.55);}
+.stat label{
+  font-size:12px;letter-spacing:.28em;color:#6b7fa6;text-transform:uppercase;
+}
+.stat value{
+  font-family:'Cinzel',serif;
+  font-size:clamp(15px,4.2vw,19px);
+  font-weight:700;letter-spacing:.1em;
+  color:#eaf6ff;
+  text-shadow:0 0 20px rgba(95,180,255,.75);
+}
+.stat.hero value{
+  color:var(--cyan);
+  font-size:clamp(18px,5vw,24px);
+  text-shadow:0 0 30px rgba(95,224,255,1);
+}
+.rank-row{
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  margin-top:24px;
+  font-size:12px;letter-spacing:.4em;color:#6b7fa6;
+  text-transform:uppercase;
+}
+.rank-badge{
+  width:58px;height:58px;
+  display:grid;place-items:center;
+  font-family:'Cinzel',serif;font-size:26px;font-weight:900;
+  color:#0a0418;
+  background:radial-gradient(circle at 35% 28%,#ffffff,#9b6bff 55%,#5a1fd0);
+  box-shadow:0 0 42px rgba(155,107,255,.95);
+  clip-path:polygon(50% 0,100% 26%,100% 74%,50% 100%,0 74%,0 26%);
+  animation:rankPulse 2.4s ease-in-out infinite;
+}
+@keyframes rankPulse{
+  0%,100%{box-shadow:0 0 32px rgba(155,107,255,.8)}
+  50%{box-shadow:0 0 60px rgba(155,107,255,1)}
+}
+.welcome{
+  text-align:center;
+  margin-top:28px;
+  font-family:'Cinzel',serif;
+  font-size:clamp(12px,3.4vw,15px);
+  font-weight:700;
+  letter-spacing:.24em;
+  line-height:1.9;
+  color:#bcd8ff;
+  text-shadow:0 0 30px rgba(95,180,255,.8);
+  text-transform:uppercase;
+}
+
+/* ============================================================
+   LOADER
+   ============================================================ */
+#loader{
+  position:fixed;inset:0;z-index:200;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 50%, #070c1c 0%, #020307 80%);
+  gap:26px;
+}
+.loader-ring{
+  width:78px;height:78px;border-radius:50%;
+  border:2px solid rgba(95,180,255,.14);
+  border-top-color:var(--cyan);
+  border-right-color:var(--violet);
+  animation:spin 1.1s linear infinite;
+  box-shadow:0 0 44px rgba(60,140,255,.5), inset 0 0 26px rgba(60,140,255,.25);
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-text{
+  font-family:'Cinzel',serif;
+  font-size:12px;letter-spacing:.5em;
+  color:#7fa5d8;text-transform:uppercase;
+  animation:pulseTxt 1.8s ease-in-out infinite;
+}
+@keyframes pulseTxt{0%,100%{opacity:.45}50%{opacity:1}}
+.loader-bar{
+  width:min(60vw,240px);height:2px;
+  background:rgba(95,180,255,.12);border-radius:2px;overflow:hidden;
+}
+.loader-bar i{
+  display:block;height:100%;width:0%;
+  background:linear-gradient(90deg,var(--cyan),var(--violet));
+  box-shadow:0 0 16px var(--cyan);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width:420px){
+  .panel{padding:28px 18px 24px;}
+  .cards{gap:11px;}
+  .card{padding:16px 6px 14px;}
+  .age-display #age-val{font-size:48px;}
+  .status-inner{padding:26px 16px 24px;}
+  .stat{padding:11px 12px;}
+}
+@media (max-height:640px){
+  .stage{padding-top:64px;padding-bottom:20px;}
+  .subtitle{margin-bottom:24px;}
+}
+@media (prefers-reduced-motion: reduce){
+  .fallback-bg::after,.card,.status-card::before{animation:none !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ CANVAS ============ -->
+<canvas id="webgl"></canvas>
+<div class="fallback-bg"></div>
+<div id="vignette"></div>
+<div id="flash"></div>
+
+<!-- ============ HUD ============ -->
+<header id="hud">
+  <div id="progress">
+    <i></i><i></i><i></i><i></i>
+  </div>
+  <button id="mute" aria-label="Toggle sound">♪</button>
+</header>
+
+<!-- ============ STAGES ============ -->
+<main id="ui">
+
+  <!-- INTRO -->
+  <section class="stage" id="stage-intro">
+    <div class="intro-inner">
+      <div class="sys-tag" data-reveal>◇ System detected an unregistered soul ◇</div>
+      <h1 class="title">
+        <span class="t-mask"><span class="t-line" data-reveal>SOVEREIGN</span></span>
+        <span class="t-mask"><span class="t-line alt" data-reveal>AWAKENING</span></span>
+      </h1>
+      <p class="subtitle" data-reveal>The Gate has opened.<br>Only the worthy may be registered.</p>
+      <button class="btn-primary" id="btn-enter" data-reveal>Enter the System</button>
+    </div>
+  </section>
+
+  <!-- NAME -->
+  <section class="stage" id="stage-name">
+    <div class="panel">
+      <div class="step-tag" data-reveal>Step 01 / 04 — Identity</div>
+      <h2 class="q" data-reveal>What is your <span class="accent">name</span>, Player?</h2>
+      <div class="field" data-reveal>
+        <input id="in-name" type="text" maxlength="20" placeholder="ENTER YOUR TRUE NAME"
+               autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Your name">
+        <span class="field-glow"></span>
+      </div>
+      <div class="err" id="err-name"></div>
+      <div class="actions" data-reveal>
+        <button class="btn-ghost" data-back>Back</button>
+        <button class="btn-primary" id="btn-name">Submit</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- GENDER -->
+  <section class="stage" id="stage-gender">
+    <div class="panel">
+      <div class="step-tag" data-reveal>Step 02 / 04 — Vessel</div>
+      <h2 class="q" data-reveal>Choose your <span class="accent">gender</span></h2>
+      <div class="cards" data-reveal>
+        <button class="card" data-gender="male" aria-label="Male">
+          <span class="card-check">✓</span>
+          <svg viewBox="0 0 100 200" aria-hidden="true">
+            <defs>
+              <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#bfe6ff"/>
+                <stop offset="60%" stop-color="#4a9de8"/>
+                <stop offset="100%" stop-color="#1c4b96"/>
+              </linearGradient>
+            </defs>
+            <g fill="url(#gm)">
+              <circle cx="50" cy="30" r="16"/>
+              <path d="M50 50 L73 64 L77 126 L65 128 L63 104 L61 176 L54 176 L53 128 L47 128 L46 176 L39 176 L37 104 L35 128 L23 126 L27 64 Z"/>
+            </g>
+          </svg>
+          <span class="card-label">MALE</span>
+        </button>
+
+        <button class="card" data-gender="female" aria-label="Female">
+          <span class="card-check">✓</span>
+          <svg viewBox="0 0 100 200" aria-hidden="true">
+            <defs>
+              <linearGradient id="gf" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#efdcff"/>
+                <stop offset="55%" stop-color="#a475ff"/>
+                <stop offset="100%" stop-color="#5a24c0"/>
+              </linearGradient>
+            </defs>
+            <g fill="url(#gf)">
+              <circle cx="50" cy="30" r="16"/>
+              <path d="M50 48 C65 48 71 60 71 73 L75 120 L66 122 L64 104 L66 142 L80 182 L20 182 L34 142 L36 104 L34 122 L25 120 L29 73 C29 60 35 48 50 48 Z"/>
+            </g>
+          </svg>
+          <span class="card-label">FEMALE</span>
+        </button>
+      </div>
+      <div class="actions" data-reveal>
+        <button class="btn-ghost" data-back>Back</button>
+        <button class="btn-primary" id="btn-gender" disabled>Confirm</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGE -->
+  <section class="stage" id="stage-age">
+    <div class="panel">
+      <div class="step-tag" data-reveal>Step 03 / 04 — Lifespan</div>
+      <h2 class="q" data-reveal>How old are you, <span class="accent">Player</span>?</h2>
+      <div class="age-wrap" data-reveal>
+        <button class="age-btn" id="age-minus" aria-label="Decrease age">−</button>
+        <div class="age-display"><span id="age-val">18</span><span class="age-unit">YRS</span></div>
+        <button class="age-btn" id="age-plus" aria-label="Increase age">+</button>
+      </div>
+      <input type="range" id="age-range" min="12" max="90" value="18" data-reveal aria-label="Age slider">
+      <div class="age-hint" data-reveal>Drag to adjust your resonance</div>
+      <div class="actions" data-reveal>
+        <button class="btn-ghost" data-back>Back</button>
+        <button class="btn-primary" id="btn-age">Confirm</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLAYER NAME -->
+  <section class="stage" id="stage-player">
+    <div class="panel">
+      <div class="step-tag" data-reveal>Step 04 / 04 — Designation</div>
+      <h2 class="q" data-reveal>Choose your <span class="accent">Player Name</span></h2>
+      <div class="field" data-reveal>
+        <input id="in-player" type="text" maxlength="16" placeholder="UNIQUE SYSTEM ID"
+               autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Player name">
+        <span class="field-glow"></span>
+      </div>
+      <div class="err" id="err-player"></div>
+      <div class="preview" data-reveal>
+        <div class="pv-row"><span>Name</span><b id="pv-name">—</b></div>
+        <div class="pv-row"><span>Gender</span><b id="pv-gender">—</b></div>
+        <div class="pv-row"><span>Age</span><b id="pv-age">—</b></div>
+        <div class="pv-row big"><span>Player ID</span><b id="pv-id">—</b></div>
+      </div>
+      <div class="actions" data-reveal>
+        <button class="btn-ghost" data-back>Back</button>
+        <button class="btn-primary" id="btn-player">Awaken</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- AWAKENING -->
+  <section class="stage" id="stage-awakening">
+    <div class="awak-inner">
+      <h2 class="awak-label" id="awak-label">AWAKENING</h2>
+      <div class="awak-bar"><i id="awak-fill"></i></div>
+      <div class="awak-sub" id="awak-sub">Binding your soul to the system</div>
+    </div>
+  </section>
+
+  <!-- STATUS -->
+  <section class="stage" id="stage-status">
+    <div class="status-card">
+      <div class="status-inner">
+        <div class="status-head">◇ Player Status ◇</div>
+        <div class="status-sub">Registration Complete</div>
+        <div class="status-grid">
+          <div class="stat"><label>Name</label><value id="st-name">—</value></div>
+          <div class="stat"><label>Gender</label><value id="st-gender">—</value></div>
+          <div class="stat"><label>Age</label><value id="st-age">—</value></div>
+          <div class="stat hero"><label>Player ID</label><value id="st-id">—</value></div>
+        </div>
+        <div class="rank-row">
+          <span>Rank</span>
+          <div class="rank-badge">S</div>
+        </div>
+        <div class="welcome">Welcome, Player.<br>Your journey begins now.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ LOADER ============ -->
+<div id="loader">
+  <div class="loader-ring"></div>
+  <div class="loader-text">Initializing System</div>
+  <div class="loader-bar"><i id="loader-fill"></i></div>
+</div>
+
+<!-- ============ LIBRARIES ============ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+/* ================================================================
+   SOVEREIGN AWAKENING — Cinematic Player Registration
+   ================================================================ */
+
+/* ----------------------------------------------------------------
+   0. ENVIRONMENT DETECTION
+   ---------------------------------------------------------------- */
+const IS_MOBILE =
+  /Android|iPhone|iPad|iPod|Mobile|Opera Mini/i.test(navigator.userAgent) ||
+  window.innerWidth < 820;
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const QUALITY = {
+  dust:    IS_MOBILE ? 850  : 2200,
+  embers:  IS_MOBILE ? 180  : 420,
+  pixelRatio: IS_MOBILE ? 1.75 : 2,
+  antialias: !IS_MOBILE,
+  monoliths: IS_MOBILE ? 6 : 10
+};
+
+/* ----------------------------------------------------------------
+   1. GLOBAL STATE
+   ---------------------------------------------------------------- */
+const state = {
+  name: '',
+  gender: '',
+  age: 18,
+  playerName: ''
+};
+
+const STEP_IDS = ['name', 'gender', 'age', 'player'];
+let stepIndex = -1;
+
+let THREE = null;
+let renderer = null, scene = null, camera = null;
+
+/* Camera rig */
+const rig = {
+  pos:  { x: 0, y: 14, z: 62 },
+  look: { x: 0, y: 2.4, z: 0 },
+  shake: 0,
+  awakening: 0,
+  time: 0
+};
+
+const CAM = {
+  intro:     { pos: [0, 4.6, 30],   look: [0, 1.6, 0], dur: 3.4 },
+  name:      { pos: [0, 2.7, 14.5], look: [0, 1.7, 0], dur: 2.0 },
+  gender:    { pos: [0, 3.4, 18],   look: [0, 1.4, 0], dur: 2.0 },
+  age:       { pos: [4.4, 2.1, 15.5], look: [0, 1.5, 0], dur: 2.0 },
+  player:    { pos: [-5.2, 3.1, 16.5], look: [0, 1.5, 0], dur: 2.0 },
+  awakening: { pos: [0, 2.2, 11],   look: [0, 1.9, 0], dur: 2.6 },
+  status:    { pos: [0, 4.2, 24],   look: [0, 1.4, 0], dur: 2.6 }
+};
+
+/* ----------------------------------------------------------------
+   2. AUDIO ENGINE (procedural, no external assets)
+   ---------------------------------------------------------------- */
+const Sound = (() => {
+  let ctx = null;
+  let master = null, musicBus = null, sfxBus = null;
+  let muted = false;
+  let started = false;
+
+  function makeNoise(seconds) {
+    const len = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function init() {
+    if (ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try { ctx = new AC(); } catch (e) { return; }
+
+    master = ctx.createGain();
+    master.gain.value = 0.85;
+    master.connect(ctx.destination);
+
+    musicBus = ctx.createGain();
+    musicBus.gain.value = 0.0001;
+    musicBus.connect(master);
+
+    sfxBus = ctx.createGain();
+    sfxBus.gain.value = 0.55;
+    sfxBus.connect(master);
+
+    buildAmbient();
+  }
+
+  function buildAmbient() {
+    /* Deep drone stack */
+    const freqs = [41.2, 55.0, 82.4, 110.0, 164.8];
+    freqs.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = i % 2 ? 'sine' : 'triangle';
+      osc.frequency.value = f;
+      osc.detune.value = (Math.random() - 0.5) * 16;
+
+      const g = ctx.createGain();
+      g.gain.value = 0.30 / (i + 1.4);
+
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 420 + i * 90;
+      lp.Q.value = 0.8;
+
+      osc.connect(g); g.connect(lp); lp.connect(musicBus);
+      osc.start();
+
+      /* Slow filter drift */
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.03 + Math.random() * 0.05;
+      const lg = ctx.createGain();
+      lg.gain.value = 120;
+      lfo.connect(lg); lg.connect(lp.frequency);
+      lfo.start();
+    });
+
+    /* Airy shimmer noise */
+    const src = ctx.createBufferSource();
+    src.buffer = makeNoise(4);
+    src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2100;
+    bp.Q.value = 1.1;
+    const ng = ctx.createGain();
+    ng.gain.value = 0.022;
+    src.connect(bp); bp.connect(ng); ng.connect(musicBus);
+    src.start();
+  }
+
+  function tone(freq, dur, type = 'sine', vol = 0.25, slideTo = null) {
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(slideTo, 1), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.014);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(sfxBus);
+    o.start(t); o.stop(t + dur + 0.06);
+  }
+
+  function noiseBurst(dur, f0, f1, vol, type = 'bandpass', q = 1.2) {
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = makeNoise(dur + 0.15);
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.setValueAtTime(f0, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(f1, 20), t + dur);
+    f.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.025);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(sfxBus);
+    src.start(t); src.stop(t + dur + 0.1);
+  }
+
+  const sfx = {
+    hover()  { tone(1046, 0.07, 'sine', 0.045); },
+    click()  { tone(340, 0.13, 'square', 0.10, 170); noiseBurst(0.14, 3200, 700, 0.09); },
+    type()   { tone(1500 + Math.random() * 500, 0.035, 'sine', 0.028); },
+    whoosh() { noiseBurst(0.75, 180, 2800, 0.14); tone(180, 0.6, 'sine', 0.07, 520); },
+    riser()  { tone(90, 3.0, 'sawtooth', 0.10, 720); noiseBurst(3.0, 180, 4200, 0.16); },
+    boom()   { tone(150, 1.6, 'sine', 0.5, 26); noiseBurst(1.2, 1200, 60, 0.30, 'lowpass', 0.9); },
+    chime()  { tone(1318, 0.7, 'sine', 0.11); tone(1975, 0.7, 'sine', 0.07); tone(2637, 0.9, 'sine', 0.04); }
+  };
+
+  return {
+    init,
+    sfx,
+    start() {
+      init();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      if (started) return;
+      started = true;
+      const t = ctx.currentTime;
+      musicBus.gain.cancelScheduledValues(t);
+      musicBus.gain.setValueAtTime(0.0001, t);
+      musicBus.gain.exponentialRampToValueAtTime(0.55, t + 4.0);
+    },
+    toggleMute() {
+      if (!ctx) return false;
+      muted = !muted;
+      const t = ctx.currentTime;
+      master.gain.cancelScheduledValues(t);
+      master.gain.linearRampToValueAtTime(muted ? 0.0001 : 0.85, t + 0.35);
+      return muted;
+    },
+    isMuted() { return muted; }
+  };
+})();
+
+/* ----------------------------------------------------------------
+   3. THREE.JS WORLD
+   ---------------------------------------------------------------- */
+const W = {
+  circleGroup: null,
+  runes: null,
+  ringsInner: [],
+  core: null,
+  coreWire: null,
+  coreGlow: null,
+  dust: null,
+  embers: null,
+  monoliths: null,
+  pulseRings: [],
+  beam: null
+};
+
+/* --- Procedural rune texture --- */
+function makeRuneTexture(size = 1024) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const x = c.getContext('2d');
+  x.translate(size / 2, size / 2);
+  x.strokeStyle = '#ffffff';
+  x.lineCap = 'round';
+  x.lineJoin = 'round';
+
+  /* Concentric guide circles */
+  x.lineWidth = 7;
+  x.beginPath(); x.arc(0, 0, size * 0.475, 0, Math.PI * 2); x.stroke();
+  x.lineWidth = 3;
+  x.beginPath(); x.arc(0, 0, size * 0.443, 0, Math.PI * 2); x.stroke();
+  x.beginPath(); x.arc(0, 0, size * 0.330, 0, Math.PI * 2); x.stroke();
+  x.lineWidth = 2;
+  x.beginPath(); x.arc(0, 0, size * 0.312, 0, Math.PI * 2); x.stroke();
+
+  /* Rune band */
+  const N = 44;
+  const rMid = size * 0.386;
+  const strokes = [
+    [[-1, -1], [0, 1]],
+    [[0, -1], [0, 1]],
+    [[1, -1], [0, 0]],
+    [[-1, 0], [1, 0]],
+    [[1, 1], [0, 0]],
+    [[-1, -1], [-1, 1]],
+    [[-1, 1], [1, 1]],
+    [[-1, -1], [1, 1]],
+    [[1, -1], [-1, 1]],
+    [[0, -1], [-1, 0]],
+    [[0, 1], [1, 0]]
+  ];
+
+  for (let i = 0; i < N; i++) {
+    x.save();
+    x.rotate((i / N) * Math.PI * 2);
+    x.translate(0, -rMid);
+    x.lineWidth = 6;
+    const h = size * 0.052;
+    const w = size * 0.024;
+    const used = new Set();
+    const count = 2 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < count; k++) {
+      let idx;
+      let guard = 0;
+      do { idx = Math.floor(Math.random() * strokes.length); guard++; } while (used.has(idx) && guard < 20);
+      used.add(idx);
+      const s = strokes[idx];
+      x.beginPath();
+      x.moveTo(s[0][0] * w, s[0][1] * h);
+      x.lineTo(s[1][0] * w, s[1][1] * h);
+      x.stroke();
+    }
+    x.restore();
+  }
+
+  /* Inner spokes */
+  x.lineWidth = 2.5;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    x.beginPath();
+    x.moveTo(Math.cos(a) * size * 0.20, Math.sin(a) * size * 0.20);
+    x.lineTo(Math.cos(a) * size * 0.30, Math.sin(a) * size * 0.30);
+    x.stroke();
+  }
+  /* Center sigil */
+  x.lineWidth = 3;
+  x.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    const px = Math.cos(a) * size * 0.13;
+    const py = Math.sin(a) * size * 0.13;
+    if (i === 0) x.moveTo(px, py); else x.lineTo(px, py);
+  }
+  x.closePath();
+  x.stroke();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/* --- Radial glow sprite texture --- */
+function makeGlowTexture() {
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0.0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.18, 'rgba(190,230,255,0.85)');
+  g.addColorStop(0.42, 'rgba(90,170,255,0.35)');
+  g.addColorStop(0.72, 'rgba(90,90,255,0.08)');
+  g.addColorStop(1.0, 'rgba(0,0,0,0)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, s, s);
+  return new THREE.CanvasTexture(c);
+}
+
+/* --- Floor shader --- */
+function makeFloor() {
+  const geo = new THREE.CircleGeometry(62, 96);
+  geo.rotateX(-Math.PI / 2);
+
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: { value: 0 },
+      uColorA: { value: new THREE.Color(0x1f6bd8) },
+      uColorB: { value: new THREE.Color(0x7a3bff) }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main(){
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform vec3 uColorA;
+      uniform vec3 uColorB;
+      varying vec2 vUv;
+
+      float gridLine(vec2 uv, float n, float thickness){
+        vec2 f = abs(fract(uv * n) - 0.5);
+        float d = min(f.x, f.y);
+        return 1.0 - smoothstep(0.0, thickness, d);
+      }
+
+      void main(){
+        vec2 p = vUv - 0.5;
+        float r = length(p) * 2.0;
+        if (r > 1.0) discard;
+
+        float line = gridLine(vUv, 64.0, 0.028);
+        line += gridLine(vUv, 16.0, 0.012) * 0.9;
+        line *= smoothstep(0.98, 0.30, r);
+
+        float pulse = 0.5 + 0.5 * sin(r * 7.0 - uTime * 1.1);
+        vec3 col = mix(uColorA, uColorB, pulse);
+
+        float ring1 = 1.0 - smoothstep(0.0, 0.013, abs(r - 0.38));
+        float ring2 = 1.0 - smoothstep(0.0, 0.010, abs(r - 0.62));
+        float ring3 = 1.0 - smoothstep(0.0, 0.008, abs(r - 0.81));
+        float ring4 = 1.0 - smoothstep(0.0, 0.006, abs(r - 0.93));
+
+        float alpha = line * 0.55 + (ring1 + ring2 + ring3 + ring4) * 0.62;
+        alpha *= smoothstep(1.0, 0.12, r);
+
+        gl_FragColor = vec4(col * alpha * 1.7, alpha);
+      }
+    `
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.y = -2.9;
+  return mesh;
+}
+
+/* --- Particle system --- */
+function makeParticles(count, opts) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  const scale = new Float32Array(count);
+  const speed = new Float32Array(count);
+  const phase = new Float32Array(count);
+
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const rr = Math.pow(Math.random(), 0.65) * opts.radius;
+    pos[i * 3]     = Math.cos(a) * rr;
+    pos[i * 3 + 1] = (Math.random() - 0.5) * opts.height;
+    pos[i * 3 + 2] = Math.sin(a) * rr;
+    scale[i] = opts.size * (0.35 + Math.random() * 0.9);
+    speed[i] = 0.25 + Math.random() * 1.1;
+    phase[i] = Math.random() * opts.height;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aScale', new THREE.BufferAttribute(scale, 1));
+  geo.setAttribute('aSpeed', new THREE.BufferAttribute(speed, 1));
+  geo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime:    { value: 0 },
+      uPR:      { value: renderer.getPixelRatio() },
+      uHeight:  { value: opts.height },
+      uColor:   { value: new THREE.Color(opts.color) },
+      uOpacity: { value: 1.0 },
+      uBoost:   { value: 0.0 }
+    },
+    vertexShader: `
+      uniform float uTime;
+      uniform float uPR;
+      uniform float uHeight;
+      uniform float uBoost;
+      attribute float aScale;
+      attribute float aSpeed;
+      attribute float aPhase;
+      varying float vFade;
+      void main(){
+        vec3 p = position;
+        float h = uHeight;
+        p.y = mod(p.y + uTime * aSpeed + aPhase, h) - h * 0.5;
+        p.x += sin(uTime * 0.35 + aPhase * 0.4) * 0.9;
+        p.z += cos(uTime * 0.31 + aPhase * 0.3) * 0.9;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_Position = projectionMatrix * mv;
+        float sz = aScale * (1.0 + uBoost * 2.2);
+        gl_PointSize = sz * uPR * (300.0 / max(-mv.z, 0.5));
+        vFade = 1.0 - smoothstep(h * 0.30, h * 0.5, abs(p.y));
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying float vFade;
+      void main(){
+        vec2 uv = gl_PointCoord - 0.5;
+        float d = length(uv);
+        if (d > 0.5) discard;
+        float a = pow(1.0 - d * 2.0, 2.0);
+        gl_FragColor = vec4(uColor * (1.0 + a * 1.1), a * vFade * uOpacity);
+      }
+    `
+  });
+
+  return new THREE.Points(geo, mat);
+}
+
+function initThree() {
+  const canvas = document.getElementById('webgl');
+
+  renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: QUALITY.antialias,
+    alpha: false,
+    powerPreference: 'high-performance',
+    stencil: false
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY.pixelRatio));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x03040a, 1);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x03040a, 0.021);
+
+  camera = new THREE.PerspectiveCamera(
+    55,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    400
+  );
+  camera.position.set(rig.pos.x, rig.pos.y, rig.pos.z);
+  camera.lookAt(rig.look.x, rig.look.y, rig.look.z);
+
+  /* --- Lights --- */
+  scene.add(new THREE.AmbientLight(0x2b4a80, 1.4));
+
+  const l1 = new THREE.PointLight(0x5fe0ff, 320, 70, 2);
+  l1.position.set(0, 6, 0);
+  scene.add(l1);
+
+  const l2 = new THREE.PointLight(0x9b4dff, 220, 90, 2);
+  l2.position.set(-16, 12, -14);
+  scene.add(l2);
+
+  const l3 = new THREE.PointLight(0x2a6fff, 220, 90, 2);
+  l3.position.set(18, 9, -16);
+  scene.add(l3);
+
+  /* --- Floor --- */
+  const floor = makeFloor();
+  scene.add(floor);
+  W.floor = floor;
+
+  /* --- Magic circle group --- */
+  W.circleGroup = new THREE.Group();
+  W.circleGroup.position.y = -2.75;
+  scene.add(W.circleGroup);
+
+  /* Rune plane */
+  const runeTex = makeRuneTexture(1024);
+  const runeMat = new THREE.MeshBasicMaterial({
+    map: runeTex,
+    transparent: true,
+    opacity: 0.7,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    color: 0x9fd8ff,
+    side: THREE.DoubleSide
+  });
+  W.runes = new THREE.Mesh(new THREE.PlaneGeometry(15.5, 15.5), runeMat);
+  W.runes.rotation.x = -Math.PI / 2;
+  W.runes.position.y = 0.02;
+  W.circleGroup.add(W.runes);
+
+  /* Concentric energy rings */
+  const ringDefs = [
+    { r: 4.6, w: 0.045, color: 0x5fe0ff, op: 0.85, spd: 0.55 },
+    { r: 5.6, w: 0.03,  color: 0x9b6bff, op: 0.7,  spd: -0.35 },
+    { r: 6.9, w: 0.05,  color: 0x2a7fff, op: 0.6,  spd: 0.22 },
+    { r: 3.2, w: 0.025, color: 0xbfe6ff, op: 0.75, spd: -0.8 }
+  ];
+  ringDefs.forEach(d => {
+    const g = new THREE.RingGeometry(d.r, d.r + d.w, 128);
+    const m = new THREE.MeshBasicMaterial({
+      color: d.color,
+      transparent: true,
+      opacity: d.op,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.userData.spd = d.spd;
+    mesh.userData.baseOp = d.op;
+    W.circleGroup.add(mesh);
+    W.ringsInner.push(mesh);
+  });
+
+  /* --- Pulse rings (used in awakening) --- */
+  for (let i = 0; i < 3; i++) {
+    const g = new THREE.RingGeometry(1.0, 1.12, 96);
+    const m = new THREE.MeshBasicMaterial({
+      color: i % 2 ? 0x9b6bff : 0x5fe0ff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = -2.7;
+    mesh.visible = false;
+    mesh.scale.setScalar(0.5);
+    scene.add(mesh);
+    W.pulseRings.push(mesh);
+  }
+
+  /* --- Energy core --- */
+  W.core = new THREE.Group();
+  W.core.position.set(0, 2.4, 0);
+  scene.add(W.core);
+
+  const coreSolid = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.85, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0x8fdcff,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  W.core.add(coreSolid);
+  W.coreSolid = coreSolid;
+
+  const wire = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.55, 1),
+    new THREE.MeshBasicMaterial({
+      color: 0x6fa8ff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.5,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+  );
+  W.core.add(wire);
+  W.coreWire = wire;
+
+  const glowTex = makeGlowTexture();
+  const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex,
+    color: 0x7fc8ff,
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  }));
+  glowSprite.scale.set(13, 13, 1);
+  W.core.add(glowSprite);
+  W.coreGlow = glowSprite;
+
+  /* --- Light beam (awakening) --- */
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xa8e0ff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 2.4, 40, 24, 1, true), beamMat);
+  beam.position.set(0, 16, 0);
+  scene.add(beam);
+  W.beam = beam;
+
+  /* --- Monoliths --- */
+  const monoGroup = new THREE.Group();
+  const monoGeo = new THREE.BoxGeometry(1, 1, 1);
+  for (let i = 0; i < QUALITY.monoliths; i++) {
+    const a = (i / QUALITY.monoliths) * Math.PI * 2 + 0.3;
+    const r = 17 + Math.random() * 7;
+    const h = 8 + Math.random() * 14;
+    const w = 1.6 + Math.random() * 2.2;
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x0a1020,
+      roughness: 0.45,
+      metalness: 0.85,
+      emissive: 0x0d1c3a,
+      emissiveIntensity: 0.9
+    });
+    const m = new THREE.Mesh(monoGeo, mat);
+    m.scale.set(w, h, w);
+    m.position.set(Math.cos(a) * r, h / 2 - 3, Math.sin(a) * r);
+    m.rotation.y = Math.random() * Math.PI;
+    m.rotation.z = (Math.random() - 0.5) * 0.09;
+    monoGroup.add(m);
+
+    /* Glowing edges */
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(monoGeo),
+      new THREE.LineBasicMaterial({
+        color: 0x3d7fd6,
+        transparent: true,
+        opacity: 0.55,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    edges.scale.set(w * 1.005, h * 1.005, w * 1.005);
+    edges.position.copy(m.position);
+    edges.rotation.copy(m.rotation);
+    monoGroup.add(edges);
+  }
+  scene.add(monoGroup);
+  W.monoliths = monoGroup;
+
+  /* --- Particles --- */
+  W.dust = makeParticles(QUALITY.dust, {
+    radius: 34,
+    height: 34,
+    size: 0.55,
+    color: 0x9fd8ff
+  });
+  scene.add(W.dust);
+
+  W.embers = makeParticles(QUALITY.embers, {
+    radius: 22,
+    height: 26,
+    size: 1.35,
+    color: 0xb07dff
+  });
+  scene.add(W.embers);
+
+  window.addEventListener('resize', onResize, { passive: true });
+  window.addEventListener('orientationchange', () => setTimeout(onResize, 260));
+}
+
+function onResize() {
+  if (!renderer || !camera) return;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY.pixelRatio));
+  renderer.setSize(w, h);
+  if (W.dust) W.dust.material.uniforms.uPR.value = renderer.getPixelRatio();
+  if (W.embers) W.embers.material.uniforms.uPR.value = renderer.getPixelRatio();
+}
+
+/* --- Camera choreography --- */
+function moveCamera(cfg) {
+  if (!cfg) return;
+  gsap.to(rig.pos, {
+    x: cfg.pos[0], y: cfg.pos[1], z: cfg.pos[2],
+    duration: cfg.dur || 2.0,
+    ease: 'power3.inOut',
+    overwrite: 'auto'
+  });
+  gsap.to(rig.look, {
+    x: cfg.look[0], y: cfg.look[1], z: cfg.look[2],
+    duration: cfg.dur || 2.0,
+    ease: 'power3.inOut',
+    overwrite: 'auto'
+  });
+}
+
+/* --- Render loop --- */
+let lastFrame = performance.now();
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min((now - lastFrame) / 1000, 0.05);
+  lastFrame = now;
+  rig.time += dt;
+
+  if (!renderer || !scene || !camera) return;
+
+  const t = rig.time;
+  const aw = rig.awakening;
+
+  /* Floor */
+  if (W.floor) W.floor.material.uniforms.uTime.value = t;
+
+  /* Magic circle rotation */
+  if (W.circleGroup) W.circleGroup.rotation.y += dt * (0.11 + aw * 2.6);
+  if (W.runes) {
+    W.runes.rotation.z -= dt * (0.055 + aw * 3.4);
+    W.runes.material.opacity = 0.55 + Math.sin(t * 1.5) * 0.12 + aw * 0.45;
+    W.runes.material.color.setHSL(0.56 - aw * 0.12, 0.85, 0.68 + aw * 0.15);
+  }
+  W.ringsInner.forEach((r, i) => {
+    r.rotation.z += dt * r.userData.spd * (1 + aw * 6);
+    r.material.opacity = r.userData.baseOp * (0.75 + Math.sin(t * 1.8 + i) * 0.25 + aw * 0.5);
+  });
+
+  /* Core */
+  if (W.core) {
+    W.core.position.y = 2.4 + Math.sin(t * 1.1) * 0.22;
+    const s = 1 + aw * 2.6 + Math.sin(t * 3.1) * 0.055;
+    W.core.scale.setScalar(s);
+    W.coreSolid.rotation.x += dt * (0.6 + aw * 3);
+    W.coreSolid.rotation.y += dt * (0.9 + aw * 4);
+    W.coreWire.rotation.x -= dt * (0.4 + aw * 2.5);
+    W.coreWire.rotation.z += dt * (0.3 + aw * 3);
+    W.coreWire.material.opacity = 0.45 + Math.sin(t * 2.2) * 0.15 + aw * 0.5;
+    W.coreGlow.scale.setScalar(13 + Math.sin(t * 1.7) * 1.4 + aw * 14);
+    W.coreGlow.material.opacity = 0.85 + aw * 0.15;
+  }
+
+  /* Beam */
+  if (W.beam) {
+    W.beam.rotation.y += dt * 0.6;
+    W.beam.material.opacity = aw * 0.28 * (0.7 + Math.sin(t * 6) * 0.3);
+  }
+
+  /* Monoliths drift */
+  if (W.monoliths) {
+    W.monoliths.rotation.y += dt * 0.012;
+  }
+
+  /* Particles */
+  if (W.dust) {
+    W.dust.material.uniforms.uTime.value = t;
+    W.dust.material.uniforms.uBoost.value = aw;
+    W.dust.material.uniforms.uOpacity.value = 0.85 + aw * 0.15;
+  }
+  if (W.embers) {
+    W.embers.material.uniforms.uTime.value = t * 1.55;
+    W.embers.material.uniforms.uBoost.value = aw;
+    W.embers.material.uniforms.uOpacity.value = 0.9 + aw * 0.1;
+  }
+
+  /* Camera with sway + shake */
+  const swayX = Math.sin(t * 0.33) * 0.55;
+  const swayY = Math.cos(t * 0.27) * 0.32;
+  const shX = rig.shake ? (Math.random() - 0.5) * rig.shake : 0;
+  const shY = rig.shake ? (Math.random() - 0.5) * rig.shake : 0;
+  const shZ = rig.shake ? (Math.random() - 0.5) * rig.shake : 0;
+
+  camera.position.set(
+    rig.pos.x + swayX + shX,
+    rig.pos.y + swayY + shY,
+    rig.pos.z + shZ
+  );
+  camera.lookAt(rig.look.x, rig.look.y, rig.look.z);
+
+  if (rig.shake > 0) {
+    rig.shake *= 0.88;
+    if (rig.shake < 0.012) rig.shake = 0;
+  }
+
+  renderer.render(scene, camera);
+}
+
+/* --- Pulse ring effect --- */
+function pulseRing(index) {
+  const r = W.pulseRings[index % W.pulseRings.length];
+  if (!r) return;
+  r.visible = true;
+  r.scale.setScalar(0.6);
+  r.material.opacity = 1.0;
+  gsap.to(r.scale, { x: 17, y: 17, z: 17, duration: 1.9, ease: 'power2.out' });
+  gsap.to(r.material, {
+    opacity: 0, duration: 1.9, ease: 'power2.out',
+    onComplete: () => { r.visible = false; }
+  });
+}
+
+/* ----------------------------------------------------------------
+   4. STAGE NAVIGATION
+   ---------------------------------------------------------------- */
+const stageEl = id => document.getElementById('stage-' + id);
+let activeStageId = null;
+
+function showStage(id, opts = {}) {
+  const next = stageEl(id);
+  if (!next || activeStageId === id) return;
+
+  const cur = activeStageId ? stageEl(activeStageId) : null;
+  activeStageId = id;
+
+  if (cur) {
+    cur.classList.remove('active');
+    gsap.killTweensOf(cur);
+    gsap.to(cur, { opacity: 0, duration: 0.38, ease: 'power2.in' });
+  }
+
+  next.classList.add('active');
+  gsap.killTweensOf(next);
+  gsap.fromTo(next, { opacity: 0 }, { opacity: 1, duration: 0.5, delay: 0.22, ease: 'power2.out' });
+
+  /* Stagger children */
+  const reveals = next.querySelectorAll('[data-reveal]');
+  if (reveals.length) {
+    gsap.killTweensOf(reveals);
+    gsap.fromTo(reveals,
+      { y: 26, opacity: 0 },
+      {
+        y: 0, opacity: 1,
+        duration: 0.85,
+        stagger: 0.075,
+        delay: 0.3,
+        ease: 'power3.out',
+        overwrite: 'auto'
+      }
+    );
+  }
+
+  /* Camera */
+  if (!opts.skipCam && CAM[id]) moveCamera(CAM[id]);
+
+  /* Progress */
+  updateProgress(id);
+}
+
+function updateProgress(id) {
+  const bar = document.getElementById('progress');
+  const idx = STEP_IDS.indexOf(id);
+
+  if (idx === -1) {
+    bar.classList.remove('show');
+    return;
+  }
+  bar.classList.add('show');
+  const dots = bar.querySelectorAll('i');
+  dots.forEach((d, i) => {
+    d.classList.toggle('done', i < idx);
+    d.classList.toggle('active', i === idx);
+  });
+}
+
+/* ----------------------------------------------------------------
+   5. UI WIRING
+   ---------------------------------------------------------------- */
+const el = id => document.getElementById(id);
+
+function showError(node, msg) {
+  node.textContent = msg;
+  node.classList.add('show');
+  gsap.fromTo(node, { x: -6 }, { x: 0, duration: 0.45, ease: 'elastic.out(1,0.35)' });
+}
+function clearError(node) {
+  node.classList.remove('show');
+  node.textContent = '';
+}
+
+function shakeNode(node) {
+  node.classList.remove('shake');
+  void node.offsetWidth;
+  node.classList.add('shake');
+}
+
+function wireHoverSounds() {
+  document.querySelectorAll('button, .card').forEach(btn => {
+    btn.addEventListener('pointerenter', () => Sound.sfx.hover());
+  });
+}
+
+/* ------- Step 1: Name ------- */
+const NAME_RE = /^[A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\s'.-]{1,19}$/;
+
+function submitName() {
+  const input = el('in-name');
+  const err = el('err-name');
+  const value = input.value.trim().replace(/\s+/g, ' ');
+
+  if (value.length < 2) {
+    showError(err, 'A name requires at least 2 characters');
+    shakeNode(input);
+    Sound.sfx.click();
+    input.focus();
+    return false;
+  }
+  if (!NAME_RE.test(value)) {
+    showError(err, 'Only letters, spaces, apostrophes and hyphens');
+    shakeNode(input);
+    Sound.sfx.click();
+    input.focus();
+    return false;
+  }
+
+  clearError(err);
+  state.name = value;
+  Sound.sfx.whoosh();
+  gsap.to('.panel', {
+    scale: 0.97, opacity: 0, duration: 0.3, ease: 'power2.in',
+    onComplete: () => gsap.set('.panel', { scale: 1, opacity: 1 })
+  });
+  setTimeout(() => showStage('gender'), 140);
+  return true;
+}
+
+/* ------- Step 2: Gender ------- */
+function wireGender() {
+  const cards = document.querySelectorAll('#stage-gender .card');
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      cards.forEach(c => c.classList.remove('sel'));
+      card.classList.add('sel');
+      state.gender = card.dataset.gender;
+      Sound.sfx.click();
+      el('btn-gender').disabled = false;
+      pulseRing(0);
+
+      gsap.fromTo(card, { scale: 0.96 }, { scale: 1, duration: 0.45, ease: 'back.out(2)' });
+    });
+
+    /* 3D tilt */
+    if (!REDUCED) {
+      card.addEventListener('pointermove', e => {
+        const r = card.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        gsap.to(card, {
+          rotateY: px * 20,
+          rotateX: -py * 20,
+          transformPerspective: 900,
+          duration: 0.45,
+          ease: 'power2.out',
+          overwrite: 'auto'
+        });
+        const svg = card.querySelector('svg');
+        if (svg) {
+          gsap.to(svg, { x: px * 8, y: py * 6, duration: 0.45, overwrite: 'auto' });
+        }
+      });
+      card.addEventListener('pointerleave', () => {
+        gsap.to(card, { rotateX: 0, rotateY: 0, duration: 0.8, ease: 'power3.out', overwrite: 'auto' });
+        const svg = card.querySelector('svg');
+        if (svg) gsap.to(svg, { x: 0, y: 0, duration: 0.8, ease: 'power3.out', overwrite: 'auto' });
+      });
+    }
+  });
+
+  el('btn-gender').addEventListener('click', () => {
+    if (!state.gender) return;
+    Sound.sfx.whoosh();
+    setTimeout(() => showStage('age'), 120);
+  });
+}
+
+/* ------- Step 3: Age ------- */
+function setAge(v) {
+  v = Math.max(12, Math.min(90, v));
+  state.age = v;
+  el('age-val').textContent = v;
+  el('age-range').value = v;
+  gsap.fromTo('#age-val',
+    { scale: 1.22, filter: 'brightness(1.7)' },
+    { scale: 1, filter: 'brightness(1)', duration: 0.35, ease: 'power2.out' }
+  );
+}
+
+function wireAge() {
+  el('age-minus').addEventListener('click', () => { Sound.sfx.click(); setAge(state.age - 1); });
+  el('age-plus').addEventListener('click', () => { Sound.sfx.click(); setAge(state.age + 1); });
+
+  el('age-range').addEventListener('input', e => {
+    setAge(parseInt(e.target.value, 10));
+  });
+
+  el('btn-age').addEventListener('click', () => {
+    Sound.sfx.whoosh();
+    setTimeout(() => {
+      syncPreview();
+      showStage('player');
+      setTimeout(() => el('in-player').focus(), 650);
+    }, 120);
+  });
+}
+
+/* ------- Step 4: Player Name ------- */
+const PNAME_RE = /^[A-Za-z0-9_]{3,16}$/;
+
+function syncPreview() {
+  el('pv-name').textContent = state.name ? state.name.toUpperCase() : '—';
+  el('pv-gender').textContent = state.gender ? state.gender.toUpperCase() : '—';
+  el('pv-age').textContent = state.age || '—';
+  const pid = el('in-player').value.trim();
+  el('pv-id').textContent = pid ? pid : '—';
+}
+
+function submitPlayer() {
+  const input = el('in-player');
+  const err = el('err-player');
+  const value = input.value.trim();
+
+  if (value.length < 3) {
+    showError(err, 'Player ID must be at least 3 characters');
+    shakeNode(input);
+    Sound.sfx.click();
+    input.focus();
+    return false;
+  }
+  if (!PNAME_RE.test(value)) {
+    showError(err, 'Letters, numbers and underscores only (no spaces)');
+    shakeNode(input);
+    Sound.sfx.click();
+    input.focus();
+    return false;
+  }
+
+  clearError(err);
+  state.playerName = value;
+  Sound.sfx.click();
+  runAwakening();
+  return true;
+}
+
+/* ----------------------------------------------------------------
+   6. AWAKENING SEQUENCE
+   ---------------------------------------------------------------- */
+function flashScreen() {
+  const f = el('flash');
+  gsap.killTweensOf(f);
+  gsap.timeline()
+    .set(f, { opacity: 0 })
+    .to(f, { opacity: 0.95, duration: 0.1, ease: 'power2.out' })
+    .to(f, { opacity: 0, duration: 0.85, ease: 'power2.in' });
+}
+
+function runAwakening() {
+  showStage('awakening', { skipCam: true });
+
+  const fill = el('awak-fill');
+  const sub = el('awak-sub');
+  gsap.set(fill, { width: '0%' });
+
+  /* Camera rush */
+  gsap.to(rig.pos, {
+    x: 0, y: 1.9, z: 8.5,
+    duration: 3.0, ease: 'power2.inOut', overwrite: 'auto'
+  });
+  gsap.to(rig.look, {
+    x: 0, y: 2.1, z: 0,
+    duration: 3.0, ease: 'power2.inOut', overwrite: 'auto'
+  });
+
+  /* Energy build */
+  gsap.to(rig, { awakening: 1, duration: 3.0, ease: 'power2.in' });
+
+  Sound.sfx.riser();
+
+  /* Progress bar */
+  gsap.to(fill, { width: '100%', duration: 3.1, ease: 'power1.inOut' });
+
+  /* Sub-messages */
+  const messages = [
+    'Binding your soul to the system',
+    'Aligning your resonance frequency',
+    'Forging your player signature',
+    'The system acknowledges you'
+  ];
+  messages.forEach((m, i) => {
+    gsap.delayedCall(0.35 + i * 0.78, () => {
+      sub.textContent = m;
+      gsap.fromTo(sub, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.5 });
+    });
+  });
+
+  /* Ring pulses */
+  pulseRing(0);
+  gsap.delayedCall(0.8, () => pulseRing(1));
+  gsap.delayedCall(1.6, () => pulseRing(2));
+  gsap.delayedCall(2.3, () => pulseRing(0));
+
+  /* Shake before detonation */
+  gsap.delayedCall(2.3, () => { rig.shake = 0.9; });
+  gsap.delayedCall(2.6, () => { rig.shake = 1.6; });
+
+  /* Detonation */
+  gsap.delayedCall(3.15, () => {
+    Sound.sfx.boom();
+    flashScreen();
+    rig.shake = 2.6;
+    pulseRing(1);
+    pulseRing(2);
+    gsap.to('#awak-label', {
+      scale: 1.18, opacity: 0, duration: 0.6, ease: 'power2.out'
+    });
+    gsap.to('.awak-bar', { opacity: 0, duration: 0.4 });
+    gsap.to(sub, { opacity: 0, duration: 0.4 });
+  });
+
+  /* Land on the status screen */
+  gsap.delayedCall(3.8, () => {
+    fillStatusScreen();
+    showStage('status', { skipCam: true });
+    gsap.to(rig, { awakening: 0.35, duration: 2.4, ease: 'power2.out' });
+    moveCamera(CAM.status);
+    Sound.sfx.chime();
+  });
+
+  /* Status content reveal */
+  gsap.delayedCall(4.0, () => {
+    // Send data to Kotlin/Android
+    if (window.AndroidBridge && window.AndroidBridge.onIntroComplete) {
+      window.AndroidBridge.onIntroComplete(
+        state.name,
+        state.gender,
+        state.age,
+        state.playerName
+      );
+    }
+    gsap.fromTo('.status-card',
+      { scale: 0.9, opacity: 0, rotateX: 12 },
+      { scale: 1, opacity: 1, rotateX: 0, duration: 1.1, ease: 'power3.out', transformPerspective: 1200 }
+    );
+    gsap.fromTo('.stat',
+      { x: -26, opacity: 0 },
+      { x: 0, opacity: 1, duration: 0.6, stagger: 0.13, delay: 0.35, ease: 'power3.out' }
+    );
+    gsap.fromTo('.rank-badge',
+      { scale: 0, rotate: -140 },
+      { scale: 1, rotate: 0, duration: 0.9, delay: 0.9, ease: 'back.out(1.9)' }
+    );
+    gsap.fromTo('.welcome',
+      { opacity: 0, y: 18 },
+      { opacity: 1, y: 0, duration: 1.0, delay: 1.15, ease: 'power2.out' }
+    );
+  });
+}
+
+function fillStatusScreen() {
+  el('st-name').textContent = state.name.toUpperCase();
+  el('st-gender').textContent = state.gender === 'male' ? 'MALE' : 'FEMALE';
+  el('st-age').textContent = state.age;
+  el('st-id').textContent = state.playerName;
+}
+
+/* ----------------------------------------------------------------
+   7. BACK NAVIGATION
+   ---------------------------------------------------------------- */
+function wireBack() {
+  document.querySelectorAll('[data-back]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      Sound.sfx.click();
+      const cur = activeStageId;
+      if (cur === 'name') {
+        showStage('intro');
+      } else if (cur === 'gender') {
+        el('in-name').value = state.name;
+        showStage('name');
+      } else if (cur === 'age') {
+        showStage('gender');
+      } else if (cur === 'player') {
+        showStage('age');
+      }
+    });
+  });
+}
+
+/* ----------------------------------------------------------------
+   8. BOOT
+   ---------------------------------------------------------------- */
+async function boot() {
+  /* --- Load Three.js dynamically (graceful fallback) --- */
+  try {
+    THREE = await import('three');
+  } catch (e) {
+    THREE = null;
+    console.warn('Three.js failed to load — using fallback visuals.', e);
+  }
+
+  /* --- Try to build the 3D world --- */
+  let webglOK = false;
+  if (THREE) {
+    try {
+      initThree();
+      webglOK = true;
+    } catch (e) {
+      console.warn('WebGL init failed — using fallback visuals.', e);
+      webglOK = false;
+    }
+  }
+  if (!webglOK) {
+    document.body.classList.add('no-webgl');
+  }
+
+  /* --- Loader progress --- */
+  const fill = el('loader-fill');
+  const loaderText = document.querySelector('.loader-text');
+  const steps = [
+    { p: 25, t: 'Forging dungeon geometry' },
+    { p: 55, t: 'Weaving shadow energy' },
+    { p: 80, t: 'Calibrating the gate' },
+    { p: 100, t: 'System online' }
+  ];
+
+  for (const s of steps) {
+    await new Promise(r => setTimeout(r, 340 + Math.random() * 240));
+    gsap.to(fill, { width: s.p + '%', duration: 0.5, ease: 'power2.out' });
+    loaderText.textContent = s.t;
+  }
+
+  await new Promise(r => setTimeout(r, 520));
+
+  /* --- Fade the loader --- */
+  gsap.to('#loader', {
+    opacity: 0,
+    duration: 0.9,
+    ease: 'power2.inOut',
+    onComplete: () => { el('loader').style.display = 'none'; }
+  });
+
+  /* --- Wire everything --- */
+  wireHoverSounds();
+  wireGender();
+  wireAge();
+  wireBack();
+
+  /* Intro button */
+  el('btn-enter').addEventListener('click', () => {
+    Sound.start();
+    Sound.sfx.whoosh();
+    gsap.to(rig, { shake: 0.9, duration: 0.01 });
+    setTimeout(() => {
+      showStage('name');
+      setTimeout(() => el('in-name').focus(), 700);
+    }, 160);
+  });
+
+  /* Name submit */
+  el('btn-name').addEventListener('click', submitName);
+  el('in-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submitName(); }
+  });
+  el('in-name').addEventListener('input', () => {
+    clearError(el('err-name'));
+    Sound.sfx.type();
+  });
+
+  /* Player name submit */
+  el('btn-player').addEventListener('click', submitPlayer);
+  el('in-player').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submitPlayer(); }
+  });
+  el('in-player').addEventListener('input', () => {
+    clearError(el('err-player'));
+    syncPreview();
+    Sound.sfx.type();
+  });
+
+  /* Mute button */
+  const muteBtn = el('mute');
+  muteBtn.addEventListener('click', () => {
+    Sound.start();
+    const muted = Sound.toggleMute();
+    muteBtn.classList.toggle('off', muted);
+    muteBtn.textContent = muted ? '✕' : '♪';
+    if (!muted) Sound.sfx.click();
+  });
+
+  /* First interaction unlocks audio anywhere */
+  const unlock = () => {
+    Sound.start();
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+  };
+  window.addEventListener('pointerdown', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
+
+  /* Restore saved form state if user refreshed */
+  try {
+    const saved = JSON.parse(localStorage.getItem('sovereign_state') || 'null');
+    if (saved && saved.name) {
+      state.name = saved.name;
+      el('in-name').value = saved.name;
+    }
+  } catch (e) { /* ignore */ }
+
+  /* --- Start the render loop --- */
+  requestAnimationFrame(loop);
+
+  /* --- Cinematic intro camera move --- */
+  gsap.to(rig.pos, {
+    x: 0, y: 5.2, z: 32,
+    duration: 5.0, ease: 'power2.out'
+  });
+  gsap.to(rig.look, {
+    x: 0, y: 1.7, z: 0,
+    duration: 5.0, ease: 'power2.out'
+  });
+
+  showStage('intro', { skipCam: true });
+  setTimeout(() => moveCamera(CAM.intro), 400);
+}
+
+/* Persist name across refresh (light touch) */
+window.addEventListener('beforeunload', () => {
+  try {
+    if (state.name) localStorage.setItem('sovereign_state', JSON.stringify({ name: state.name }));
+  } catch (e) { /* ignore */ }
+});
+
+boot();
+</script>
+</body>
+</html>
