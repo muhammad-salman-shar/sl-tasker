@@ -168,12 +168,17 @@ fun AlarmRingContent(
         }
     }
 
+    var failCount by remember { mutableIntStateOf(0) }
     fun verifyChallenge(): Boolean {
-        return when {
-            dismissMethod.contains("PIN", ignoreCase = true) -> inputVal == requiredPin || requiredPin.isBlank()
-            dismissMethod.contains("MATH", ignoreCase = true) -> inputVal.toIntOrNull() == expectedAnswer
+        val ok = when {
+            dismissMethod.contains("PIN", ignoreCase = true) ->
+                requiredPin.isNotBlank() && inputVal.trim() == requiredPin.trim()
+            dismissMethod.contains("MATH", ignoreCase = true) ->
+                inputVal.trim().toIntOrNull() == expectedAnswer
             else -> true
         }
+        if (!ok) failCount += 1
+        return ok
     }
 
     fun attemptDismiss() {
@@ -318,8 +323,8 @@ fun AlarmRingContent(
                                     executePendingAction(pendingAction)
                                 } else {
                                     errorMessage = if (dismissMethod.contains("MATH", ignoreCase = true))
-                                        "Incorrect calculation. Try again."
-                                    else "Incorrect PIN. Focus Hunter."
+                                        "Incorrect. Try again ($failCount/5)"
+                                    else "Incorrect PIN. Try again ($failCount/5)"
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -333,6 +338,21 @@ fun AlarmRingContent(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
+            }
+
+            // Emergency escape after 5 fails
+            if (showChallenge && failCount >= 5) {
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { executePendingAction(pendingAction) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DarkCard,
+                        contentColor = DangerPenaltyRed
+                    )
+                ) {
+                    Text("EMERGENCY UNLOCK", fontSize = 11.sp)
+                }
             }
 
             // Swipe hints

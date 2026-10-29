@@ -125,6 +125,30 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // Android 14+ requires explicit permission for full-screen alarm overlays
+        if (Build.VERSION.SDK_INT >= 34) {
+            try {
+                val nm = getSystemService(android.app.NotificationManager::class.java)
+                if (nm != null && !nm.canUseFullScreenIntent()) {
+                    val i = Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT")
+                    i.data = Uri.parse("package:$packageName")
+                    startActivity(i)
+                }
+            } catch (_: Exception) {
+            }
+        }
+        // Ask for battery optimization exemption so alarms fire on Samsung/Xiaomi/etc.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val pm = getSystemService(android.os.PowerManager::class.java)
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                    val i = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    i.data = Uri.parse("package:$packageName")
+                    startActivity(i)
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 }
 

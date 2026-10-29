@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -77,6 +78,15 @@
         <receiver
             android:name=".worker.AlarmReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".worker.PreAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="PRE_ALARM_SKIP" />
+                <action android:name="PRE_ALARM_DISMISS" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".worker.ReminderReceiver"

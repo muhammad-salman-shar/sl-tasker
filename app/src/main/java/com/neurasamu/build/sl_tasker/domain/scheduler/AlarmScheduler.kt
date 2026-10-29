@@ -12,6 +12,10 @@ import java.util.Calendar
 
 class AlarmScheduler(private val context: Context) {
 
+    companion object {
+        const val PRE_ALARM_OFFSET_MS = 5L * 60L * 1000L
+    }
+
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     fun scheduleAlarm(alarm: AlarmEntity) {
@@ -60,6 +64,9 @@ class AlarmScheduler(private val context: Context) {
         } catch (_: Throwable) {
             scheduleExact(triggerAt, pendingIntent)
         }
+
+        // 5-minute advance warning
+        schedulePreAlarmNotification(alarm, triggerAt)
     }
 
     fun snooze(alarmId: Long, minutes: Int, label: String, dismissMethod: String, pinCode: String) {
@@ -144,6 +151,31 @@ class AlarmScheduler(private val context: Context) {
 
         // Fallback
         scheduleExact(triggerAtMillis, pendingIntent)
+    }
+
+    fun schedulePreAlarmNotification(alarm: AlarmEntity, triggerAtMillis: Long) {
+        val preAt = triggerAtMillis - PRE_ALARM_OFFSET_MS
+        if (preAt <= System.currentTimeMillis()) return
+        val intent = Intent(context, com.neurasamu.build.sl_tasker.worker.PreAlarmReceiver::class.java).apply {
+            putExtra("ALARM_ID", alarm.id)
+            putExtra("ALARM_LABEL", alarm.label)
+            putExtra("ALARM_HOUR", alarm.hour)
+            putExtra("ALARM_MINUTE", alarm.minute)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            (alarm.id + 800_000).toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            alarmManager.setAlarmClock(
+                AlarmManager.AlarmClockInfo(preAt, pi),
+                pi
+            )
+        } catch (_: Throwable) {
+            scheduleExact(preAt, pi)
+        }
     }
 
     fun cancelReminder(occurrenceId: Long) {
