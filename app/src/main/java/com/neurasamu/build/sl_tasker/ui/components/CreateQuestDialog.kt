@@ -87,7 +87,10 @@ fun CreateQuestDialog(
         )
     }
     var isRepeat by remember {
-        mutableStateOf(initialTask?.repeatRule != com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE)
+        mutableStateOf(
+            initialTask != null &&
+            initialTask.repeatRule != com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE
+        )
     }
     var allowEarly by remember {
         mutableStateOf(initialTask?.allowEarlyComplete ?: false)

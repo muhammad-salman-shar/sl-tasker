@@ -114,7 +114,10 @@ class TaskRepository(private val database: AppDatabase) {
                         repeatRule = task.repeatRule,
                         customRepeatDays = task.customRepeatDays
                     )
-                    if (nextScheduled != null && nextScheduled > now) {
+                    // Ensure the next occurrence is strictly after the one we just completed
+                    // AND after now — prevents infinite same-time loops on repeat tasks.
+                    val minNext = maxOf(now, occurrence.scheduledAt + 60_000L)
+                    if (nextScheduled != null && nextScheduled >= minNext) {
                         val durationMillis = task.durationMinutes * 60 * 1000L
                         occurrenceDao.insertOccurrence(
                             OccurrenceEntity(
