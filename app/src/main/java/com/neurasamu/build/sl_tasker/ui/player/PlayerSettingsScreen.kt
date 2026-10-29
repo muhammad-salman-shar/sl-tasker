@@ -61,6 +61,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import kotlinx.coroutines.launch
+import androidx.activity.compose.BackHandler
 
 data class AppRow(val pkg: String, val label: String)
 
@@ -79,6 +80,8 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
             it.label.contains(query, ignoreCase = true) || it.pkg.contains(query, ignoreCase = true)
         }
     }
+
+    BackHandler { onClose() }
 
     Scaffold(
         containerColor = DarkBackground,

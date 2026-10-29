@@ -67,6 +67,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.IntentCompat
 
 @Composable
 fun AlarmScreen(
@@ -360,13 +361,13 @@ private fun AddAlarmDialog(
     val ringtoneLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            if (uri != null) {
-                soundUri = uri.toString()
-            } else if (result.data?.getBooleanExtra("picked_none", false) == true) {
-                soundUri = ""
-            }
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val uri: Uri? = IntentCompat.getParcelableExtra(
+                result.data!!,
+                RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+                Uri::class.java
+            )
+            soundUri = uri?.toString() ?: ""
         }
     }
     val dayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
@@ -619,10 +620,11 @@ private fun AddAlarmDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (soundUri.isBlank()) "Default alarm tone" else "Custom tone",
+                        text = getRingtoneLabel(ctx, soundUri),
                         color = TextSecondary,
                         fontSize = 12.sp,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1
                     )
                     TextButton(
                         onClick = {
@@ -763,4 +765,14 @@ private fun validatePin(pin: String): String? {
     if (pin.startsWith("12345")) return "PIN cannot start with 12345"
     if (pin.toSet().size == 1) return "PIN cannot be all same digit"
     return null
+}
+
+private fun getRingtoneLabel(ctx: android.content.Context, uri: String): String {
+    if (uri.isBlank()) return "Default alarm tone"
+    return try {
+        val r = android.media.RingtoneManager.getRingtone(ctx, Uri.parse(uri))
+        r?.getTitle(ctx) ?: "Custom tone"
+    } catch (_: Throwable) {
+        "Custom tone"
+    }
 }

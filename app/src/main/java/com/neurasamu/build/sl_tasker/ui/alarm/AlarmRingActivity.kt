@@ -85,6 +85,7 @@ class AlarmRingActivity : ComponentActivity() {
                     requiredPin = requiredPin,
                     snoozeEnabled = snoozeEnabled,
                     snoozeMinutes = snoozeMinutes,
+                    onForgotCredential = { requestDeviceUnlock() },
                     onDismissConfirmed = { dismissAlarm() },
                     onSnoozeConfirmed = {
                         if (alarmId > 0) {
@@ -126,6 +127,34 @@ class AlarmRingActivity : ComponentActivity() {
         finish()
     }
 
+    private val deviceCredentialLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            dismissAlarm()
+        }
+    }
+
+    fun requestDeviceUnlock() {
+        try {
+            val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && km.isKeyguardSecure) {
+                val intent = km.createConfirmDeviceCredentialIntent(
+                    "EMERGENCY UNLOCK",
+                    "Confirm your device PIN, password, or pattern"
+                )
+                if (intent != null) {
+                    deviceCredentialLauncher.launch(intent)
+                    return
+                }
+            }
+            // Fallback: no device lock configured
+            dismissAlarm()
+        } catch (_: Throwable) {
+            dismissAlarm()
+        }
+    }
+
     private fun stopAlarmService() {
         val stopIntent = Intent(this, AlarmService::class.java).apply {
             action = AlarmService.ACTION_STOP
@@ -141,6 +170,7 @@ fun AlarmRingContent(
     requiredPin: String,
     snoozeEnabled: Boolean,
     snoozeMinutes: Int,
+    onForgotCredential: () -> Unit,
     onDismissConfirmed: () -> Unit,
     onSnoozeConfirmed: () -> Unit
 ) {
@@ -334,6 +364,17 @@ fun AlarmRingContent(
                             )
                         ) {
                             Text(if (pendingAction == "snooze") "CONFIRM & SNOOZE" else "CONFIRM & DISMISS")
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = { onForgotCredential() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = DarkCard,
+                                contentColor = TextMuted
+                            )
+                        ) {
+                            Text("FORGOT · USE DEVICE LOCK", fontSize = 11.sp)
                         }
                     }
                 }
