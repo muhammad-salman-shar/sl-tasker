@@ -104,7 +104,7 @@ fun DashboardScreen(
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("ALL TASKS", "COMPLETED").forEachIndexed { idx, label ->
+                listOf("INCOMPLETE", "COMPLETED").forEachIndexed { idx, label ->
                     val sel = subTab == idx
                     Box(
                         modifier = Modifier
@@ -181,14 +181,16 @@ fun DashboardScreen(
     if (showCreateDialog) {
         CreateQuestDialog(
             onDismiss = { showCreateDialog = false },
-            onConfirm = { title, description, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes ->
+            onConfirm = { title, description, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly ->
                 taskViewModel.createQuest(
                     title = title,
                     description = description,
                     difficulty = difficulty,
                     reminderMinutesOfDay = reminderMinutesOfDay,
                     customRepeatDays = daysCsv,
-                    durationMinutes = durationMinutes
+                    durationMinutes = durationMinutes,
+                    isRepeat = isRepeat,
+                    allowEarlyComplete = allowEarly
                 )
                 showCreateDialog = false
             }
@@ -217,7 +219,7 @@ fun DashboardScreen(
         CreateQuestDialog(
             onDismiss = { editingTask = null },
             initialTask = task,
-            onConfirm = { title, description, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes ->
+            onConfirm = { title, description, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly ->
                 taskViewModel.updateTaskFields(
                     taskId = task.id,
                     title = title,
@@ -225,7 +227,9 @@ fun DashboardScreen(
                     difficulty = difficulty,
                     reminderMinutesOfDay = reminderMinutesOfDay,
                     customRepeatDays = daysCsv,
-                    durationMinutes = durationMinutes
+                    durationMinutes = durationMinutes,
+                    isRepeat = isRepeat,
+                    allowEarlyComplete = allowEarly
                 )
                 editingTask = null
             }

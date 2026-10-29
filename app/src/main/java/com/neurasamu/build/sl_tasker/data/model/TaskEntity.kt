@@ -17,6 +17,7 @@ data class TaskEntity(
     val customRepeatDays: String = "",
     val durationMinutes: Int = 30,
     val reminderMinutesOfDay: Int = 0,
+    val allowEarlyComplete: Boolean = false,
     val criticalTimerMinutes: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val archived: Boolean = false

@@ -56,7 +56,12 @@ class TaskRepository(private val database: AppDatabase) {
     suspend fun completeOccurrence(occurrenceId: Long): Boolean = withContext(Dispatchers.IO) {
         database.withTransaction {
             val occurrence = occurrenceDao.getOccurrenceById(occurrenceId) ?: return@withTransaction false
+            if (occurrence.status == OccurrenceStatus.COMPLETED) return@withTransaction false
             val task = taskDao.getTaskById(occurrence.taskId) ?: return@withTransaction false
+            // Defense-in-depth time gate — UI prevents this, but enforce here too
+            if (!task.allowEarlyComplete && System.currentTimeMillis() < occurrence.scheduledAt) {
+                return@withTransaction false
+            }
             val currentStats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
 
             val updatedOccurrence = occurrence.copy(

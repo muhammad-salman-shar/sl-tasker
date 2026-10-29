@@ -104,17 +104,20 @@ class TaskViewModel(
         difficulty: Difficulty,
         reminderMinutesOfDay: Int,
         customRepeatDays: String,
-        durationMinutes: Int
+        durationMinutes: Int,
+        isRepeat: Boolean,
+        allowEarlyComplete: Boolean
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val existing = taskRepository.getTaskById(taskId) ?: return@launch
 
-            // Cancel old occurrence + reminder
             val oldOccs = taskRepository.getPendingOccurrencesForTask(taskId)
             oldOccs.forEach { occ ->
                 alarmScheduler.cancelReminder(occ.id)
                 taskRepository.deleteOccurrence(occ.id)
             }
+
+            val repeatRuleVal = if (isRepeat) RepeatRule.CUSTOM else RepeatRule.ONCE
 
             val updated = existing.copy(
                 title = title,
@@ -122,13 +125,12 @@ class TaskViewModel(
                 difficulty = difficulty,
                 reminderMinutesOfDay = reminderMinutesOfDay,
                 customRepeatDays = customRepeatDays,
-                durationMinutes = durationMinutes
+                durationMinutes = durationMinutes,
+                repeatRule = repeatRuleVal,
+                allowEarlyComplete = allowEarlyComplete
             )
             taskRepository.updateTaskFields(updated)
 
-            // Recreate occurrence + reminder with new time
-            val isRepeatTask = customRepeatDays.isNotBlank()
-            val repeatRuleVal = if (isRepeatTask) RepeatRule.CUSTOM else RepeatRule.ONCE
             val nextTrigger = com.neurasamu.build.sl_tasker.domain.scheduler.ScheduleHelper.nextTrigger(
                 hour = reminderMinutesOfDay / 60,
                 minute = reminderMinutesOfDay % 60,
@@ -137,9 +139,7 @@ class TaskViewModel(
             ) ?: (System.currentTimeMillis() + 60_000L)
             val deadlineAt = nextTrigger + durationMinutes * 60 * 1000L
 
-            val updatedWithRule = updated.copy(repeatRule = repeatRuleVal)
-            taskRepository.updateTaskFields(updatedWithRule)
-            val (_, occId) = taskRepository.createTaskWithOccurrence(updatedWithRule, nextTrigger, deadlineAt)
+            val (_, occId) = taskRepository.createTaskWithOccurrence(updated, nextTrigger, deadlineAt)
             alarmScheduler.scheduleReminder(occId, nextTrigger, title)
         }
     }
@@ -150,11 +150,14 @@ class TaskViewModel(
         difficulty: Difficulty,
         reminderMinutesOfDay: Int,
         customRepeatDays: String,
-        durationMinutes: Int
+        durationMinutes: Int,
+        isRepeat: Boolean,
+        allowEarlyComplete: Boolean
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            val isRepeatTask = customRepeatDays.isNotBlank()
-            val repeatRuleVal = if (isRepeatTask) RepeatRule.CUSTOM else RepeatRule.ONCE
+            // IMPORTANT: isRepeat is user-intent, not "did they pick days".
+            // A single-day task with a specific day is still ONCE (no weekly loop).
+            val repeatRuleVal = if (isRepeat) RepeatRule.CUSTOM else RepeatRule.ONCE
             val nextTrigger = com.neurasamu.build.sl_tasker.domain.scheduler.ScheduleHelper.nextTrigger(
                 hour = reminderMinutesOfDay / 60,
                 minute = reminderMinutesOfDay % 60,
@@ -172,7 +175,8 @@ class TaskViewModel(
                 repeatRule = repeatRuleVal,
                 customRepeatDays = customRepeatDays,
                 durationMinutes = durationMinutes,
-                reminderMinutesOfDay = reminderMinutesOfDay
+                reminderMinutesOfDay = reminderMinutesOfDay,
+                allowEarlyComplete = allowEarlyComplete
             )
             val (_, occurrenceId) = taskRepository.createTaskWithOccurrence(task, scheduledAt, deadlineAt)
             alarmScheduler.scheduleReminder(occurrenceId, scheduledAt, title)

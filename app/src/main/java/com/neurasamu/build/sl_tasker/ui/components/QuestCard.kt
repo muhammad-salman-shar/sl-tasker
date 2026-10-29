@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -188,37 +189,67 @@ fun QuestCard(
                 )
 
                 val isCompleted = occurrence.status == OccurrenceStatus.COMPLETED
-                if (isCompleted) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.CheckCircle,
-                            contentDescription = null,
-                            tint = SuccessGreen.copy(alpha = 0.75f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "COMPLETED",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = SuccessGreen.copy(alpha = 0.75f),
-                            fontSize = 11.sp
-                        )
+                val now = System.currentTimeMillis()
+                val isLocked = !isCompleted && !task.allowEarlyComplete && now < occurrence.scheduledAt
+                val remainingMs = (occurrence.scheduledAt - now).coerceAtLeast(0L)
+                val lockedLabel = when {
+                    remainingMs < 60_000L -> "LOCKED"
+                    remainingMs < 60L * 60_000L -> "LOCKED ${remainingMs / 60_000L}m"
+                    remainingMs < 24L * 60L * 60_000L -> "LOCKED ${remainingMs / (60L * 60_000L)}h"
+                    else -> "LOCKED"
+                }
+
+                when {
+                    isCompleted -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.CheckCircle,
+                                contentDescription = null,
+                                tint = SuccessGreen.copy(alpha = 0.75f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "COMPLETED",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = SuccessGreen.copy(alpha = 0.75f),
+                                fontSize = 11.sp
+                            )
+                        }
                     }
-                } else {
-                    val needsTimer = task.difficulty != Difficulty.MEDIUM
-                    Button(
-                        onClick = if (needsTimer) onStart else onComplete,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (needsTimer) difficultyColor else PrimaryManaBlue,
-                            contentColor = DarkCard
-                        ),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = if (needsTimer) "START" else "COMPLETE QUEST",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = DarkCard
-                        )
+                    isLocked -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.Lock,
+                                contentDescription = null,
+                                tint = TextMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = lockedLabel,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = TextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                    else -> {
+                        val needsTimer = task.difficulty != Difficulty.MEDIUM
+                        Button(
+                            onClick = if (needsTimer) onStart else onComplete,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (needsTimer) difficultyColor else PrimaryManaBlue,
+                                contentColor = DarkCard
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = if (needsTimer) "START" else "COMPLETE",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = DarkCard
+                            )
+                        }
                     }
                 }
             }

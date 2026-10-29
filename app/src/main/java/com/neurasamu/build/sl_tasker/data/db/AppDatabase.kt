@@ -23,7 +23,7 @@ import com.neurasamu.build.sl_tasker.data.model.TaskEntity
         PlayerStatsEntity::class,
         AlarmEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

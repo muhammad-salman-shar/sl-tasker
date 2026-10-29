@@ -60,7 +60,9 @@ fun CreateQuestDialog(
         difficulty: Difficulty,
         reminderMinutesOfDay: Int,
         daysOfWeekCsv: String,
-        durationMinutes: Int
+        durationMinutes: Int,
+        isRepeat: Boolean,
+        allowEarlyComplete: Boolean
     ) -> Unit
 ) {
     val isEdit = initialTask != null
@@ -86,6 +88,9 @@ fun CreateQuestDialog(
     }
     var isRepeat by remember {
         mutableStateOf(initialTask?.repeatRule != com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE)
+    }
+    var allowEarly by remember {
+        mutableStateOf(initialTask?.allowEarlyComplete ?: false)
     }
 
     val difficultyColor = when (difficulty) {
@@ -336,6 +341,29 @@ fun CreateQuestDialog(
                     }
                 }
 
+                SectionLabel("COMPLETION")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Allow complete anytime", color = TextPrimary, fontSize = 11.sp)
+                        Text(
+                            if (allowEarly) "You can complete before the scheduled time"
+                            else "Locked until scheduled time",
+                            color = TextMuted, fontSize = 9.sp
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = allowEarly,
+                        onCheckedChange = { allowEarly = it },
+                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                            checkedThumbColor = DarkCard,
+                            checkedTrackColor = PrimaryManaBlue
+                        )
+                    )
+                }
+
                 if (requiresTimer) {
                     SectionLabel("TIMER (MINUTES)")
                     OutlinedTextField(
@@ -378,7 +406,7 @@ fun CreateQuestDialog(
                     val minutes = hh * 60 + mm
                     val csv = selectedDays.sorted().joinToString(",")
                     val dur = if (requiresTimer) durationText.toIntOrNull() ?: 0 else 0
-                    onConfirm(title, description, difficulty, minutes, csv, dur)
+                    onConfirm(title, description, difficulty, minutes, csv, dur, isRepeat, allowEarly)
                 },
                 enabled = valid,
                 colors = ButtonDefaults.buttonColors(
