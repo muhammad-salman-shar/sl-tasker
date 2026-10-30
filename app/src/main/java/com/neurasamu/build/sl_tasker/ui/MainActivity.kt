@@ -105,6 +105,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try {
+            val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            com.neurasamu.build.sl_tasker.ui.theme.ThemeState.mode = prefs.getInt("theme_mode", 0)
+        } catch (_: Throwable) {}
         checkAndRequestPermissions()
 
         lifecycleScope.launch {

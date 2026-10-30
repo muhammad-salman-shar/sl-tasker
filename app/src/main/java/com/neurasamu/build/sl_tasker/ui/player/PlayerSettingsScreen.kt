@@ -62,6 +62,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 
 data class AppRow(val pkg: String, val label: String)
 
@@ -148,6 +149,53 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                         color = PrimaryManaBlue,
                         fontSize = 11.sp
                     )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            SettingsCard {
+                Text("APPEARANCE", color = PrimaryManaBlue, fontSize = 11.sp)
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkSurface)
+                        .border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    listOf(0 to "System", 1 to "Dark", 2 to "Light").forEach { (mode, label) ->
+                        val sel = ThemeState.mode == mode
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
+                                .border(
+                                    1.dp,
+                                    if (sel) PrimaryManaBlue else androidx.compose.ui.graphics.Color.Transparent,
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .clickable {
+                                    ThemeState.mode = mode
+                                    try {
+                                        context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                                            .edit().putInt("theme_mode", mode).apply()
+                                    } catch (_: Throwable) {}
+                                }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                label,
+                                color = if (sel) PrimaryManaBlue else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = if (sel) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal
+                            )
+                        }
+                    }
                 }
             }
 
