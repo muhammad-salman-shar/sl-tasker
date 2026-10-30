@@ -226,9 +226,12 @@ fun CalendarScreen(
 
         val dayTasks: List<Pair<OccurrenceEntity, com.neurasamu.build.sl_tasker.data.model.TaskEntity>> =
             if (selectedDay > 0) {
-                (byDay[selectedDay] ?: emptyList()).mapNotNull { occ ->
-                    taskMap[occ.taskId]?.let { occ to it }
-                }.sortedBy { it.0.scheduledAt }
+                val raw = byDay[selectedDay] ?: emptyList()
+                val mapped = raw.mapNotNull { occ ->
+                    val t = taskMap[occ.taskId]
+                    if (t != null) occ to t else null
+                }
+                mapped.sortedBy { it.first.scheduledAt }
             } else {
                 emptyList()
             }
