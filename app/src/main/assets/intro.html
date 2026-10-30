@@ -873,16 +873,10 @@ input[type=range]::-moz-range-thumb{
 </div>
 
 <!-- ============ LIBRARIES ============ -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="gsap.min.js"></script>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-  }
-}
-</script>
 
+<script src="three.min.js"></script>
 <script type="module">
 /* ================================================================
    SOVEREIGN AWAKENING — Cinematic Player Registration
@@ -2100,11 +2094,9 @@ function wireBack() {
    ---------------------------------------------------------------- */
 async function boot() {
   /* --- Load Three.js dynamically (graceful fallback) --- */
-  try {
-    THREE = await import('three');
-  } catch (e) {
-    THREE = null;
-    console.warn('Three.js failed to load — using fallback visuals.', e);
+  THREE = (typeof window !== 'undefined' && window.THREE) ? window.THREE : null;
+  if (!THREE) {
+    console.warn('Three.js missing — using fallback visuals.');
   }
 
   /* --- Try to build the 3D world --- */
@@ -2126,19 +2118,17 @@ async function boot() {
   const fill = el('loader-fill');
   const loaderText = document.querySelector('.loader-text');
   const steps = [
-    { p: 25, t: 'Forging dungeon geometry' },
-    { p: 55, t: 'Weaving shadow energy' },
-    { p: 80, t: 'Calibrating the gate' },
+    { p: 50, t: 'Forging dungeon geometry' },
     { p: 100, t: 'System online' }
   ];
 
   for (const s of steps) {
-    await new Promise(r => setTimeout(r, 340 + Math.random() * 240));
-    gsap.to(fill, { width: s.p + '%', duration: 0.5, ease: 'power2.out' });
+    await new Promise(r => setTimeout(r, 200));
+    gsap.to(fill, { width: s.p + '%', duration: 0.4, ease: 'power2.out' });
     loaderText.textContent = s.t;
   }
 
-  await new Promise(r => setTimeout(r, 520));
+  await new Promise(r => setTimeout(r, 200));
 
   /* --- Fade the loader --- */
   gsap.to('#loader', {

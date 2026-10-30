@@ -101,12 +101,19 @@ class IntroActivity : ComponentActivity() {
 
         setContentView(root)
 
-        // If bridge doesn't fire within 30s, show fallback (user might be stuck)
+        // Watchdog 1: show skip option at 6s if still loading
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(30_000L)
+            kotlinx.coroutines.delay(6_000L)
             if (!bridgeCalled && fallbackView.visibility != View.VISIBLE) {
-                // Don't force fallback, just enable skip mode via tap
-                // Softer: do nothing. User can still complete.
+                showFallback("Intro loading slowly.\n\nTap to skip and enter the app.")
+            }
+        }
+
+        // Watchdog 2: auto-skip at 20s if intro never completes
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(20_000L)
+            if (!bridgeCalled) {
+                skipIntro()
             }
         }
     }
