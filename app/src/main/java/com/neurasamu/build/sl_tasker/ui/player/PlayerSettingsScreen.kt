@@ -213,6 +213,15 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
 
             Spacer(Modifier.height(10.dp))
 
+            val selectablePkgs = remember(allApps) {
+                allApps
+                    .filter { it.pkg != "com.neurasamu.build.sl_tasker" }
+                    .filterNot { it.pkg in PROTECTED_PACKAGES }
+                    .map { it.pkg }
+                    .toSet()
+            }
+            val allSelected = selectablePkgs.isNotEmpty() && selectablePkgs.all { it in s.selectedPackages }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -227,20 +236,27 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .background(DarkCard)
-                        .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
+                        .border(
+                            1.dp,
+                            if (allSelected) DangerPenaltyRed else DarkBorder,
+                            RoundedCornerShape(6.dp)
+                        )
                         .clickable {
                             scope.launch {
-                                val all = allApps
-                                    .filter { it.pkg != "com.neurasamu.build.sl_tasker" }
-                                    .filterNot { it.pkg in PROTECTED_PACKAGES }
-                                    .map { it.pkg }
-                                    .toSet()
-                                prefs.setSelected(all)
+                                if (allSelected) {
+                                    prefs.setSelected(emptySet())
+                                } else {
+                                    prefs.setSelected(selectablePkgs)
+                                }
                             }
                         }
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Text("SELECT ALL", color = PrimaryManaBlue, fontSize = 10.sp)
+                    Text(
+                        text = if (allSelected) "UNSELECT ALL" else "SELECT ALL",
+                        color = if (allSelected) DangerPenaltyRed else PrimaryManaBlue,
+                        fontSize = 10.sp
+                    )
                 }
             }
             Spacer(Modifier.height(6.dp))
