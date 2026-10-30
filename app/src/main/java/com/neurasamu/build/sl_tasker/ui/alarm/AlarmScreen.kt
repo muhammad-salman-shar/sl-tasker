@@ -223,12 +223,17 @@ private fun AlarmCard(
     val amPm = if (alarm.hour >= 12) "PM" else "AM"
     val timeString = String.format(Locale.getDefault(), "%02d:%02d", displayHour, alarm.minute)
 
+    val shape = com.neurasamu.build.sl_tasker.ui.components.NotchedShape(notch = 16.dp, corner = 12.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(DarkCard)
-            .border(1.dp, if (alarm.enabled) PrimaryManaBlue else DarkBorder, RoundedCornerShape(12.dp))
+            .clip(shape)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(DarkCard.copy(alpha = 0.92f), DarkCard.copy(alpha = 0.65f))
+                )
+            )
+            .border(1.dp, if (alarm.enabled) PrimaryManaBlue else DarkBorder, shape)
             .padding(16.dp)
     ) {
         Row(

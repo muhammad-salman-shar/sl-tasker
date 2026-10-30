@@ -35,6 +35,8 @@ import com.neurasamu.build.sl_tasker.ui.theme.PrimaryBlue
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
+import com.neurasamu.build.sl_tasker.ui.components.GlassCard
+import com.neurasamu.build.sl_tasker.ui.components.NotchedShape
 
 @Composable
 fun DailyQuestSection(
@@ -82,12 +84,17 @@ private fun DailyQuestRow(quest: DailyQuestEntity, onComplete: () -> Unit) {
     val bg = if (done) DarkCard.copy(alpha = 0.5f) else DarkCard
     val borderColor = if (done) SuccessGreen.copy(alpha = 0.3f) else AccentGold.copy(alpha = 0.3f)
 
+    val shape = NotchedShape(notch = 10.dp, corner = 10.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(bg)
-            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+            .clip(shape)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(bg.copy(alpha = 0.9f), bg.copy(alpha = 0.6f))
+                )
+            )
+            .border(1.dp, borderColor, shape)
             .clickable(enabled = !done) { onComplete() }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically

@@ -61,6 +61,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.compose.ui.platform.LocalContext
 import com.neurasamu.build.sl_tasker.util.SoundFx
+import com.neurasamu.build.sl_tasker.ui.components.NotchedShape
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -91,15 +92,20 @@ fun QuestCard(
         Difficulty.MEDIUM -> RankC
     }
 
+    val shape = NotchedShape(notch = 16.dp, corner = 12.dp)
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(DarkCard)
+            .clip(shape)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(DarkCard.copy(alpha = 0.92f), DarkCard.copy(alpha = 0.65f))
+                )
+            )
             .border(
                 1.dp,
                 if (task.priority == Priority.CRITICAL) DangerPenaltyRed else DarkBorder,
-                RoundedCornerShape(12.dp)
+                shape
             )
             .combinedClickable(
                 onClick = {},
