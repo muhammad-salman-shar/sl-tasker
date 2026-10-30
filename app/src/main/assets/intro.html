@@ -882,6 +882,10 @@ input[type=range]::-moz-range-thumb{
    SOVEREIGN AWAKENING — Cinematic Player Registration
    ================================================================ */
 
+// Signal Kotlin that the intro has started loading
+try { window.AndroidBridge && window.AndroidBridge.onIntroStarted && window.AndroidBridge.onIntroStarted(); } catch(e) {}
+
+
 /* ----------------------------------------------------------------
    0. ENVIRONMENT DETECTION
    ---------------------------------------------------------------- */
@@ -2219,6 +2223,9 @@ async function boot() {
 
   showStage('intro', { skipCam: true });
   setTimeout(() => moveCamera(CAM.intro), 400);
+
+  // Signal Kotlin that intro is fully ready
+  try { window.AndroidBridge && window.AndroidBridge.onIntroReady && window.AndroidBridge.onIntroReady(); } catch(e) {}
 }
 
 /* Persist name across refresh (light touch) */

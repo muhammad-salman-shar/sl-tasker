@@ -24,6 +24,8 @@ class IntroActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var fallbackView: TextView
     private var bridgeCalled = false
+    private var introStarted = false
+    private var introReady = false
 
     @SuppressLint("SetJavaScriptEnabled", "AddJavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -101,19 +103,20 @@ class IntroActivity : ComponentActivity() {
 
         setContentView(root)
 
-        // Watchdog 1: show skip option at 6s if still loading
+        // Watchdog: show skip only if intro REALLY stuck
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(6_000L)
-            if (!bridgeCalled && fallbackView.visibility != View.VISIBLE) {
-                showFallback("Intro loading slowly.\n\nTap to skip and enter the app.")
+            kotlinx.coroutines.delay(12_000L)
+            // If JS never even started (WebView crashed / asset missing) → fallback
+            if (!introStarted && !bridgeCalled) {
+                showFallback("Intro could not load.\n\nTap to skip and enter the app.")
             }
         }
 
-        // Watchdog 2: auto-skip at 20s if intro never completes
+        // Second watchdog: if started but never ready in 25s → fallback
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(20_000L)
-            if (!bridgeCalled) {
-                skipIntro()
+            kotlinx.coroutines.delay(25_000L)
+            if (introStarted && !introReady && !bridgeCalled) {
+                showFallback("Intro is taking long.\n\nTap to skip and enter the app.")
             }
         }
     }
@@ -158,6 +161,22 @@ class IntroActivity : ComponentActivity() {
             lifecycleScope.launch {
                 PlayerProfileStore(applicationContext).save(safeName, safeGender, safeAge, safeId)
                 runOnUiThread { enterApp() }
+            }
+        }
+
+        @JavascriptInterface
+        fun onIntroStarted() {
+            introStarted = true
+        }
+
+        @JavascriptInterface
+        fun onIntroReady() {
+            introReady = true
+            // If fallback was already showing, hide it (intro actually works)
+            runOnUiThread {
+                if (fallbackView.visibility == View.VISIBLE) {
+                    fallbackView.visibility = View.GONE
+                }
             }
         }
     }
