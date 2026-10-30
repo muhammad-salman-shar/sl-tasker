@@ -299,6 +299,17 @@ fun MainAppScaffold(
         }
     }
     val currentLevel = pStats?.level ?: 1
+    androidx.compose.runtime.LaunchedEffect(pStats?.health, pStats?.ep, pStats?.streak) {
+        try {
+            val mgr = android.appwidget.AppWidgetManager.getInstance(context)
+            val ids = mgr.getAppWidgetIds(
+                android.content.ComponentName(context, com.neurasamu.build.sl_tasker.widget.StatsWidgetProvider::class.java)
+            )
+            ids.forEach { id ->
+                com.neurasamu.build.sl_tasker.widget.StatsWidgetProvider.updateWidget(context, mgr, id)
+            }
+        } catch (_: Throwable) {}
+    }
     androidx.compose.runtime.LaunchedEffect(currentLevel) {
         if (currentLevel > 1 && levelUpShown != currentLevel) {
             levelUpShown = currentLevel

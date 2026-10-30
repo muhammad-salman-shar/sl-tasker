@@ -70,6 +70,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import com.neurasamu.build.sl_tasker.util.ShareCardGenerator
 
 @Composable
 fun StatsScreen(
@@ -101,7 +106,16 @@ fun StatsScreen(
     ) {
         profile?.let { p ->
             if (p.introCompleted) {
-                item { PlayerIdentityCard(p) }
+                item {
+                    PlayerIdentityCard(
+                        profile = p,
+                        onShare = {
+                            try {
+                                ShareCardGenerator.share(ctx, stats, p)
+                            } catch (_: Throwable) {}
+                        }
+                    )
+                }
             }
         }
 
@@ -527,7 +541,7 @@ private fun EventRow(event: com.neurasamu.build.sl_tasker.data.model.EventEntity
 }
 
 @Composable
-private fun PlayerIdentityCard(profile: PlayerProfile) {
+private fun PlayerIdentityCard(profile: PlayerProfile, onShare: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -536,13 +550,30 @@ private fun PlayerIdentityCard(profile: PlayerProfile) {
             .border(1.dp, PrimaryManaBlue.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
             .padding(16.dp)
     ) {
-        Text(
-            "PLAYER IDENTITY",
-            color = PrimaryManaBlue,
-            fontSize = 11.sp,
-            style = MaterialTheme.typography.labelLarge,
-            letterSpacing = 2.sp
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "PLAYER IDENTITY",
+                color = PrimaryManaBlue,
+                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelLarge,
+                letterSpacing = 2.sp,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = onShare,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Share,
+                    contentDescription = "Share Player Card",
+                    tint = PrimaryManaBlue,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
         Spacer(Modifier.height(10.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {

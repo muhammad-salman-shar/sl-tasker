@@ -286,8 +286,14 @@ fun CalendarScreen(
                             val c = Calendar.getInstance().apply { timeInMillis = occ.scheduledAt }
                             val hh = c.get(Calendar.HOUR_OF_DAY)
                             val mm = c.get(Calendar.MINUTE)
+                            val timeStr = String.format("%02d:%02d", hh, mm)
+                            val statusStr = when {
+                                isDone -> "DONE"
+                                isMissed -> "MISSED"
+                                else -> "PENDING"
+                            }
                             Text(
-                                "%02d:%02d · ${task.difficulty.name} · ${if (isDone) "DONE" else if (isMissed) "MISSED" else "PENDING"}".format(hh, mm),
+                                "$timeStr - ${task.difficulty.name} - $statusStr",
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
