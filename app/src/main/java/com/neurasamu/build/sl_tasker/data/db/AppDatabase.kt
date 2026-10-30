@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.neurasamu.build.sl_tasker.data.model.AlarmEntity
+import com.neurasamu.build.sl_tasker.data.model.DailyQuestEntity
 import com.neurasamu.build.sl_tasker.data.model.EventEntity
 import com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity
 import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
@@ -21,9 +22,10 @@ import com.neurasamu.build.sl_tasker.data.model.TaskEntity
         TaskDebtEntity::class,
         RecoveryQuestEntity::class,
         PlayerStatsEntity::class,
-        AlarmEntity::class
+        AlarmEntity::class,
+        DailyQuestEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -36,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun recoveryQuestDao(): RecoveryQuestDao
     abstract fun playerStatsDao(): PlayerStatsDao
     abstract fun alarmDao(): AlarmDao
+    abstract fun dailyQuestDao(): DailyQuestDao
 
     companion object {
         @Volatile

@@ -90,12 +90,14 @@ import com.neurasamu.build.sl_tasker.ui.components.LevelUpOverlay
 import com.neurasamu.build.sl_tasker.util.SoundFx
 import kotlinx.coroutines.flow.collectLatest
 import com.neurasamu.build.sl_tasker.util.SystemEvents
+import com.neurasamu.build.sl_tasker.ui.viewmodel.DailyQuestViewModel
 
 class MainActivity : ComponentActivity() {
 
     private val taskViewModel: TaskViewModel by viewModels { TaskViewModel.Factory(application) }
     private val statsViewModel: StatsViewModel by viewModels { StatsViewModel.Factory(application) }
     private val alarmViewModel: AlarmViewModel by viewModels { AlarmViewModel.Factory(application) }
+    private val dailyQuestViewModel: DailyQuestViewModel by viewModels { DailyQuestViewModel.Factory(application) }
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -265,7 +267,8 @@ private data class TabItem(
 fun MainAppScaffold(
     taskViewModel: TaskViewModel,
     statsViewModel: StatsViewModel,
-    alarmViewModel: AlarmViewModel
+    alarmViewModel: AlarmViewModel,
+    dailyQuestViewModel: DailyQuestViewModel
 ) {
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf(
@@ -431,7 +434,8 @@ fun MainAppScaffold(
             when (selectedTabIndex) {
                 0 -> HomeScreen(
                     taskViewModel = taskViewModel,
-                    statsViewModel = statsViewModel
+                    statsViewModel = statsViewModel,
+                    dailyQuestViewModel = dailyQuestViewModel
                 )
                 1 -> TasksScreen(
                     taskViewModel = taskViewModel,

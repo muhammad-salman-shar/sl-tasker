@@ -63,15 +63,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.width
+import com.neurasamu.build.sl_tasker.ui.viewmodel.DailyQuestViewModel
+import com.neurasamu.build.sl_tasker.ui.components.DailyQuestSection
 
 @Composable
 fun HomeScreen(
     taskViewModel: TaskViewModel,
     statsViewModel: StatsViewModel,
+    dailyQuestViewModel: DailyQuestViewModel,
     modifier: Modifier = Modifier
 ) {
     val activeQuests by taskViewModel.activeQuests.collectAsStateWithLifecycle()
     val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
+    val dailyQuests by dailyQuestViewModel.quests.collectAsStateWithLifecycle()
     val upcoming = activeQuests.take(5)
 
     Column(
@@ -102,7 +106,15 @@ fun HomeScreen(
             )
         }
 
-        Spacer(Modifier.height(28.dp))
+        if (dailyQuests.isNotEmpty()) {
+            Spacer(Modifier.height(20.dp))
+            DailyQuestSection(
+                quests = dailyQuests,
+                onComplete = { id -> dailyQuestViewModel.complete(id) }
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
 
         Text(
             text = "UPCOMING QUESTS",
