@@ -168,7 +168,38 @@ fun DashboardScreen(
                             onComplete = {
                                 taskViewModel.completeQuest(item.occurrence.id)
                             },
-                            onStart = { timerItem = item },
+                            onStart = {
+                                try {
+                                    val accent = when (item.task.difficulty) {
+                                        com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL ->
+                                            0xFFFF1744.toInt()
+                                        com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD ->
+                                            0xFFFB923C.toInt()
+                                        else -> 0xFF00E5FF.toInt()
+                                    }
+                                    val timer = com.neurasamu.build.sl_tasker.data.timer.ActiveTimer(
+                                        occurrenceId = item.occurrence.id,
+                                        taskTitle = item.task.title,
+                                        totalSeconds = (item.task.durationMinutes.coerceAtLeast(1)) * 60,
+                                        startedAtMillis = System.currentTimeMillis(),
+                                        elapsedBeforePauseSeconds = 0,
+                                        isPaused = false,
+                                        accentColorArgb = accent,
+                                        durationMinutes = item.task.durationMinutes.coerceAtLeast(1)
+                                    )
+                                    val svc = Intent(ctx, com.neurasamu.build.sl_tasker.service.TimerService::class.java)
+                                    svc.action = com.neurasamu.build.sl_tasker.service.TimerService.ACTION_START
+                                    svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_OCC_ID, timer.occurrenceId)
+                                    svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_TITLE, timer.taskTitle)
+                                    svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_MINUTES, timer.durationMinutes)
+                                    svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_ACCENT, timer.accentColorArgb)
+                                    androidx.core.content.ContextCompat.startForegroundService(ctx, svc)
+                                    ctx.startActivity(
+                                        Intent(ctx, com.neurasamu.build.sl_tasker.ui.timer.TimerActivity::class.java)
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                } catch (_: Throwable) {}
+                            },
                             onEdit = { editingTask = item.task },
                             onDelete = { taskViewModel.deleteTask(item.task.id) }
                         )
@@ -194,24 +225,6 @@ fun DashboardScreen(
                 )
                 showCreateDialog = false
             }
-        )
-    }
-
-    timerItem?.let { item ->
-        val accent = when (item.task.difficulty) {
-            com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
-            com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> com.neurasamu.build.sl_tasker.ui.theme.RankA
-            else -> com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
-        }
-        com.neurasamu.build.sl_tasker.ui.timer.TaskTimerScreen(
-            title = item.task.title,
-            durationMinutes = item.task.durationMinutes.coerceAtLeast(1),
-            accentColor = accent,
-            onFinish = {
-                taskViewModel.completeQuest(item.occurrence.id)
-                timerItem = null
-            },
-            onCancel = { timerItem = null }
         )
     }
 

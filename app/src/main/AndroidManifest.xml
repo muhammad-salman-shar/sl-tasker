@@ -72,6 +72,20 @@
             android:foregroundServiceType="specialUse" />
 
         <service
+            android:name=".service.TimerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
+
+        <activity
+            android:name=".ui.timer.TimerActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:theme="@android:style/Theme.Material.NoActionBar"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density" />
+
+        <service
             android:name=".service.AppBlockerAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">

@@ -122,6 +122,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // If a timer is active, ensure its service is running and overlay visible.
+        try {
+            val active = com.neurasamu.build.sl_tasker.data.timer.TimerRuntime.active.value
+            if (active != null) {
+                val svc = Intent(this, com.neurasamu.build.sl_tasker.service.TimerService::class.java)
+                svc.action = com.neurasamu.build.sl_tasker.service.TimerService.ACTION_SHOW_OVERLAY
+                startService(svc)
+            }
+        } catch (_: Throwable) {}
+    }
+
     private fun checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val permissionStatus = ContextCompat.checkSelfPermission(
@@ -163,6 +176,23 @@ class MainActivity : ComponentActivity() {
                     val i = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
                     i.data = Uri.parse("package:$packageName")
                     startActivity(i)
+                }
+            } catch (_: Exception) {
+            }
+        }
+        // Overlay permission for floating timer — ask only once
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                if (!android.provider.Settings.canDrawOverlays(this)) {
+                    val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                    if (!prefs.getBoolean("overlay_asked", false)) {
+                        prefs.edit().putBoolean("overlay_asked", true).apply()
+                        val i = Intent(
+                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                        startActivity(i)
+                    }
                 }
             } catch (_: Exception) {
             }

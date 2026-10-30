@@ -238,6 +238,20 @@ class TaskRepository(private val database: AppDatabase) {
         occurrenceDao.deleteOccurrenceById(id)
     }
 
+    suspend fun dropHealth(amount: Int): Int = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            val stats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
+            val newHp = (stats.health - amount).coerceAtLeast(0)
+            playerStatsDao.insertOrUpdate(
+                stats.copy(
+                    health = newHp,
+                    recoveryModeActive = newHp < 50 || stats.recoveryModeActive
+                )
+            )
+            newHp
+        }
+    }
+
     suspend fun archiveTask(taskId: Long) = withContext(Dispatchers.IO) {
         taskDao.archiveTask(taskId)
     }
