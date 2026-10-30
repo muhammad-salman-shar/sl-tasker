@@ -55,6 +55,12 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import androidx.compose.ui.platform.LocalContext
+import com.neurasamu.build.sl_tasker.util.SoundFx
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -68,6 +74,7 @@ fun QuestCard(
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val ctx = LocalContext.current
     val dateFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     val scheduledStr = dateFormat.format(Date(occurrence.scheduledAt))
 
@@ -237,7 +244,19 @@ fun QuestCard(
                     else -> {
                         val needsTimer = task.difficulty != Difficulty.MEDIUM
                         Button(
-                            onClick = if (needsTimer) onStart else onComplete,
+                            onClick = {
+                                SoundFx.complete()
+                                try {
+                                    val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        v.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        v.vibrate(80)
+                                    }
+                                } catch (_: Throwable) {}
+                                if (needsTimer) onStart() else onComplete()
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (needsTimer) difficultyColor else PrimaryManaBlue,
                                 contentColor = DarkCard

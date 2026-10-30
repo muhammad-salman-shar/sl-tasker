@@ -28,6 +28,7 @@ import com.neurasamu.build.sl_tasker.data.repository.TaskRepository
 import com.neurasamu.build.sl_tasker.data.timer.ActiveTimer
 import com.neurasamu.build.sl_tasker.data.timer.TimerRuntime
 import com.neurasamu.build.sl_tasker.data.timer.TimerStore
+import com.neurasamu.build.sl_tasker.util.SoundFx
 import com.neurasamu.build.sl_tasker.ui.timer.TimerActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -171,6 +172,7 @@ class TimerService : Service() {
         val t = TimerRuntime.active.value ?: return
         scope.launch {
             try { repository?.dropHealth(40) } catch (_: Throwable) {}
+            try { com.neurasamu.build.sl_tasker.util.SoundFx.giveUp() } catch (_: Throwable) {}
             clearTimerAndStop()
         }
     }
@@ -205,6 +207,7 @@ class TimerService : Service() {
 
     private suspend fun onTimerComplete(t: ActiveTimer) {
         try { repository?.completeOccurrence(t.occurrenceId) } catch (_: Throwable) {}
+        try { com.neurasamu.build.sl_tasker.util.SoundFx.complete() } catch (_: Throwable) {}
         clearTimerAndStop()
     }
 

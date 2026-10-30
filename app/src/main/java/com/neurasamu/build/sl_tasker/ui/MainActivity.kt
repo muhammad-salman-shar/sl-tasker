@@ -83,6 +83,11 @@ import com.neurasamu.build.sl_tasker.data.player.PlayerProfileStore
 import com.neurasamu.build.sl_tasker.ui.intro.IntroActivity
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
+import android.os.Vibrator
+import android.os.VibrationEffect
+import android.content.Context
+import com.neurasamu.build.sl_tasker.ui.components.LevelUpOverlay
+import com.neurasamu.build.sl_tasker.util.SoundFx
 
 class MainActivity : ComponentActivity() {
 
@@ -278,6 +283,23 @@ fun MainAppScaffold(
     var showAiSheet by remember { mutableStateOf(false) }
     val blockPrefs = remember { BlockPrefs(context) }
     val criticalActive by blockPrefs.criticalActive.collectAsState(initial = false)
+    val pStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
+    val currentLevel = pStats?.level ?: 1
+    androidx.compose.runtime.LaunchedEffect(currentLevel) {
+        if (currentLevel > 1 && levelUpShown != currentLevel) {
+            levelUpShown = currentLevel
+            SoundFx.levelUp()
+            try {
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 60, 60, 60, 60, 120), -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    v.vibrate(longArrayOf(0, 60, 60, 60, 60, 120), -1)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
     val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
     val locked = criticalActive || (playerStats?.health ?: 100) <= 30
 
@@ -423,6 +445,10 @@ fun MainAppScaffold(
 
     if (showSettings) {
         PlayerSettingsScreen(onClose = { showSettings = false })
+    }
+
+    levelUpShown?.let { lvl ->
+        LevelUpOverlay(level = lvl, onDismiss = { levelUpShown = null })
     }
 
     if (showAiSheet) {
