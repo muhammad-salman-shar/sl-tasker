@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import com.neurasamu.build.sl_tasker.data.block.BlockMode
+import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
 
 data class AiMessage(val role: String, val text: String, val raw: String? = null)
 
@@ -35,6 +37,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
     private val taskRepo = TaskRepository(db)
     private val alarmRepo = AlarmRepository(db.alarmDao())
     private val scheduler = AlarmScheduler(app)
+    private val blockPrefs = BlockPrefs(app)
 
     private val _messages = MutableStateFlow<List<AiMessage>>(emptyList())
     val messages: StateFlow<List<AiMessage>> = _messages
@@ -100,17 +103,22 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
 
-                val sysMsg = ChatMsg("system", AiPrompt.buildSystemPrompt(cfg.chatMode))
-                // Chat mode: send full history (user + assistant raw JSON). Agent mode: single message.
+                val sysMsg = ChatMsg(
+                    "system",
+                    if (cfg.chatMode) AiPrompt.buildChatPrompt()
+                    else AiPrompt.buildAgentPrompt()
+                )
                 val history: List<ChatMsg> = if (cfg.chatMode) {
+                    // Chat mode: full user/assistant history, plain text
                     _messages.value.mapNotNull { m ->
                         when (m.role) {
                             "user" -> ChatMsg("user", m.text)
-                            "assistant" -> ChatMsg("assistant", m.raw ?: m.text)
+                            "assistant" -> ChatMsg("assistant", m.text)
                             else -> null
                         }
                     }
                 } else {
+                    // Agent mode: single message, no history
                     listOf(ChatMsg("user", trimmed))
                 }
 
@@ -133,6 +141,12 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 _lastRawResponse.value = raw
+
+                if (cfg.chatMode) {
+                    // Chat mode: display raw text directly
+                    _messages.value = _messages.value + AiMessage("assistant", raw.trim())
+                    return@launch
+                }
 
                 val cleaned = stripFences(raw)
                 val json = try {
@@ -266,6 +280,126 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 _messages.value = _messages.value + AiMessage("info",
                     "Alarm set: \"$label\" at $timeStr$extra.")
+            }
+            "delete_task" -> {
+                val title = json.optString("title").trim()
+                if (title.isBlank()) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Which task title?")
+                    return
+                }
+                try {
+                    val all = taskRepo.getAllActiveTasks().first()
+                    val match = all.lastOrNull { it.title.equals(title, ignoreCase = true) }
+                    if (match == null) {
+                        _messages.value = _messages.value + AiMessage("assistant", "No task named \"$title\".")
+                    } else {
+                        taskRepo.deleteTask(match.id)
+                        _messages.value = _messages.value + AiMessage("info", "Task deleted: \"${match.title}\".")
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Delete failed: ${e.message}")
+                }
+            }
+            "delete_alarm" -> {
+                val label = json.optString("label").trim()
+                if (label.isBlank()) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Which alarm label?")
+                    return
+                }
+                try {
+                    val all = alarmRepo.allAlarms.first()
+                    val match = all.lastOrNull { it.label.equals(label, ignoreCase = true) }
+                    if (match == null) {
+                        _messages.value = _messages.value + AiMessage("assistant", "No alarm \"$label\".")
+                    } else {
+                        alarmRepo.deleteAlarm(match)
+                        _messages.value = _messages.value + AiMessage("info", "Alarm deleted: \"${match.label}\".")
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Delete failed: ${e.message}")
+                }
+            }
+            "complete_task" -> {
+                val title = json.optString("title").trim()
+                if (title.isBlank()) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Which task title?")
+                    return
+                }
+                try {
+                    val all = taskRepo.getAllActiveTasks().first()
+                    val match = all.lastOrNull { it.title.equals(title, ignoreCase = true) }
+                    if (match == null) {
+                        _messages.value = _messages.value + AiMessage("assistant", "No task \"$title\".")
+                    } else {
+                        val occs = taskRepo.getPendingOccurrencesForTask(match.id)
+                        val occ = occs.firstOrNull()
+                        if (occ == null) {
+                            _messages.value = _messages.value + AiMessage("assistant", "No pending occurrence for \"$title\".")
+                        } else {
+                            val ok = taskRepo.completeOccurrence(occ.id)
+                            if (ok) {
+                                _messages.value = _messages.value + AiMessage("info", "Task completed: \"${match.title}\".")
+                            } else {
+                                _messages.value = _messages.value + AiMessage("assistant", "Could not complete \"$title\" right now.")
+                            }
+                        }
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Complete failed: ${e.message}")
+                }
+            }
+            "list_tasks" -> {
+                try {
+                    val all = taskRepo.getAllActiveTasks().first()
+                    if (all.isEmpty()) {
+                        _messages.value = _messages.value + AiMessage("assistant", "You have no active tasks.")
+                    } else {
+                        val text = all.take(15).joinToString("\n") { "• ${it.title} (${it.difficulty.name})" }
+                        _messages.value = _messages.value + AiMessage("assistant", text)
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "List failed: ${e.message}")
+                }
+            }
+            "list_alarms" -> {
+                try {
+                    val all = alarmRepo.allAlarms.first()
+                    if (all.isEmpty()) {
+                        _messages.value = _messages.value + AiMessage("assistant", "You have no alarms.")
+                    } else {
+                        val text = all.take(15).joinToString("\n") {
+                            val hh = it.hour.toString().padStart(2, '0')
+                            val mm = it.minute.toString().padStart(2, '0')
+                            "• $hh:$mm ${it.label}"
+                        }
+                        _messages.value = _messages.value + AiMessage("assistant", text)
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "List failed: ${e.message}")
+                }
+            }
+            "show_stats" -> {
+                try {
+                    val stats = db.playerStatsDao().getPlayerStats()
+                    if (stats == null) {
+                        _messages.value = _messages.value + AiMessage("assistant", "No stats yet.")
+                    } else {
+                        val text = "Level ${stats.level} · HP ${stats.health}/100 · EP ${stats.ep} · Streak ${stats.streak} · Completed ${stats.totalCompleted} · Missed ${stats.totalMissed}"
+                        _messages.value = _messages.value + AiMessage("assistant", text)
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Stats failed: ${e.message}")
+                }
+            }
+            "set_block_mode" -> {
+                val mode = json.optString("mode", "OFF").uppercase()
+                val bm = when (mode) {
+                    "TEST" -> BlockMode.TEST
+                    "STRICT" -> BlockMode.STRICT
+                    else -> BlockMode.OFF
+                }
+                blockPrefs.setMode(bm)
+                _messages.value = _messages.value + AiMessage("info", "Block mode: ${bm.name}.")
             }
             else -> {
                 val reply = json.optString("reply").trim().ifBlank { "…" }

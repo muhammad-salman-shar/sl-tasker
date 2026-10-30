@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { _ -> }
+    ) { _ -> advanceAfterReturn() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,6 +124,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+
+        // Continue permissions flow if we returned from a settings screen
+        try {
+            val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            if (prefs.getString(permQueueKey, null) != null && !permFlowRunning) {
+                advanceAfterReturn()
+            }
+        } catch (_: Throwable) {}
+
         // If a timer is active, ensure its service is running and overlay visible.
         try {
             val active = com.neurasamu.build.sl_tasker.data.timer.TimerRuntime.active.value
@@ -135,67 +144,105 @@ class MainActivity : ComponentActivity() {
         } catch (_: Throwable) {}
     }
 
+    private val permQueueKey = "pending_perms_queue"
+
+    @Volatile private var permFlowRunning = false
+
     private fun checkAndRequestPermissions() {
+        // Fire runtime notification permission first (popup), then continue chain
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val permissionStatus = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            )
-            if (permissionStatus != PackageManager.PERMISSION_GRANTED) {
+            val granted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
                 requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val am = getSystemService(AlarmManager::class.java)
-            if (am != null && !am.canScheduleExactAlarms()) {
-                try {
+        ensurePermQueueInitialized()
+        continueSpecialPermissionsFlow()
+    }
+
+    private fun ensurePermQueueInitialized() {
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        if (prefs.getString(permQueueKey, null) == null) {
+            prefs.edit()
+                .putString(permQueueKey, "exact_alarm,full_screen,battery,overlay")
+                .apply()
+        }
+    }
+
+    private fun continueSpecialPermissionsFlow() {
+        if (permFlowRunning) return
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val queue = prefs.getString(permQueueKey, "") ?: ""
+        val list = queue.split(",").filter { it.isNotBlank() }
+        if (list.isEmpty()) return
+
+        val next = list.first()
+        val remaining = list.drop(1)
+        prefs.edit().putString(permQueueKey, remaining.joinToString(",")).apply()
+
+        permFlowRunning = true
+        val launched = tryLaunchSpecialPermission(next)
+        if (!launched) {
+            permFlowRunning = false
+            continueSpecialPermissionsFlow()
+        }
+    }
+
+    private fun tryLaunchSpecialPermission(key: String): Boolean {
+        return try {
+            when (key) {
+                "exact_alarm" -> {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+                    val am = getSystemService(AlarmManager::class.java)
+                    if (am == null || am.canScheduleExactAlarms()) return false
                     val i = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
                     i.data = Uri.parse("package:$packageName")
                     startActivity(i)
-                } catch (_: Exception) {
+                    true
                 }
-            }
-        }
-        // Android 14+ requires explicit permission for full-screen alarm overlays
-        if (Build.VERSION.SDK_INT >= 34) {
-            try {
-                val nm = getSystemService(android.app.NotificationManager::class.java)
-                if (nm != null && !nm.canUseFullScreenIntent()) {
+                "full_screen" -> {
+                    if (Build.VERSION.SDK_INT < 34) return false
+                    val nm = getSystemService(android.app.NotificationManager::class.java)
+                    if (nm == null || nm.canUseFullScreenIntent()) return false
                     val i = Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT")
                     i.data = Uri.parse("package:$packageName")
                     startActivity(i)
+                    true
                 }
-            } catch (_: Exception) {
-            }
-        }
-        // Ask for battery optimization exemption so alarms fire on Samsung/Xiaomi/etc.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                val pm = getSystemService(android.os.PowerManager::class.java)
-                if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
-                    val i = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                "battery" -> {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
+                    val pm = getSystemService(android.os.PowerManager::class.java)
+                    if (pm == null || pm.isIgnoringBatteryOptimizations(packageName)) return false
+                    val i = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
                     i.data = Uri.parse("package:$packageName")
                     startActivity(i)
+                    true
                 }
-            } catch (_: Exception) {
+                "overlay" -> {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
+                    if (Settings.canDrawOverlays(this)) return false
+                    val i = Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
+                    )
+                    startActivity(i)
+                    true
+                }
+                else -> false
             }
+        } catch (_: Exception) {
+            false
         }
-        // Overlay permission for floating timer — ask only once
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                if (!android.provider.Settings.canDrawOverlays(this)) {
-                    val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                    if (!prefs.getBoolean("overlay_asked", false)) {
-                        prefs.edit().putBoolean("overlay_asked", true).apply()
-                        val i = Intent(
-                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:$packageName")
-                        )
-                        startActivity(i)
-                    }
-                }
-            } catch (_: Exception) {
-            }
+    }
+
+    private fun advanceAfterReturn() {
+        permFlowRunning = false
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(300L)
+            continueSpecialPermissionsFlow()
         }
     }
 }
