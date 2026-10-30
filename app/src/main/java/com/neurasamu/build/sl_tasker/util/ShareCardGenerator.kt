@@ -129,7 +129,7 @@ object ShareCardGenerator {
 
         // Text helpers
         val bold = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        val black = Typeface.create(Typeface.DEFAULT, Typeface.BLACK)
+        val black = Typeface.create("sans-serif-black", Typeface.BOLD)
 
         // Brand
         val brandPaint = Paint().apply {
