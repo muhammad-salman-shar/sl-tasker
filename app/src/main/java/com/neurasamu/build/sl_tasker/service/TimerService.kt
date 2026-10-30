@@ -82,7 +82,7 @@ class TimerService : Service() {
         store = TimerStore(applicationContext)
         repository = TaskRepository(AppDatabase.getInstance(applicationContext))
         createChannel()
-        ensureForeground(getString(R.string.app_name))
+        ensureForeground("SL Tasker")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -176,7 +176,7 @@ class TimerService : Service() {
     }
 
     private fun handleStop() {
-        clearTimerAndStop()
+        scope.launch { clearTimerAndStop() }
     }
 
     private suspend fun clearTimerAndStop() {
