@@ -82,6 +82,7 @@ import androidx.lifecycle.lifecycleScope
 import com.neurasamu.build.sl_tasker.data.player.PlayerProfileStore
 import com.neurasamu.build.sl_tasker.ui.intro.IntroActivity
 import kotlinx.coroutines.launch
+import androidx.activity.compose.BackHandler
 
 class MainActivity : ComponentActivity() {
 
@@ -412,6 +413,12 @@ fun MainAppScaffold(
                 )
             }
         }
+    }
+
+    BackHandler(enabled = showSettings) { showSettings = false }
+    BackHandler(enabled = showAiSheet) { showAiSheet = false }
+    BackHandler(enabled = selectedTabIndex != 0 && !showSettings && !showAiSheet) {
+        selectedTabIndex = 0
     }
 
     if (showSettings) {
