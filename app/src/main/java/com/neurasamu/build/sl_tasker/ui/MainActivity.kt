@@ -125,7 +125,8 @@ class MainActivity : ComponentActivity() {
                     MainAppScaffold(
                         taskViewModel = taskViewModel,
                         statsViewModel = statsViewModel,
-                        alarmViewModel = alarmViewModel
+                        alarmViewModel = alarmViewModel,
+                        dailyQuestViewModel = dailyQuestViewModel
                     )
                 }
             }
