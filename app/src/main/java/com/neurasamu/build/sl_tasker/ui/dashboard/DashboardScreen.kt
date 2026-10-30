@@ -69,7 +69,7 @@ fun DashboardScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = DarkBackground,
         floatingActionButton = {
-            FloatingActionButton(
+            if (subTab != 2) FloatingActionButton(
                 onClick = { showCreateDialog = true },
                 containerColor = PrimaryManaBlue,
                 contentColor = DarkCard,
@@ -135,7 +135,7 @@ fun DashboardScreen(
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf("INCOMPLETE", "COMPLETED").forEachIndexed { idx, label ->
+                listOf("INCOMPLETE", "COMPLETED", "CALENDAR").forEachIndexed { idx, label ->
                     val sel = subTab == idx
                     Box(
                         modifier = Modifier
@@ -158,6 +158,14 @@ fun DashboardScreen(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
+
+            if (subTab == 2) {
+                com.neurasamu.build.sl_tasker.ui.calendar.CalendarScreen(
+                    taskViewModel = taskViewModel,
+                    modifier = Modifier.fillMaxSize()
+                )
+                return@Column
+            }
 
             val currentList = if (subTab == 0) activeQuests else completedQuests
             if (currentList.isEmpty()) {

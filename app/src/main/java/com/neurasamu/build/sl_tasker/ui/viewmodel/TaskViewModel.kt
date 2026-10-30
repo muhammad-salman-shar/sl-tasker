@@ -49,6 +49,22 @@ class TaskViewModel(
         initialValue = emptyList()
     )
 
+    val allOccurrences: StateFlow<List<com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity>> =
+        taskRepository.observeAllOccurrences()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+
+    val allActiveTasks: StateFlow<List<com.neurasamu.build.sl_tasker.data.model.TaskEntity>> =
+        taskRepository.getAllActiveTasks()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+
     val activeQuests: StateFlow<List<TaskOccurrenceItem>> = combine(
         taskRepository.observeOccurrencesByStatus(listOf(OccurrenceStatus.PENDING)),
         taskRepository.getAllActiveTasks()
