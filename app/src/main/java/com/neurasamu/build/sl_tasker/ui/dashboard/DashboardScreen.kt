@@ -94,6 +94,36 @@ fun DashboardScreen(
 
             HunterHud(stats = playerStats)
 
+            if (playerStats.health in 1..49) {
+                val active = playerStats.totalRecoveries
+                val needed = com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.TARGET_EP
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                        .background(com.neurasamu.build.sl_tasker.ui.theme.WarningOrange.copy(alpha = 0.15f))
+                        .border(1.dp, com.neurasamu.build.sl_tasker.ui.theme.WarningOrange, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                        .padding(12.dp)
+                ) {
+                    Column {
+                        androidx.compose.material3.Text(
+                            "⚠ PENALTY DUNGEON",
+                            color = com.neurasamu.build.sl_tasker.ui.theme.WarningOrange,
+                            fontSize = 11.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            letterSpacing = 2.sp
+                        )
+                        androidx.compose.material3.Text(
+                            "Health critical. Complete tasks to earn $needed EP and restore ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP.",
+                            color = com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(

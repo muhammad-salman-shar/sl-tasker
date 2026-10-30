@@ -88,6 +88,8 @@ import android.os.VibrationEffect
 import android.content.Context
 import com.neurasamu.build.sl_tasker.ui.components.LevelUpOverlay
 import com.neurasamu.build.sl_tasker.util.SoundFx
+import kotlinx.coroutines.flow.collectLatest
+import com.neurasamu.build.sl_tasker.util.SystemEvents
 
 class MainActivity : ComponentActivity() {
 
@@ -285,6 +287,13 @@ fun MainAppScaffold(
     val blockPrefs = remember { BlockPrefs(context) }
     val criticalActive by blockPrefs.criticalActive.collectAsState(initial = false)
     val pStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        SystemEvents.toasts.collectLatest { msg ->
+            try {
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            } catch (_: Throwable) {}
+        }
+    }
     val currentLevel = pStats?.level ?: 1
     androidx.compose.runtime.LaunchedEffect(currentLevel) {
         if (currentLevel > 1 && levelUpShown != currentLevel) {

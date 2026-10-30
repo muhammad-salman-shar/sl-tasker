@@ -70,12 +70,89 @@ class TaskRepository(private val database: AppDatabase) {
             )
             occurrenceDao.updateOccurrence(updatedOccurrence)
 
+            // ---- Streak update BEFORE gamification ----
+            val streakResult = com.neurasamu.build.sl_tasker.domain.engine.StreakEngine.compute(currentStats)
+            val streakUpdated = currentStats.copy(
+                streak = streakResult.newStreak,
+                lastStreakDayEpoch = streakResult.newLastDay
+            )
+
             val gameResult = GamificationEngine.processQuestCompletion(
-                currentStats = currentStats,
+                currentStats = streakUpdated,
                 difficulty = task.difficulty,
                 streakBonusActive = true
             )
-            playerStatsDao.insertOrUpdate(gameResult.updatedStats)
+
+            // Milestone bonus EP (goes into epModulo within level)
+            var finalStats = gameResult.updatedStats
+            val milestoneBonus = when (streakResult.milestoneReached) {
+                3 -> 5
+                7 -> 15
+                14 -> 30
+                30 -> 60
+                60 -> 100
+                100 -> 150
+                365 -> 500
+                else -> 0
+            }
+            if (milestoneBonus > 0) {
+                val rawEp = finalStats.ep + milestoneBonus
+                val extraLevels = rawEp / GamificationEngine.EP_PER_LEVEL
+                finalStats = finalStats.copy(
+                    ep = rawEp % GamificationEngine.EP_PER_LEVEL,
+                    level = finalStats.level + extraLevels
+                )
+            }
+            // ---- Recovery quest update ----
+            try {
+                val activeRecovery = recoveryQuestDao.getActiveRecoveryQuestsList()
+                if (activeRecovery.isNotEmpty()) {
+                    val rq = activeRecovery.first()
+                    val newEarned = rq.earnedEp + gameResult.epGained
+                    if (newEarned >= rq.requiredEp) {
+                        recoveryQuestDao.updateRecoveryQuest(
+                            rq.copy(
+                                status = com.neurasamu.build.sl_tasker.data.model.RecoveryStatus.COMPLETED,
+                                earnedEp = newEarned,
+                                completedAt = System.currentTimeMillis()
+                            )
+                        )
+                        val hpNow = finalStats.health
+                        val restored = (hpNow + com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE)
+                            .coerceAtMost(com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.MAX_HP)
+                        finalStats = finalStats.copy(
+                            health = restored,
+                            totalRecoveries = finalStats.totalRecoveries + 1,
+                            recoveryModeActive = restored < 50
+                        )
+                        playerStatsDao.insertOrUpdate(finalStats)
+                        com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
+                            "💚 RECOVERED! +${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP"
+                        )
+                    } else {
+                        recoveryQuestDao.updateRecoveryQuest(rq.copy(earnedEp = newEarned))
+                        val remaining = rq.requiredEp - newEarned
+                        com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
+                            "⚡ Recovery: $remaining EP to go"
+                        )
+                    }
+                }
+            } catch (_: Throwable) {}
+
+            playerStatsDao.insertOrUpdate(finalStats)
+
+            // Notify via SystemEvents (survives across repository/UI)
+            try {
+                if (streakResult.milestoneReached != null) {
+                    com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
+                        "🔥 ${streakResult.milestoneReached}-day streak! +$milestoneBonus EP"
+                    )
+                } else if (streakResult.broken) {
+                    com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
+                        "💔 Streak reset. Start again."
+                    )
+                }
+            } catch (_: Throwable) {}
 
             eventDao.insertEvent(
                 EventEntity(
@@ -179,13 +256,20 @@ class TaskRepository(private val database: AppDatabase) {
             )
 
             if (penaltyResult.recoveryModeTriggered) {
-                recoveryQuestDao.insertRecoveryQuest(
-                    RecoveryQuestEntity(
-                        taskId = task.id,
-                        originOccurrenceId = occurrenceId,
-                        requiredEp = 30
+                // Only create if no active recovery quest exists
+                val existing = recoveryQuestDao.getActiveRecoveryQuestsList()
+                if (existing.isEmpty()) {
+                    recoveryQuestDao.insertRecoveryQuest(
+                        RecoveryQuestEntity(
+                            taskId = task.id,
+                            originOccurrenceId = occurrenceId,
+                            requiredEp = com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.TARGET_EP
+                        )
                     )
-                )
+                    com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
+                        "⚠️ PENALTY ZONE: Earn ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.TARGET_EP} EP to restore ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP"
+                    )
+                }
             }
 
             if (currentStats.criticalActiveOccurrenceId == occurrenceId) {
