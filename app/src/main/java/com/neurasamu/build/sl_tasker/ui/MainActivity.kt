@@ -281,6 +281,7 @@ fun MainAppScaffold(
     }
     var showSettings by remember { mutableStateOf(false) }
     var showAiSheet by remember { mutableStateOf(false) }
+    var levelUpShown by remember { mutableStateOf<Int?>(null) }
     val blockPrefs = remember { BlockPrefs(context) }
     val criticalActive by blockPrefs.criticalActive.collectAsState(initial = false)
     val pStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
