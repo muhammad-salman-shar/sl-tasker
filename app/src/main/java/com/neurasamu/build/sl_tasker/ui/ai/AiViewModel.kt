@@ -127,7 +127,8 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     append("Model: ").append(cfg.model).append('\n')
                     append("Stream: ").append(cfg.useStream).append('\n')
                     append("JSON mode: ").append(cfg.useJsonFormat).append('\n')
-                    append("System prompt length: ").append(AiPrompt.buildSystemPrompt().length).append(" chars\n")
+                    val sysLen = if (cfg.chatMode) AiPrompt.buildChatPrompt().length else AiPrompt.buildAgentPrompt().length
+                    append("System prompt length: ").append(sysLen).append(" chars\n")
                     append("Messages sent: ").append(history.size)
                 }
 
