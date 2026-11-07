@@ -342,110 +342,43 @@ fun MainAppScaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = tabs[selectedTabIndex].title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = PrimaryManaBlue
-                        )
-                        LiveClock()
+            com.neurasamu.build.sl_tasker.ui.components.GlassHeader(
+                title = tabs[selectedTabIndex].title,
+                subtitleSlot = { LiveClock() },
+                showSettings = selectedTabIndex == 3,
+                onSettingsClick = {
+                    if (locked) {
+                        Toast.makeText(
+                            context,
+                            if (criticalActive) "Critical task in progress" else "Health too low — recover first",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        showSettings = true
                     }
                 },
-                actions = {
-                    if (selectedTabIndex == 3) {
-                        IconButton(
-                            onClick = {
-                                if (locked) {
-                                    val msg = if (criticalActive) "Critical task in progress" else "Health too low — recover first"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                } else {
-                                    showSettings = true
-                                }
-                            },
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .size(44.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Settings,
-                                contentDescription = "Block System Settings",
-                                tint = if (locked) com.neurasamu.build.sl_tasker.ui.theme.TextMuted else PrimaryManaBlue,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
+                aiOrb = {
                     Box(
                         modifier = Modifier
-                            .padding(end = 12.dp)
-                            .size(46.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
-                            .background(DarkCard)
-                            .border(1.dp, DarkBorder, CircleShape)
                             .clickable { showAiSheet = true },
                         contentAlignment = Alignment.Center
                     ) {
                         AiHubLogo(size = 34.dp)
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DarkBackground,
-                    titleContentColor = PrimaryManaBlue,
-                    actionIconContentColor = PrimaryManaBlue
-                )
+                }
             )
         },
         bottomBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(DarkBackground)
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(DarkCard)
-                        .border(1.dp, DarkBorder, RoundedCornerShape(14.dp))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    tabs.forEachIndexed { index, tab ->
-                        val isSelected = selectedTabIndex == index
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) DarkSurface else DarkCard)
-                                .border(
-                                    1.dp,
-                                    if (isSelected) PrimaryManaBlue else DarkCard,
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .clickable { selectedTabIndex = index }
-                                .padding(vertical = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.title,
-                                tint = if (isSelected) PrimaryManaBlue else TextMuted,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = tab.title,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) PrimaryManaBlue else TextMuted,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                }
-            }
+            com.neurasamu.build.sl_tasker.ui.components.FloatingDock(
+                items = tabs.map {
+                    com.neurasamu.build.sl_tasker.ui.components.DockItem(it.title, it.icon)
+                },
+                selectedIndex = selectedTabIndex,
+                onSelect = { selectedTabIndex = it },
+                accent = PrimaryManaBlue
+            )
         }
     ) { innerPadding ->
         Box(
