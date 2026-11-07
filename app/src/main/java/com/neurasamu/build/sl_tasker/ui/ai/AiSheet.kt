@@ -103,7 +103,7 @@ fun AiSheet(
             AiHubLogo(size = 30.dp)
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("AI HUB", color = PrimaryManaBlue, fontSize = 13.sp, style = MaterialTheme.typography.labelLarge)
+                Text("AI HUB", color = PrimaryManaBlue, fontSize = 13.sp, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
                 Text(
                     if (config.isConfigured) config.model else "Not configured",
                     color = TextMuted,
@@ -136,21 +136,17 @@ fun AiSheet(
                 }
             }
             Spacer(Modifier.width(6.dp))
-            IconButton(onClick = { showRaw = !showRaw }) {
-                Icon(
-                    Icons.Rounded.BugReport,
-                    contentDescription = "Raw debug",
-                    tint = if (showRaw) PrimaryManaBlue else TextMuted
-                )
+            IconButton(onClick = { showRaw = !showRaw }, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.BugReport, contentDescription = "Raw debug", tint = if (showRaw) PrimaryManaBlue else TextMuted, modifier = Modifier.size(18.dp))
             }
-            IconButton(onClick = { vm.clearChat() }) {
-                Icon(Icons.Rounded.Delete, contentDescription = "Clear chat", tint = TextMuted)
+            IconButton(onClick = { vm.clearChat() }, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.Delete, contentDescription = "Clear chat", tint = TextMuted, modifier = Modifier.size(18.dp))
             }
-            IconButton(onClick = { showSettings = true }) {
-                Icon(Icons.Rounded.Settings, contentDescription = "Settings", tint = PrimaryManaBlue)
+            IconButton(onClick = { showSettings = true }, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.Settings, contentDescription = "Settings", tint = PrimaryManaBlue, modifier = Modifier.size(18.dp))
             }
-            IconButton(onClick = onClose) {
-                Icon(Icons.Rounded.Close, contentDescription = "Close", tint = TextMuted)
+            IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.Close, contentDescription = "Close", tint = TextMuted, modifier = Modifier.size(18.dp))
             }
         }
 

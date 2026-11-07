@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
 import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
@@ -66,7 +67,7 @@ fun HunterHud(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(DarkCard)
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(if (ThemeState.isLight) listOf(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.88f), androidx.compose.ui.graphics.Color.White.copy(alpha = 0.62f)) else listOf(DarkCard.copy(alpha = 0.55f), DarkCard.copy(alpha = 0.28f))))
             .border(1.dp, if (stats.recoveryModeActive) DangerPenaltyRed else DarkBorder, RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {

@@ -3,6 +3,8 @@ package com.neurasamu.build.sl_tasker.ui.dashboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.neurasamu.build.sl_tasker.ui.theme.liquidGlass
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,17 +72,26 @@ fun DashboardScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
         floatingActionButton = {
-            if (subTab != 2) FloatingActionButton(
-                onClick = { showCreateDialog = true },
-                containerColor = PrimaryManaBlue,
-                contentColor = DarkCard,
-                shape = CircleShape
+            if (subTab != 2) Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .liquidGlass(
+                        shape = CircleShape,
+                        tint = PrimaryManaBlue,
+                        fillTop = 0.55f,
+                        fillBottom = 0.30f,
+                        rimAlpha = 0.9f,
+                        shadowElevation = 14.dp
+                    )
+                    .clickable { showCreateDialog = true },
+                contentAlignment = Alignment.Center
             ) {
-                Text(
+                androidx.compose.material3.Text(
                     text = "+",
                     style = MaterialTheme.typography.titleLarge,
-                    fontSize = 24.sp,
-                    color = DarkCard
+                    fontSize = 26.sp,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                 )
             }
         }
