@@ -380,7 +380,7 @@ private fun AddAlarmDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkCard,
+        containerColor = if (ThemeState.isLight) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.95f) else DarkCard.copy(alpha = 0.95f),
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(

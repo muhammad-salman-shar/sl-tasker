@@ -40,6 +40,7 @@ import com.neurasamu.build.sl_tasker.data.model.Difficulty
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.RankA
@@ -105,7 +106,7 @@ fun CreateQuestDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DarkCard,
+        containerColor = if (ThemeState.isLight) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.95f) else DarkCard.copy(alpha = 0.95f),
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(

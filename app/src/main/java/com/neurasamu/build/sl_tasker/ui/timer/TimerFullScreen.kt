@@ -68,7 +68,7 @@ fun TimerFullScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(DarkBackground),
+                .background(androidx.compose.ui.graphics.Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text("Timer ended", color = TextPrimary)
@@ -107,7 +107,7 @@ fun TimerFullScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(androidx.compose.ui.graphics.Color.Transparent)
     ) {
         Column(
             modifier = Modifier
