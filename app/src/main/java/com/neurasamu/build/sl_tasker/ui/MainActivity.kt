@@ -126,12 +126,14 @@ class MainActivity : ComponentActivity() {
 
             setContent {
                 SoloLevelingTheme {
-                    MainAppScaffold(
-                        taskViewModel = taskViewModel,
-                        statsViewModel = statsViewModel,
-                        alarmViewModel = alarmViewModel,
-                        dailyQuestViewModel = dailyQuestViewModel
-                    )
+                    com.neurasamu.build.sl_tasker.ui.theme.AmbientBackground {
+                        MainAppScaffold(
+                            taskViewModel = taskViewModel,
+                            statsViewModel = statsViewModel,
+                            alarmViewModel = alarmViewModel,
+                            dailyQuestViewModel = dailyQuestViewModel
+                        )
+                    }
                 }
             }
         }
@@ -338,7 +340,7 @@ fun MainAppScaffold(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = DarkBackground,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {

@@ -94,7 +94,7 @@ fun StatsScreen(
         } catch (_: Throwable) { }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(CyberBg)) {
+    Box(modifier = modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Transparent)) {
         // Background grid + radial glow (HTML replica)
         Canvas(modifier = Modifier.fillMaxSize()) {
             // Radial glow at top

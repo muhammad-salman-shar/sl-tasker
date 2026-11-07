@@ -76,3 +76,14 @@ val SecondaryNeonBlue: Color get() = PrimaryBlueLight
 val AccentShadowPurple: Color get() = PurpleMagic
 val GoldWarning: Color get() = AccentGold
 val DangerPenaltyRed: Color get() = DangerRed
+
+// ==== Liquid Glass tokens ====
+val GlassFill = Color(0xFFFFFFFF)
+val GlassRim = Color(0xFFFFFFFF)
+val GlassTintBlue = Color(0xFF3B82F6)
+val GlassTintViolet = Color(0xFF8B5CF6)
+val GlassTintEmerald = Color(0xFF10B981)
+val GlassTintCyan = Color(0xFF00D9FF)
+val GlassTintAmber = Color(0xFFF59E0B)
+val GlassTintRuby = Color(0xFFEF4444)
+val AmbientBase = Color(0xFF03060F)

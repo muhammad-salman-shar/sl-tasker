@@ -67,7 +67,7 @@ fun DashboardScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = DarkBackground,
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         floatingActionButton = {
             if (subTab != 2) FloatingActionButton(
                 onClick = { showCreateDialog = true },

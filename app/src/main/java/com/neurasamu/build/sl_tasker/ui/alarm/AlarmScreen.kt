@@ -80,7 +80,7 @@ fun AlarmScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = DarkBackground,
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },

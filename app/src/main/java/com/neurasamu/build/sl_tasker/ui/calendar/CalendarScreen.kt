@@ -105,7 +105,7 @@ fun CalendarScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(androidx.compose.ui.graphics.Color.Transparent)
             .padding(horizontal = 16.dp)
     ) {
         Spacer(Modifier.height(16.dp))
