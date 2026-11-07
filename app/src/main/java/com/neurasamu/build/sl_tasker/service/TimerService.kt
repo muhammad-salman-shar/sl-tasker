@@ -242,8 +242,8 @@ class TimerService : Service() {
         windowManager = wm
 
         val accent = TimerRuntime.active.value?.accentColorArgb ?: 0xFF00E5FF.toInt()
-        val dp = resources.displayMetrics.density
-        fun dp(v: Int) = (v * dp).toInt()
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
 
         val root = android.widget.FrameLayout(this)
 
@@ -261,7 +261,7 @@ class TimerService : Service() {
             setOnClickListener {
                 // Expand
                 overlayCollapsed = false
-                switchOverlay(root, wm, false, accent, dp)
+                switchOverlay(root, wm, false, accent)
                 updateOverlayUi()
             }
         }
@@ -273,7 +273,7 @@ class TimerService : Service() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(6), dp(10), dp(6))
             background = GradientDrawable().apply {
-                cornerRadius = 28f * dp
+                cornerRadius = 28f * density
                 setColor(0xE60A0E18.toInt())
                 setStroke(dp(1.5f.toInt()), accent)
             }
@@ -327,7 +327,7 @@ class TimerService : Service() {
             setPadding(dp(4), 0, 0, 0)
             setOnClickListener {
                 overlayCollapsed = true
-                switchOverlay(root, wm, true, accent, dp)
+                switchOverlay(root, wm, true, accent)
                 updateOverlayUi()
             }
         }
@@ -426,13 +426,14 @@ class TimerService : Service() {
         root: android.widget.FrameLayout,
         wm: WindowManager,
         collapse: Boolean,
-        accent: Int,
-        dp: (Int) -> Int
+        accent: Int
     ) {
         root.removeAllViews()
+        val density = resources.displayMetrics.density
+        val sizePx = (56 * density).toInt()
         if (collapse) {
             val cv = this.collapsedView ?: return
-            root.addView(cv, android.widget.FrameLayout.LayoutParams(dp(56), dp(56)))
+            root.addView(cv, android.widget.FrameLayout.LayoutParams(sizePx, sizePx))
         } else {
             val ec = this.expandedContainer ?: return
             root.addView(ec, android.widget.FrameLayout.LayoutParams(
