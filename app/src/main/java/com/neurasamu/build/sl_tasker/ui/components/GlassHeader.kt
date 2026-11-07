@@ -46,9 +46,9 @@ fun GlassHeader(
             .liquidGlass(
                 shape = RoundedCornerShape(24.dp),
                 tint = Color.White,
-                fillTop = if (isLight) 0.65f else 0.12f,
-                fillBottom = if (isLight) 0.40f else 0.04f,
-                rimAlpha = if (isLight) 0.95f else 0.5f,
+                fillTop = if (isLight) 0.14f else 0.12f,
+                fillBottom = if (isLight) 0.05f else 0.04f,
+                rimAlpha = if (isLight) 0.35f else 0.5f,
                 shadowElevation = 20.dp
             )
             .padding(horizontal = 18.dp, vertical = 12.dp),
@@ -57,7 +57,7 @@ fun GlassHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
-                color = if (isLight) Color(0xFF0F1830) else Color(0xFFE8EEF9),
+                color = if (isLight) Color(0xFF0B1220) else Color(0xFFE8EEF9),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
