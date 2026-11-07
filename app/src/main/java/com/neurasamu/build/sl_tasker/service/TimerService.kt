@@ -250,7 +250,7 @@ class TimerService : Service() {
         // ================ COLLAPSED VIEW: circle with just MM or SS ================
         val collapsedView = TextView(this).apply {
             setTextColor(Color.WHITE)
-            textSize = 18f
+            textSize = 11f
             typeface = Typeface.create("monospace", Typeface.BOLD)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
@@ -258,14 +258,8 @@ class TimerService : Service() {
                 setColor(0xEE0A0E18.toInt())
                 setStroke(dp(2), accent)
             }
-            setOnClickListener {
-                // Expand
-                overlayCollapsed = false
-                switchOverlay(root, wm, false, accent)
-                updateOverlayUi()
-            }
         }
-        val collapsedParams = android.widget.FrameLayout.LayoutParams(dp(56), dp(56))
+        val collapsedParams = android.widget.FrameLayout.LayoutParams(dp(34), dp(34))
 
         // ================ EXPANDED VIEW ================
         val expandedContainer = LinearLayout(this).apply {
@@ -321,10 +315,10 @@ class TimerService : Service() {
         expandedContainer.addView(closeBtn)
 
         val collapseBtn = TextView(this).apply {
-            text = "⌄"
-            setTextColor(0xFF8B9AB8.toInt())
-            textSize = 16f
-            setPadding(dp(4), 0, 0, 0)
+            text = "▼"
+            setTextColor(accent)
+            textSize = 18f
+            setPadding(dp(6), 0, 0, 0)
             setOnClickListener {
                 overlayCollapsed = true
                 switchOverlay(root, wm, true, accent)
@@ -396,9 +390,10 @@ class TimerService : Service() {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (!moved && System.currentTimeMillis() - downTime < 250) {
-                        // tap on bubble itself (not on buttons) -> open TimerActivity
                         if (overlayCollapsed) {
-                            // Already expanded by collapsedView onClick, so ignore
+                            overlayCollapsed = false
+                            switchOverlay(root, wm, false, accent)
+                            updateOverlayUi()
                         } else {
                             try {
                                 startActivity(Intent(this@TimerService, TimerActivity::class.java)
@@ -430,7 +425,7 @@ class TimerService : Service() {
     ) {
         root.removeAllViews()
         val density = resources.displayMetrics.density
-        val sizePx = (56 * density).toInt()
+        val sizePx = (34 * density).toInt()
         if (collapse) {
             val cv = this.collapsedView ?: return
             root.addView(cv, android.widget.FrameLayout.LayoutParams(sizePx, sizePx))

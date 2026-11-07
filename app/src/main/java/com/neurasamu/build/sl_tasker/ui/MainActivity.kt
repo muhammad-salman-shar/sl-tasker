@@ -457,6 +457,5 @@ private fun LiveClock() {
         style = MaterialTheme.typography.labelSmall,
         color = if (com.neurasamu.build.sl_tasker.ui.theme.ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
         fontSize = 10.sp,
-        modifier = androidx.compose.ui.Modifier.background(androidx.compose.ui.graphics.Color.Transparent)
     )
 }

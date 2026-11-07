@@ -63,6 +63,11 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
+import android.app.AlarmManager
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import androidx.core.app.NotificationManagerCompat
 
 data class AppRow(val pkg: String, val label: String)
 
@@ -121,34 +126,72 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
             Spacer(Modifier.height(8.dp))
 
             val hasAccess = remember { isAccessibilityEnabled(context) }
+            val hasOverlay = remember {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
+            }
+            val hasBatteryOpt = remember {
+                val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+                pm.isIgnoringBatteryOptimizations(context.packageName)
+            }
+            val hasExactAlarm = remember {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                    am.canScheduleExactAlarms()
+                } else true
+            }
+            val hasNotif = remember {
+                NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
             SettingsCard {
                 Text("PERMISSIONS", color = PrimaryManaBlue, fontSize = 11.sp)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = if (hasAccess) "Accessibility: GRANTED" else "Accessibility: NOT GRANTED",
-                    color = if (hasAccess) SuccessGreen else DangerPenaltyRed,
-                    fontSize = 12.sp
-                )
                 Spacer(Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(PrimaryManaBlue.copy(alpha = 0.15f))
-                        .border(1.dp, PrimaryManaBlue, RoundedCornerShape(8.dp))
-                        .clickable {
-                            val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                PermissionRow("Notifications", hasNotif) {
+                    try {
+                        val i = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(i)
+                    } catch (_: Throwable) {}
+                }
+                PermissionRow("Alarms & Reminders", hasExactAlarm) {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            val i = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
                             context.startActivity(i)
                         }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (hasAccess) "OPEN ACCESSIBILITY SETTINGS" else "GRANT ACCESSIBILITY",
-                        color = PrimaryManaBlue,
-                        fontSize = 11.sp
-                    )
+                    } catch (_: Throwable) {}
+                }
+                PermissionRow("Battery Optimization", hasBatteryOpt) {
+                    try {
+                        val i = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(i)
+                    } catch (_: Throwable) {}
+                }
+                PermissionRow("Display Over Other Apps", hasOverlay) {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val i = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(i)
+                        }
+                    } catch (_: Throwable) {}
+                }
+                PermissionRow("Accessibility Service", hasAccess) {
+                    try {
+                        val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(i)
+                    } catch (_: Throwable) {}
                 }
             }
 
@@ -417,4 +460,42 @@ private fun isAccessibilityEnabled(context: Context): Boolean {
         Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
     ) ?: return false
     return enabled.contains(service, ignoreCase = true)
+}
+
+@Composable
+private fun PermissionRow(
+    label: String,
+    granted: Boolean,
+    onOpen: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(if (granted) SuccessGreen else DangerPenaltyRed)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(label, color = TextPrimary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(PrimaryManaBlue.copy(alpha = 0.15f))
+                .border(1.dp, PrimaryManaBlue.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                .clickable { onOpen() }
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(
+                if (granted) "MANAGE" else "GRANT",
+                color = PrimaryManaBlue,
+                fontSize = 10.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+            )
+        }
+    }
 }

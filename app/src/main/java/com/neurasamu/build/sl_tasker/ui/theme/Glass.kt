@@ -50,13 +50,7 @@ fun Modifier.liquidGlass(
     )
     .border(
         width = 1.dp,
-        brush = Brush.linearGradient(
-            0f to Color.White.copy(alpha = rimAlpha),
-            0.45f to Color.White.copy(alpha = 0.12f),
-            1f to Color.White.copy(alpha = 0.02f),
-            start = Offset.Zero,
-            end = Offset(1500f, 1500f)
-        ),
+        color = Color.White.copy(alpha = rimAlpha * 0.55f),
         shape = shape
     )
 
