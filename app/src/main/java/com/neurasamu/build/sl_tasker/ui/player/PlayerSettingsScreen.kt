@@ -68,6 +68,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationManagerCompat
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 
 data class AppRow(val pkg: String, val label: String)
 
