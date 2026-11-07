@@ -51,6 +51,14 @@ object SoundFx {
         } catch (_: Throwable) {}
     }
 
+    fun timerEnd() {
+        if (muted) return
+        try {
+            // 4-second beep pattern via ToneGenerator
+            tone?.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 4000)
+        } catch (_: Throwable) {}
+    }
+
     fun giveUp() {
         if (muted) return
         try {

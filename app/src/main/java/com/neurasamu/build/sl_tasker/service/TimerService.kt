@@ -75,8 +75,11 @@ class TimerService : Service() {
     private var overlayParams: WindowManager.LayoutParams? = null
     private var timeLabel: TextView? = null
     private var pauseBtn: TextView? = null
+    private var expandedContainer: LinearLayout? = null
+    private var collapsedView: TextView? = null
     private var overlayVisible = false
     private var overlayAllowed = false
+    private var overlayCollapsed = false
 
     override fun onCreate() {
         super.onCreate()
@@ -207,7 +210,9 @@ class TimerService : Service() {
 
     private suspend fun onTimerComplete(t: ActiveTimer) {
         try { repository?.completeOccurrence(t.occurrenceId) } catch (_: Throwable) {}
-        try { com.neurasamu.build.sl_tasker.util.SoundFx.complete() } catch (_: Throwable) {}
+        try { com.neurasamu.build.sl_tasker.util.SoundFx.timerEnd() } catch (_: Throwable) {}
+        // give beep time before closing
+        kotlinx.coroutines.delay(4000L)
         clearTimerAndStop()
     }
 
@@ -238,32 +243,56 @@ class TimerService : Service() {
 
         val accent = TimerRuntime.active.value?.accentColorArgb ?: 0xFF00E5FF.toInt()
         val dp = resources.displayMetrics.density
+        fun dp(v: Int) = (v * dp).toInt()
 
-        val root = LinearLayout(this).apply {
+        val root = android.widget.FrameLayout(this)
+
+        // ================ COLLAPSED VIEW: circle with just MM or SS ================
+        val collapsedView = TextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            typeface = Typeface.create("monospace", Typeface.BOLD)
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xEE0A0E18.toInt())
+                setStroke(dp(2), accent)
+            }
+            setOnClickListener {
+                // Expand
+                overlayCollapsed = false
+                switchOverlay(root, wm, false, accent, dp)
+                updateOverlayUi()
+            }
+        }
+        val collapsedParams = android.widget.FrameLayout.LayoutParams(dp(56), dp(56))
+
+        // ================ EXPANDED VIEW ================
+        val expandedContainer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
+            setPadding(dp(10), dp(6), dp(10), dp(6))
             background = GradientDrawable().apply {
                 cornerRadius = 28f * dp
                 setColor(0xE60A0E18.toInt())
-                setStroke((1.5f * dp).toInt(), accent)
+                setStroke(dp(1.5f.toInt()), accent)
             }
         }
 
-        timeLabel = TextView(this).apply {
+        val timeLabel = TextView(this).apply {
             text = "00:00"
             setTextColor(Color.WHITE)
-            textSize = 16f
+            textSize = 15f
             typeface = Typeface.create("monospace", Typeface.BOLD)
-            setPadding(0, 0, (10 * dp).toInt(), 0)
+            setPadding(0, 0, dp(8), 0)
         }
-        root.addView(timeLabel)
+        expandedContainer.addView(timeLabel)
 
-        pauseBtn = TextView(this).apply {
+        val pauseBtn = TextView(this).apply {
             text = "❚❚"
             setTextColor(accent)
-            textSize = 18f
-            setPadding((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
+            textSize = 16f
+            setPadding(dp(4), 0, dp(4), 0)
             setOnClickListener {
                 if (TimerRuntime.active.value?.isPaused == true) {
                     startService(Intent(this@TimerService, TimerService::class.java).apply {
@@ -276,20 +305,51 @@ class TimerService : Service() {
                 }
             }
         }
-        root.addView(pauseBtn)
+        expandedContainer.addView(pauseBtn)
 
-        val giveUpBtn = TextView(this).apply {
+        val closeBtn = TextView(this).apply {
             text = "✕"
             setTextColor(0xFFFF1744.toInt())
-            textSize = 18f
-            setPadding((6 * dp).toInt(), 0, 0, 0)
+            textSize = 16f
+            setPadding(dp(4), 0, dp(4), 0)
             setOnClickListener {
                 startService(Intent(this@TimerService, TimerService::class.java).apply {
                     action = ACTION_GIVE_UP
                 })
             }
         }
-        root.addView(giveUpBtn)
+        expandedContainer.addView(closeBtn)
+
+        val collapseBtn = TextView(this).apply {
+            text = "⌄"
+            setTextColor(0xFF8B9AB8.toInt())
+            textSize = 16f
+            setPadding(dp(4), 0, 0, 0)
+            setOnClickListener {
+                overlayCollapsed = true
+                switchOverlay(root, wm, true, accent, dp)
+                updateOverlayUi()
+            }
+        }
+        expandedContainer.addView(collapseBtn)
+
+        val expandedParams = android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        // Start with initial state
+        if (overlayCollapsed) {
+            root.addView(collapsedView, collapsedParams)
+        } else {
+            root.addView(expandedContainer, expandedParams)
+        }
+
+        // Hold references
+        this.expandedContainer = expandedContainer
+        this.collapsedView = collapsedView
+        this.timeLabel = timeLabel
+        this.pauseBtn = pauseBtn
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -304,40 +364,47 @@ class TimerService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = (resources.displayMetrics.widthPixels - (160 * dp).toInt())
-            y = (200 * dp).toInt()
+            x = resources.displayMetrics.widthPixels - dp(200)
+            y = dp(200)
         }
 
-        // Drag + tap detection
+        // Drag handling on root (works for both collapsed and expanded)
         var downX = 0f
         var downY = 0f
         var startX = 0
         var startY = 0
         var moved = false
-        root.setOnTouchListener { _, ev ->
+        var downTime = 0L
+
+        root.setOnTouchListener { v, ev ->
             when (ev.action) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = ev.rawX; downY = ev.rawY
                     startX = params.x; startY = params.y
                     moved = false
+                    downTime = System.currentTimeMillis()
                     false
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = ev.rawX - downX
                     val dy = ev.rawY - downY
-                    if (kotlin.math.abs(dx) > 8 || kotlin.math.abs(dy) > 8) moved = true
+                    if (kotlin.math.abs(dx) > 10 || kotlin.math.abs(dy) > 10) moved = true
                     params.x = (startX + dx).toInt()
                     params.y = (startY + dy).toInt()
                     try { wm.updateViewLayout(root, params) } catch (_: Throwable) {}
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!moved) {
-                        // tap → open TimerActivity
-                        try {
-                            startActivity(Intent(this@TimerService, TimerActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
-                        } catch (_: Throwable) {}
+                    if (!moved && System.currentTimeMillis() - downTime < 250) {
+                        // tap on bubble itself (not on buttons) -> open TimerActivity
+                        if (overlayCollapsed) {
+                            // Already expanded by collapsedView onClick, so ignore
+                        } else {
+                            try {
+                                startActivity(Intent(this@TimerService, TimerActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
+                            } catch (_: Throwable) {}
+                        }
                     }
                     true
                 }
@@ -352,6 +419,26 @@ class TimerService : Service() {
             updateOverlayUi()
         } catch (_: Throwable) {
             overlayView = null
+        }
+    }
+
+    private fun switchOverlay(
+        root: android.widget.FrameLayout,
+        wm: WindowManager,
+        collapse: Boolean,
+        accent: Int,
+        dp: (Int) -> Int
+    ) {
+        root.removeAllViews()
+        if (collapse) {
+            val cv = this.collapsedView ?: return
+            root.addView(cv, android.widget.FrameLayout.LayoutParams(dp(56), dp(56)))
+        } else {
+            val ec = this.expandedContainer ?: return
+            root.addView(ec, android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            ))
         }
     }
 
@@ -372,6 +459,8 @@ class TimerService : Service() {
         val ss = rem % 60
         timeLabel?.text = "%02d:%02d".format(mm, ss)
         pauseBtn?.text = if (t.isPaused) "▶" else "❚❚"
+        // Collapsed view: MM if > 60s, else SS
+        collapsedView?.text = if (rem > 60) "${mm}m" else "${ss}s"
     }
 
     // ---- Foreground notification ----

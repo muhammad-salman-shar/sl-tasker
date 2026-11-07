@@ -303,6 +303,7 @@ fun MainAppScaffold(
         }
     }
     val currentLevel = pStats?.level ?: 1
+    var lastSeenLevel by remember { mutableStateOf<Int?>(null) }
     androidx.compose.runtime.LaunchedEffect(pStats?.health, pStats?.ep, pStats?.streak) {
         try {
             val mgr = android.appwidget.AppWidgetManager.getInstance(context)
@@ -315,20 +316,23 @@ fun MainAppScaffold(
         } catch (_: Throwable) {}
     }
     androidx.compose.runtime.LaunchedEffect(currentLevel) {
-        if (currentLevel > 1 && levelUpShown != currentLevel) {
-            levelUpShown = currentLevel
-            SoundFx.levelUp()
-            try {
-                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 60, 60, 60, 60, 120), -1))
-                } else {
-                    @Suppress("DEPRECATION")
-                    v.vibrate(longArrayOf(0, 60, 60, 60, 60, 120), -1)
-                }
-            } catch (_: Throwable) {}
+            if (lastSeenLevel == null) {
+                lastSeenLevel = currentLevel
+            } else if (currentLevel > (lastSeenLevel ?: 1)) {
+                lastSeenLevel = currentLevel
+                levelUpShown = currentLevel
+                SoundFx.levelUp()
+                try {
+                    val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 60, 60, 60, 60, 120), -1))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        v.vibrate(longArrayOf(0, 60, 60, 60, 60, 120), -1)
+                    }
+                } catch (_: Throwable) {}
+            }
         }
-    }
     val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
     val locked = criticalActive || (playerStats?.health ?: 100) <= 30
 
