@@ -43,6 +43,7 @@ import com.neurasamu.build.sl_tasker.data.model.TaskEntity
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.GoldWarning
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
@@ -76,6 +77,7 @@ fun QuestCard(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val ctx = LocalContext.current
+    val isLight = ThemeState.isLight
     val dateFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
     val scheduledStr = dateFormat.format(Date(occurrence.scheduledAt))
 
@@ -99,7 +101,10 @@ fun QuestCard(
             .clip(shape)
             .background(
                 androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(DarkCard.copy(alpha = 0.92f), DarkCard.copy(alpha = 0.65f))
+                    if (isLight)
+                        listOf(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f), androidx.compose.ui.graphics.Color.White.copy(alpha = 0.65f))
+                    else
+                        listOf(DarkCard.copy(alpha = 0.55f), DarkCard.copy(alpha = 0.30f))
                 )
             )
             .border(
@@ -176,7 +181,7 @@ fun QuestCard(
             Text(
                 text = task.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
+                color = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary
             )
 
             if (task.description.isNotBlank()) {
@@ -184,7 +189,7 @@ fun QuestCard(
                 Text(
                     text = task.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
+                    color = if (isLight) androidx.compose.ui.graphics.Color(0xFF475569) else TextSecondary
                 )
             }
 

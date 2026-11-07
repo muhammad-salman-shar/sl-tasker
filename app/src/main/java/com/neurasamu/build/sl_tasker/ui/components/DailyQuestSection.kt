@@ -31,6 +31,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.AccentCyan
 import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryBlue
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
@@ -80,9 +81,10 @@ fun DailyQuestSection(
 
 @Composable
 private fun DailyQuestRow(quest: DailyQuestEntity, onComplete: () -> Unit) {
+    val isLight = ThemeState.isLight
     val done = quest.completed
-    val bg = if (done) DarkCard.copy(alpha = 0.5f) else DarkCard
-    val borderColor = if (done) SuccessGreen.copy(alpha = 0.3f) else AccentGold.copy(alpha = 0.3f)
+    val bg = if (isLight) androidx.compose.ui.graphics.Color.White.copy(alpha = if (done) 0.5f else 0.82f) else (if (done) DarkCard.copy(alpha = 0.5f) else DarkCard)
+    val borderColor = if (done) SuccessGreen.copy(alpha = 0.3f) else AccentGold.copy(alpha = 0.4f)
 
     val shape = NotchedShape(notch = 10.dp, corner = 10.dp)
     Row(
@@ -142,7 +144,7 @@ private fun DailyQuestRow(quest: DailyQuestEntity, onComplete: () -> Unit) {
             )
             Text(
                 quest.description,
-                color = TextMuted,
+                color = if (isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else TextMuted,
                 fontSize = 10.sp,
                 maxLines = 1
             )

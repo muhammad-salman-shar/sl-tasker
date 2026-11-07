@@ -50,6 +50,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
@@ -136,13 +137,13 @@ fun HomeScreen(
                     Text(
                         text = "THE SYSTEM AWAITS",
                         style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary
+                        color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = "Add your first quest to begin ascension.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextMuted
+                        color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else TextMuted
                     )
                 }
             }

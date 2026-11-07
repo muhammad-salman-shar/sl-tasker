@@ -52,6 +52,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
@@ -113,7 +114,7 @@ fun AlarmScreen(
             Text(
                 text = "Configure critical wake alarms and dismissal challenges",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextMuted
+                color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else TextMuted
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -129,13 +130,13 @@ fun AlarmScreen(
                         Text(
                             text = "NO ALARMS CONFIGURED",
                             style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary
+                            color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Tap + to initialize a wake-up schedule.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextMuted
+                            color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else TextMuted
                         )
                     }
                 }

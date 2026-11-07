@@ -41,6 +41,7 @@ import com.neurasamu.build.sl_tasker.ui.components.HunterHud
 import com.neurasamu.build.sl_tasker.ui.components.QuestCard
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
@@ -116,7 +117,7 @@ fun DashboardScreen(
                         )
                         androidx.compose.material3.Text(
                             "Health critical. Complete tasks to earn $needed EP and restore ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP.",
-                            color = com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
+                            color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
                             fontSize = 10.sp,
                             modifier = Modifier.padding(top = 4.dp)
                         )
