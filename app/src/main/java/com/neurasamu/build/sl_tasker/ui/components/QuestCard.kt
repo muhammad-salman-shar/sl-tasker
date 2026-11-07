@@ -167,6 +167,24 @@ fun QuestCard(
                             fontSize = 9.sp
                         )
                     }
+                    if (task.userType.isNotBlank()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(com.neurasamu.build.sl_tasker.ui.theme.AccentGold.copy(alpha = 0.15f))
+                                .border(1.dp, com.neurasamu.build.sl_tasker.ui.theme.AccentGold, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = task.userType,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = com.neurasamu.build.sl_tasker.ui.theme.AccentGold,
+                                fontSize = 9.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
 
                 Text(

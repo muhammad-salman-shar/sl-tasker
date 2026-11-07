@@ -9,6 +9,7 @@ data class TaskEntity(
     val id: Long = 0L,
     val title: String,
     val description: String = "",
+    val userType: String = "",
     val category: Category = Category.WORK,
     val priority: Priority = Priority.MEDIUM,
     val taskType: TaskType = TaskType.DAY,

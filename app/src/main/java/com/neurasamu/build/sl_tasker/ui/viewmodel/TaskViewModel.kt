@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.neurasamu.build.sl_tasker.data.task.TaskTypesStore
 
 data class TaskOccurrenceItem(
     val task: TaskEntity,
@@ -31,7 +32,8 @@ data class TaskOccurrenceItem(
 class TaskViewModel(
     application: Application,
     private val taskRepository: TaskRepository,
-    private val alarmScheduler: AlarmScheduler
+    private val alarmScheduler: AlarmScheduler,
+    private val taskTypesStore: TaskTypesStore
 ) : AndroidViewModel(application) {
 
     val completedQuests: StateFlow<List<TaskOccurrenceItem>> = combine(
@@ -90,6 +92,17 @@ class TaskViewModel(
         }
     }
 
+    val taskTypes: StateFlow<List<String>> = taskTypesStore.types
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addTaskType(type: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskTypesStore.addType(type) }
+    }
+
+    fun removeTaskType(type: String) {
+        viewModelScope.launch(Dispatchers.IO) { taskTypesStore.removeType(type) }
+    }
+
     fun completeQuest(occurrenceId: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -122,7 +135,8 @@ class TaskViewModel(
         customRepeatDays: String,
         durationMinutes: Int,
         isRepeat: Boolean,
-        allowEarlyComplete: Boolean
+        allowEarlyComplete: Boolean,
+        userType: String = ""
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val existing = taskRepository.getTaskById(taskId) ?: return@launch
@@ -143,7 +157,8 @@ class TaskViewModel(
                 customRepeatDays = customRepeatDays,
                 durationMinutes = durationMinutes,
                 repeatRule = repeatRuleVal,
-                allowEarlyComplete = allowEarlyComplete
+                allowEarlyComplete = allowEarlyComplete,
+                userType = userType.trim()
             )
             taskRepository.updateTaskFields(updated)
 
@@ -155,6 +170,9 @@ class TaskViewModel(
             ) ?: (System.currentTimeMillis() + 60_000L)
             val deadlineAt = nextTrigger + durationMinutes * 60 * 1000L
 
+            if (userType.isNotBlank()) {
+                try { taskTypesStore.addType(userType.trim()) } catch (_: Throwable) {}
+            }
             val (_, occId) = taskRepository.createTaskWithOccurrence(updated, nextTrigger, deadlineAt)
             alarmScheduler.scheduleReminder(occId, nextTrigger, title)
         }
@@ -168,7 +186,8 @@ class TaskViewModel(
         customRepeatDays: String,
         durationMinutes: Int,
         isRepeat: Boolean,
-        allowEarlyComplete: Boolean
+        allowEarlyComplete: Boolean,
+        userType: String = ""
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             // IMPORTANT: isRepeat is user-intent, not "did they pick days".
@@ -186,6 +205,7 @@ class TaskViewModel(
             val task = TaskEntity(
                 title = title,
                 description = description,
+                userType = userType.trim(),
                 priority = Priority.MEDIUM,
                 difficulty = difficulty,
                 repeatRule = repeatRuleVal,
@@ -194,6 +214,9 @@ class TaskViewModel(
                 reminderMinutesOfDay = reminderMinutesOfDay,
                 allowEarlyComplete = allowEarlyComplete
             )
+            if (userType.isNotBlank()) {
+                try { taskTypesStore.addType(userType.trim()) } catch (_: Throwable) {}
+            }
             val (_, occurrenceId) = taskRepository.createTaskWithOccurrence(task, scheduledAt, deadlineAt)
             alarmScheduler.scheduleReminder(occurrenceId, scheduledAt, title)
         }
@@ -205,7 +228,8 @@ class TaskViewModel(
             val db = AppDatabase.getInstance(application)
             val repo = TaskRepository(db)
             val scheduler = AlarmScheduler(application)
-            return TaskViewModel(application, repo, scheduler) as T
+            val typesStore = TaskTypesStore(application)
+            return TaskViewModel(application, repo, scheduler, typesStore) as T
         }
     }
 }

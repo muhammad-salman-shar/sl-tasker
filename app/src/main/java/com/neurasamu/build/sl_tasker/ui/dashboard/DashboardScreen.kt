@@ -64,6 +64,8 @@ fun DashboardScreen(
     var editingTask by remember { mutableStateOf<com.neurasamu.build.sl_tasker.data.model.TaskEntity?>(null) }
     var timerItem by remember { mutableStateOf<com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem?>(null) }
     var subTab by remember { mutableStateOf(0) }
+    var selectedTypeFilter by remember { mutableStateOf<String?>(null) }
+    val taskTypes by taskViewModel.taskTypes.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     val blockPrefs = remember { BlockPrefs(ctx) }
     val scope = rememberCoroutineScope()
@@ -172,6 +174,33 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Type filter row (only on INCOMPLETE / COMPLETED)
+            if (subTab != 2 && taskTypes.isNotEmpty()) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    item {
+                        TypeChipSmall(
+                            label = "All",
+                            selected = selectedTypeFilter == null,
+                            onClick = { selectedTypeFilter = null }
+                        )
+                    }
+                    items(taskTypes.size) { i ->
+                        val ty = taskTypes[i]
+                        TypeChipSmall(
+                            label = ty,
+                            selected = selectedTypeFilter == ty,
+                            onClick = {
+                                selectedTypeFilter = if (selectedTypeFilter == ty) null else ty
+                            }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
             if (subTab == 2) {
                 com.neurasamu.build.sl_tasker.ui.calendar.CalendarScreen(
                     taskViewModel = taskViewModel,
@@ -180,7 +209,11 @@ fun DashboardScreen(
                 return@Column
             }
 
-            val currentList = if (subTab == 0) activeQuests else completedQuests
+            val rawList = if (subTab == 0) activeQuests else completedQuests
+            val currentList = if (selectedTypeFilter == null) rawList
+                              else rawList.filter {
+                                  it.task.userType.equals(selectedTypeFilter, ignoreCase = true)
+                              }
             if (currentList.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -264,16 +297,18 @@ fun DashboardScreen(
     if (showCreateDialog) {
         CreateQuestDialog(
             onDismiss = { showCreateDialog = false },
-            onConfirm = { title, description, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly ->
+            existingTypes = taskTypes,
+            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType ->
                 taskViewModel.createQuest(
                     title = title,
-                    description = description,
+                    description = "",
                     difficulty = difficulty,
                     reminderMinutesOfDay = reminderMinutesOfDay,
                     customRepeatDays = daysCsv,
                     durationMinutes = durationMinutes,
                     isRepeat = isRepeat,
-                    allowEarlyComplete = allowEarly
+                    allowEarlyComplete = allowEarly,
+                    userType = userType
                 )
                 showCreateDialog = false
             }
@@ -284,20 +319,47 @@ fun DashboardScreen(
         CreateQuestDialog(
             onDismiss = { editingTask = null },
             initialTask = task,
-            onConfirm = { title, description, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly ->
+            existingTypes = taskTypes,
+            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType ->
                 taskViewModel.updateTaskFields(
                     taskId = task.id,
                     title = title,
-                    description = description,
+                    description = "",
                     difficulty = difficulty,
                     reminderMinutesOfDay = reminderMinutesOfDay,
                     customRepeatDays = daysCsv,
                     durationMinutes = durationMinutes,
                     isRepeat = isRepeat,
-                    allowEarlyComplete = allowEarly
+                    allowEarlyComplete = allowEarly,
+                    userType = userType
                 )
                 editingTask = null
             }
+        )
+    }
+}
+
+@Composable
+private fun TypeChipSmall(label: String, selected: Boolean, onClick: () -> Unit) {
+    val isLight = ThemeState.isLight
+    val accent = com.neurasamu.build.sl_tasker.ui.theme.AccentGold
+    Box(
+        modifier = Modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+            .background(
+                if (selected) accent.copy(alpha = 0.22f)
+                else if (isLight) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
+                else com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
+            )
+            .border(1.dp, if (selected) accent else com.neurasamu.build.sl_tasker.ui.theme.DarkBorder, androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        androidx.compose.material3.Text(
+            label,
+            color = if (selected) accent else com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
+            fontSize = 11.sp,
+            fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal
         )
     }
 }

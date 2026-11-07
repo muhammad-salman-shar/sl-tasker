@@ -25,7 +25,7 @@ import com.neurasamu.build.sl_tasker.data.model.TaskEntity
         AlarmEntity::class,
         DailyQuestEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
