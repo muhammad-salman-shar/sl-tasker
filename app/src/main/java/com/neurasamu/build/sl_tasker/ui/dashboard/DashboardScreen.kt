@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -75,14 +76,14 @@ fun DashboardScreen(
             if (subTab != 2) Box(
                 modifier = Modifier
                     .size(58.dp)
-                    .liquidGlass(
-                        shape = CircleShape,
-                        tint = PrimaryManaBlue,
-                        fillTop = 0.55f,
-                        fillBottom = 0.30f,
-                        rimAlpha = 0.9f,
-                        shadowElevation = 14.dp
+                    .shadow(8.dp, CircleShape) // standard shadow
+                    .clip(CircleShape)
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(PrimaryManaBlue.copy(alpha = 0.9f), PrimaryManaBlue.copy(alpha = 0.6f))
+                        )
                     )
+                    .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f), CircleShape)
                     .clickable { showCreateDialog = true },
                 contentAlignment = Alignment.Center
             ) {

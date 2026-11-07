@@ -361,14 +361,14 @@ private fun RankCard(level: Int, streak: Int) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 "LEVEL $level",
-                color = Color.White,
+                color = if (ThemeState.isLight) Color(0xFF0B1220) else Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.SansSerif
             )
             Text(
                 "RANK $rank HUNTER",
-                color = CyberCyan,
+                color = if (ThemeState.isLight) Color(0xFF2563EB) else CyberCyan,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp
