@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.neurasamu.build.sl_tasker.util.SoundFx
 import com.neurasamu.build.sl_tasker.ui.components.NotchedShape
 import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
+import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
