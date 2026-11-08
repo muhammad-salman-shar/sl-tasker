@@ -19,7 +19,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -63,6 +67,7 @@ fun CreateQuestDialog(
     onDismiss: () -> Unit,
     initialTask: TaskEntity? = null,
     existingTypes: List<String> = emptyList(),
+    onDeleteType: (String) -> Unit = {},
     onConfirm: (
         title: String,
         difficulty: Difficulty,
@@ -116,10 +121,13 @@ fun CreateQuestDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = if (isLight)
-            androidx.compose.ui.graphics.Color.White.copy(alpha = 0.97f)
+            androidx.compose.ui.graphics.Color.White.copy(alpha = 0.95f)
         else
-            DarkCard.copy(alpha = 0.97f),
-        shape = RoundedCornerShape(20.dp),
+            DarkCard.copy(alpha = 0.95f),
+        modifier = Modifier
+            .shadow(24.dp, RoundedCornerShape(24.dp))
+            .border(1.dp, if (isLight) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp)),
+        shape = RoundedCornerShape(24.dp),
         title = {
             Text(
                 text = if (isEdit) "EDIT TASK" else "NEW TASK",
@@ -170,7 +178,11 @@ fun CreateQuestDialog(
                         TypeChip(
                             label = t,
                             selected = selectedType.equals(t, ignoreCase = true),
-                            onClick = { selectedType = t }
+                            onClick = { selectedType = t },
+                            onDelete = {
+                                if (selectedType == t) selectedType = ""
+                                onDeleteType(t)
+                            }
                         )
                     }
                     item {
@@ -330,7 +342,7 @@ fun CreateQuestDialog(
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9) else DarkSurface)
+                            .background(androidx.compose.ui.graphics.Color.Transparent)
                             .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
                     ) {
                         listOf(false to "12h", true to "24h").forEach { (flag, label) ->
@@ -521,10 +533,10 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit, onDelete: (() -> Unit)? = null) {
     val isLight = ThemeState.isLight
     val accent = AccentGold
-    Box(
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(
@@ -538,7 +550,8 @@ private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
                 RoundedCornerShape(20.dp)
             )
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(start = 12.dp, end = if (onDelete != null) 6.dp else 12.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
@@ -546,5 +559,16 @@ private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
             fontSize = 11.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
         )
+        if (onDelete != null) {
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Delete type",
+                tint = if (selected) accent else TextMuted,
+                modifier = Modifier
+                    .size(14.dp)
+                    .clickable { onDelete() }
+            )
+        }
     }
 }

@@ -298,6 +298,7 @@ fun DashboardScreen(
         CreateQuestDialog(
             onDismiss = { showCreateDialog = false },
             existingTypes = taskTypes,
+            onDeleteType = { taskViewModel.removeTaskType(it) },
             onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType ->
                 taskViewModel.createQuest(
                     title = title,
@@ -320,6 +321,7 @@ fun DashboardScreen(
             onDismiss = { editingTask = null },
             initialTask = task,
             existingTypes = taskTypes,
+            onDeleteType = { taskViewModel.removeTaskType(it) },
             onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType ->
                 taskViewModel.updateTaskFields(
                     taskId = task.id,

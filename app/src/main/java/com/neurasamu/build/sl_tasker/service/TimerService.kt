@@ -325,6 +325,8 @@ class TimerService : Service() {
                 updateOverlayUi()
             }
         }
+        val spacer = android.view.View(this)
+        expandedContainer.addView(spacer, android.widget.LinearLayout.LayoutParams(0, 1, 1f))
         expandedContainer.addView(collapseBtn)
 
         val expandedParams = android.widget.FrameLayout.LayoutParams(
