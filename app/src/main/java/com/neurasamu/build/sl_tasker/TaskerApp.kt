@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.neurasamu.build.sl_tasker.worker.CleanupWorker
 import com.neurasamu.build.sl_tasker.worker.OverdueTaskWorker
 import java.util.concurrent.TimeUnit
 
@@ -17,6 +18,7 @@ class TaskerApp : Application() {
         com.neurasamu.build.sl_tasker.util.SoundFx.setup()
         createNotificationChannels()
         scheduleOverdueWorker()
+        scheduleCleanupWorker()
     }
 
     private fun createNotificationChannels() {
@@ -45,6 +47,17 @@ class TaskerApp : Application() {
             notificationManager.createNotificationChannel(questChannel)
             notificationManager.createNotificationChannel(alarmChannel)
         }
+    }
+
+    private fun scheduleCleanupWorker() {
+        val work = PeriodicWorkRequestBuilder<CleanupWorker>(
+            30, TimeUnit.MINUTES
+        ).build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "CleanupWorker",
+            ExistingPeriodicWorkPolicy.KEEP,
+            work
+        )
     }
 
     private fun scheduleOverdueWorker() {

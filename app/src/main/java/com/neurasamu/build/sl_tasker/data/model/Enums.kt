@@ -7,6 +7,11 @@ enum class Priority {
     CRITICAL
 }
 
+enum class ScheduleMode {
+    TIME,
+    NO_TIME
+}
+
 enum class TaskType {
     DAY,
     CRITICAL,

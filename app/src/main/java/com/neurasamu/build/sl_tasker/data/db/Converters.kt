@@ -10,6 +10,7 @@ import com.neurasamu.build.sl_tasker.data.model.Priority
 import com.neurasamu.build.sl_tasker.data.model.RecoveryStatus
 import com.neurasamu.build.sl_tasker.data.model.RepeatRule
 import com.neurasamu.build.sl_tasker.data.model.TaskType
+import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 
 class Converters {
 
@@ -66,4 +67,10 @@ class Converters {
 
     @TypeConverter
     fun toDismissMethod(value: String): DismissMethod = runCatching { DismissMethod.valueOf(value) }.getOrDefault(DismissMethod.EASY)
+
+    @TypeConverter
+    fun fromScheduleMode(value: ScheduleMode): String = value.name
+
+    @TypeConverter
+    fun toScheduleMode(value: String): ScheduleMode = runCatching { ScheduleMode.valueOf(value) }.getOrDefault(ScheduleMode.TIME)
 }

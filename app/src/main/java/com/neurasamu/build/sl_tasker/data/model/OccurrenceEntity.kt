@@ -17,6 +17,7 @@ data class OccurrenceEntity(
     val durationMinutes: Int = 30,
     val status: OccurrenceStatus = OccurrenceStatus.PENDING,
     val completedAt: Long? = null,
+    val completedCleanupAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val penaltyAppliedCount: Int = 0,
     val lastPenaltyAt: Long = 0L,

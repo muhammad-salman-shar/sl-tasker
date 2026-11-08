@@ -19,6 +19,8 @@ data class TaskEntity(
     val durationMinutes: Int = 30,
     val reminderMinutesOfDay: Int = 0,
     val allowEarlyComplete: Boolean = false,
+    val scheduleMode: ScheduleMode = ScheduleMode.TIME,
+    val validityDays: Int = 0,
     val criticalTimerMinutes: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val archived: Boolean = false

@@ -50,4 +50,13 @@ interface OccurrenceDao {
 
     @Query("SELECT * FROM occurrences WHERE taskId = :taskId AND status = 'PENDING' AND scheduledAt > :now LIMIT 1")
     suspend fun getNextPendingOccurrence(taskId: Long, now: Long): OccurrenceEntity?
+
+    @Query("SELECT * FROM occurrences WHERE status = 'PENDING' AND deadlineAt < :now")
+    suspend fun getExpiredOccurrences(now: Long): List<OccurrenceEntity>
+
+    @Query("SELECT * FROM occurrences WHERE status = 'COMPLETED' AND completedCleanupAt IS NOT NULL AND completedCleanupAt < :now")
+    suspend fun getCompletedToCleanup(now: Long): List<OccurrenceEntity>
+
+    @Query("SELECT * FROM occurrences WHERE completedCleanupAt IS NOT NULL AND completedCleanupAt < :now AND status IN ('COMPLETED', 'MISSED')")
+    suspend fun getCleanupCandidates(now: Long): List<OccurrenceEntity>
 }
