@@ -63,6 +63,7 @@ import android.os.Vibrator
 import androidx.compose.ui.platform.LocalContext
 import com.neurasamu.build.sl_tasker.util.SoundFx
 import com.neurasamu.build.sl_tasker.ui.components.NotchedShape
+import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -187,10 +188,15 @@ fun QuestCard(
                     }
                 }
 
+                val timeLabel = if (task.scheduleMode == ScheduleMode.NO_TIME) {
+                    if (task.validityDays > 0) "ANYTIME · ${task.validityDays}d" else "ANYTIME · LIFETIME"
+                } else {
+                    "AT: $scheduledStr"
+                }
                 Text(
-                    text = "AT: $scheduledStr",
+                    text = timeLabel,
                     style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
+                    color = if (task.scheduleMode == ScheduleMode.NO_TIME) AccentGold else TextMuted
                 )
             }
 

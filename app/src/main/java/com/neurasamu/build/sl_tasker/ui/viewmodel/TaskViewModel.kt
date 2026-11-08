@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.neurasamu.build.sl_tasker.data.task.TaskTypesStore
+import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 
 data class TaskOccurrenceItem(
     val task: TaskEntity,
@@ -136,7 +137,9 @@ class TaskViewModel(
         durationMinutes: Int,
         isRepeat: Boolean,
         allowEarlyComplete: Boolean,
-        userType: String = ""
+        userType: String = "",
+        scheduleMode: ScheduleMode = ScheduleMode.TIME,
+        validityDays: Int = 0
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val existing = taskRepository.getTaskById(taskId) ?: return@launch
@@ -158,17 +161,30 @@ class TaskViewModel(
                 durationMinutes = durationMinutes,
                 repeatRule = repeatRuleVal,
                 allowEarlyComplete = allowEarlyComplete,
-                userType = userType.trim()
+                userType = userType.trim(),
+                scheduleMode = scheduleMode,
+                validityDays = validityDays.coerceAtLeast(0)
             )
             taskRepository.updateTaskFields(updated)
 
-            val nextTrigger = com.neurasamu.build.sl_tasker.domain.scheduler.ScheduleHelper.nextTrigger(
-                hour = reminderMinutesOfDay / 60,
-                minute = reminderMinutesOfDay % 60,
-                daysCsv = customRepeatDays,
-                repeat = repeatRuleVal
-            ) ?: (System.currentTimeMillis() + 60_000L)
-            val deadlineAt = nextTrigger + durationMinutes * 60 * 1000L
+            val nowMs2 = System.currentTimeMillis()
+            val nextTrigger: Long
+            val deadlineAt: Long
+            if (scheduleMode == ScheduleMode.NO_TIME) {
+                nextTrigger = nowMs2
+                deadlineAt = if (validityDays > 0)
+                    nowMs2 + validityDays.toLong() * 24L * 60L * 60L * 1000L
+                else
+                    Long.MAX_VALUE - 1L
+            } else {
+                nextTrigger = com.neurasamu.build.sl_tasker.domain.scheduler.ScheduleHelper.nextTrigger(
+                    hour = reminderMinutesOfDay / 60,
+                    minute = reminderMinutesOfDay % 60,
+                    daysCsv = customRepeatDays,
+                    repeat = repeatRuleVal
+                ) ?: (nowMs2 + 60_000L)
+                deadlineAt = nextTrigger + durationMinutes * 60L * 1000L
+            }
 
             if (userType.isNotBlank()) {
                 try { taskTypesStore.addType(userType.trim()) } catch (_: Throwable) {}
@@ -187,20 +203,33 @@ class TaskViewModel(
         durationMinutes: Int,
         isRepeat: Boolean,
         allowEarlyComplete: Boolean,
-        userType: String = ""
+        userType: String = "",
+        scheduleMode: ScheduleMode = ScheduleMode.TIME,
+        validityDays: Int = 0
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             // IMPORTANT: isRepeat is user-intent, not "did they pick days".
             // A single-day task with a specific day is still ONCE (no weekly loop).
             val repeatRuleVal = if (isRepeat) RepeatRule.CUSTOM else RepeatRule.ONCE
-            val nextTrigger = com.neurasamu.build.sl_tasker.domain.scheduler.ScheduleHelper.nextTrigger(
-                hour = reminderMinutesOfDay / 60,
-                minute = reminderMinutesOfDay % 60,
-                daysCsv = customRepeatDays,
-                repeat = repeatRuleVal
-            ) ?: (System.currentTimeMillis() + 60_000L)
-            val scheduledAt = nextTrigger
-            val deadlineAt = scheduledAt + durationMinutes * 60 * 1000L
+            val nowMs = System.currentTimeMillis()
+            val scheduledAt: Long
+            val deadlineAt: Long
+            if (scheduleMode == ScheduleMode.NO_TIME) {
+                scheduledAt = nowMs
+                deadlineAt = if (validityDays > 0)
+                    nowMs + validityDays.toLong() * 24L * 60L * 60L * 1000L
+                else
+                    Long.MAX_VALUE - 1L
+            } else {
+                val nextTrigger = com.neurasamu.build.sl_tasker.domain.scheduler.ScheduleHelper.nextTrigger(
+                    hour = reminderMinutesOfDay / 60,
+                    minute = reminderMinutesOfDay % 60,
+                    daysCsv = customRepeatDays,
+                    repeat = repeatRuleVal
+                ) ?: (nowMs + 60_000L)
+                scheduledAt = nextTrigger
+                deadlineAt = scheduledAt + durationMinutes * 60L * 1000L
+            }
 
             val task = TaskEntity(
                 title = title,
@@ -212,7 +241,9 @@ class TaskViewModel(
                 customRepeatDays = customRepeatDays,
                 durationMinutes = durationMinutes,
                 reminderMinutesOfDay = reminderMinutesOfDay,
-                allowEarlyComplete = allowEarlyComplete
+                allowEarlyComplete = allowEarlyComplete,
+                scheduleMode = scheduleMode,
+                validityDays = validityDays.coerceAtLeast(0)
             )
             if (userType.isNotBlank()) {
                 try { taskTypesStore.addType(userType.trim()) } catch (_: Throwable) {}

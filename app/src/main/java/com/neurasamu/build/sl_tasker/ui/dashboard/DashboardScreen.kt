@@ -299,7 +299,7 @@ fun DashboardScreen(
             onDismiss = { showCreateDialog = false },
             existingTypes = taskTypes,
             onDeleteType = { taskViewModel.removeTaskType(it) },
-            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType ->
+            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays ->
                 taskViewModel.createQuest(
                     title = title,
                     description = "",
@@ -309,7 +309,9 @@ fun DashboardScreen(
                     durationMinutes = durationMinutes,
                     isRepeat = isRepeat,
                     allowEarlyComplete = allowEarly,
-                    userType = userType
+                    userType = userType,
+                    scheduleMode = scheduleMode,
+                    validityDays = validityDays
                 )
                 showCreateDialog = false
             }
@@ -322,7 +324,7 @@ fun DashboardScreen(
             initialTask = task,
             existingTypes = taskTypes,
             onDeleteType = { taskViewModel.removeTaskType(it) },
-            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType ->
+            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays ->
                 taskViewModel.updateTaskFields(
                     taskId = task.id,
                     title = title,
@@ -333,7 +335,9 @@ fun DashboardScreen(
                     durationMinutes = durationMinutes,
                     isRepeat = isRepeat,
                     allowEarlyComplete = allowEarly,
-                    userType = userType
+                    userType = userType,
+                    scheduleMode = scheduleMode,
+                    validityDays = validityDays
                 )
                 editingTask = null
             }

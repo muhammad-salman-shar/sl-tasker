@@ -60,6 +60,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
+import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 
 private val DayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
@@ -77,7 +78,9 @@ fun CreateQuestDialog(
         durationMinutes: Int,
         isRepeat: Boolean,
         allowEarlyComplete: Boolean,
-        userType: String
+        userType: String,
+        scheduleMode: ScheduleMode,
+        validityDays: Int
     ) -> Unit
 ) {
     val isEdit = initialTask != null
@@ -106,6 +109,10 @@ fun CreateQuestDialog(
         mutableStateOf(initialTask != null && initialTask.repeatRule != com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE)
     }
     var allowEarly by remember { mutableStateOf(initialTask?.allowEarlyComplete ?: false) }
+    var scheduleMode by remember { mutableStateOf(initialTask?.scheduleMode ?: ScheduleMode.TIME) }
+    var validityDaysText by remember {
+        mutableStateOf(if ((initialTask?.validityDays ?: 0) > 0) initialTask!!.validityDays.toString() else "")
+    }
 
     var selectedType by remember { mutableStateOf(initialTask?.userType ?: "") }
     var showNewTypeInput by remember { mutableStateOf(false) }
@@ -306,7 +313,59 @@ fun CreateQuestDialog(
                     }
                 }
 
-                if (isRepeat) {
+                SectionLabel("SCHEDULE MODE")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(ScheduleMode.TIME to "Time", ScheduleMode.NO_TIME to "No Time").forEach { (m, label) ->
+                        val sel = scheduleMode == m
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (sel) PrimaryManaBlue.copy(alpha = 0.2f)
+                                    else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
+                                    else DarkSurface
+                                )
+                                .border(1.dp, if (sel) PrimaryManaBlue else DarkBorder, RoundedCornerShape(8.dp))
+                                .clickable { scheduleMode = m }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                label,
+                                color = if (sel) PrimaryManaBlue else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                // No Time: validity input
+                if (scheduleMode == ScheduleMode.NO_TIME) {
+                    SectionLabel("VALIDITY (optional, blank = lifetime)")
+                    OutlinedTextField(
+                        value = validityDaysText,
+                        onValueChange = { validityDaysText = it.filter { c -> c.isDigit() }.take(3) },
+                        label = { Text("Days (e.g. 3, 7, 30)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentGold,
+                            unfocusedBorderColor = DarkBorder,
+                            focusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
+                            unfocusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
+                            focusedLabelColor = AccentGold,
+                            unfocusedLabelColor = TextMuted
+                        )
+                    )
+                }
+
+                if (scheduleMode == ScheduleMode.TIME && isRepeat) {
                     SectionLabel("DAYS (select 1+)")
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -337,6 +396,7 @@ fun CreateQuestDialog(
                 }
 
                 // Time
+                if (scheduleMode == ScheduleMode.TIME) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SectionLabel("TIME")
                     Spacer(Modifier.width(8.dp))
@@ -421,6 +481,8 @@ fun CreateQuestDialog(
                     }
                 }
 
+                } // end if TIME
+
                 // Timer (for Hard/Critical)
                 if (requiresTimer) {
                     SectionLabel("TIMER (MINUTES)")
@@ -501,7 +563,9 @@ fun CreateQuestDialog(
                         dur,
                         isRepeat,
                         allowEarly,
-                        selectedType
+                        selectedType,
+                        scheduleMode,
+                        validityDaysText.toIntOrNull()?.coerceAtLeast(0) ?: 0
                     )
                 },
                 enabled = valid,
