@@ -245,43 +245,6 @@ fun CreateQuestDialog(
                 }
 
                 // Difficulty
-                SectionLabel("DIFFICULTY")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Difficulty.entries.forEach { d ->
-                        val isSel = difficulty == d
-                        val c = when (d) {
-                            Difficulty.MEDIUM -> RankC
-                            Difficulty.HARD -> RankA
-                            Difficulty.CRITICAL -> DangerPenaltyRed
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isSel) c.copy(alpha = 0.25f)
-                                    else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
-                                    else DarkSurface
-                                )
-                                .border(1.dp, if (isSel) c else DarkBorder, RoundedCornerShape(8.dp))
-                                .clickable { difficulty = d }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = d.name,
-                                color = if (isSel) c else TextMuted,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-
-                // Schedule
                 SectionLabel("SCHEDULE")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -313,6 +276,36 @@ fun CreateQuestDialog(
                     }
                 }
 
+                if (scheduleMode == ScheduleMode.TIME) {
+                    SectionLabel(if (isRepeat) "DAYS (every week)" else "DAY (one-time trigger)")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        DayShort.forEachIndexed { idx, d ->
+                            val sel = idx in selectedDays
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (sel) PrimaryManaBlue.copy(alpha = 0.2f)
+                                        else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
+                                        else DarkSurface
+                                    )
+                                    .border(1.dp, if (sel) PrimaryManaBlue else DarkBorder, CircleShape)
+                                    .clickable {
+                                        selectedDays = if (sel) selectedDays - idx else selectedDays + idx
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(d, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+                
                 SectionLabel("SCHEDULE MODE")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -365,35 +358,7 @@ fun CreateQuestDialog(
                     )
                 }
 
-                if (scheduleMode == ScheduleMode.TIME && isRepeat) {
-                    SectionLabel("DAYS (select 1+)")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        DayShort.forEachIndexed { idx, d ->
-                            val sel = idx in selectedDays
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (sel) PrimaryManaBlue.copy(alpha = 0.2f)
-                                        else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
-                                        else DarkSurface
-                                    )
-                                    .border(1.dp, if (sel) PrimaryManaBlue else DarkBorder, CircleShape)
-                                    .clickable {
-                                        selectedDays = if (sel) selectedDays - idx else selectedDays + idx
-                                    }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(d, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                }
+                
 
                 // Time
                 if (scheduleMode == ScheduleMode.TIME) {
@@ -483,6 +448,44 @@ fun CreateQuestDialog(
 
                 } // end if TIME
 
+                SectionLabel("DIFFICULTY")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Difficulty.entries.forEach { d ->
+                        val isSel = difficulty == d
+                        val c = when (d) {
+                            Difficulty.MEDIUM -> RankC
+                            Difficulty.HARD -> RankA
+                            Difficulty.CRITICAL -> DangerPenaltyRed
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSel) c.copy(alpha = 0.25f)
+                                    else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
+                                    else DarkSurface
+                                )
+                                .border(1.dp, if (isSel) c else DarkBorder, RoundedCornerShape(8.dp))
+                                .clickable { difficulty = d }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = d.name,
+                                color = if (isSel) c else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                // Schedule
+                
                 // Timer (for Hard/Critical)
                 if (requiresTimer) {
                     SectionLabel("TIMER (MINUTES)")
@@ -536,7 +539,6 @@ fun CreateQuestDialog(
         },
         confirmButton = {
             val valid = title.isNotBlank() &&
-                (!isRepeat || selectedDays.isNotEmpty()) &&
                 (!requiresTimer || (durationText.toIntOrNull() ?: 0) > 0)
             Button(
                 onClick = {

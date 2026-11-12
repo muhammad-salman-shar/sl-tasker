@@ -107,10 +107,11 @@ fun HomeScreen(
             )
         }
 
-        if (dailyQuests.isNotEmpty()) {
+        val incompleteQuests = dailyQuests.filter { !it.completed }
+        if (incompleteQuests.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
             DailyQuestSection(
-                quests = dailyQuests,
+                quests = incompleteQuests,
                 onComplete = { id -> dailyQuestViewModel.complete(id) }
             )
         }
@@ -215,7 +216,7 @@ private fun StatCircle(
         // Outer breathing halo
         Canvas(modifier = Modifier.size(130.dp)) {
             drawCircle(
-                color = primaryColor.copy(alpha = 0.08f * (glow + 0.3f)),
+                color = primaryColor.copy(alpha = 0.20f * (glow + 0.4f)),
                 radius = (this.size.minDimension / 2f) * pulse
             )
         }

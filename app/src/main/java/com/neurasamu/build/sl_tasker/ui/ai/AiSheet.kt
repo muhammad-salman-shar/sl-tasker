@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -245,23 +246,41 @@ fun AiSheet(
                 )
             )
             Spacer(Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(if (busy || input.isBlank()) DarkSurface else PrimaryManaBlue)
-                    .clickable(enabled = !busy && input.isNotBlank()) {
-                        vm.send(input)
-                        input = ""
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Send,
-                    contentDescription = "Send",
-                    tint = if (busy || input.isBlank()) TextMuted else DarkBackground,
-                    modifier = Modifier.size(20.dp)
-                )
+            if (busy) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(DangerPenaltyRed)
+                        .clickable { vm.cancel() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Stop,
+                        contentDescription = "Stop",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (input.isBlank()) DarkSurface else PrimaryManaBlue)
+                        .clickable(enabled = input.isNotBlank()) {
+                            vm.send(input)
+                            input = ""
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Send,
+                        contentDescription = "Send",
+                        tint = if (input.isBlank()) TextMuted else DarkBackground,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

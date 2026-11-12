@@ -22,6 +22,7 @@ class AlarmService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
+    private var currentRingtone: android.media.Ringtone? = null
     private var ringExtras: Intent? = null
 
     companion object {
@@ -103,17 +104,40 @@ class AlarmService : Service() {
                 RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                     ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             }
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(this@AlarmService, alertUri)
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                isLooping = true
-                prepare()
-                start()
+            // Primary: RingtoneManager handles content:// URIs from picker correctly
+            var playedViaRingtone = false
+            try {
+                val rt = RingtoneManager.getRingtone(this@AlarmService, alertUri)
+                if (rt != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        rt.audioAttributes = AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        rt.isLooping = true
+                    }
+                    rt.play()
+                    currentRingtone = rt
+                    playedViaRingtone = true
+                }
+            } catch (_: Throwable) {}
+
+            if (!playedViaRingtone) {
+                // Fallback: MediaPlayer
+                mediaPlayer = MediaPlayer().apply {
+                    setDataSource(this@AlarmService, alertUri)
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    isLooping = true
+                    prepare()
+                    start()
+                }
             }
         } catch (_: Exception) {}
 
@@ -134,6 +158,10 @@ class AlarmService : Service() {
             mediaPlayer?.release()
             mediaPlayer = null
         } catch (_: Exception) {}
+        try {
+            currentRingtone?.stop()
+            currentRingtone = null
+        } catch (_: Throwable) {}
         vibrator?.cancel()
     }
 

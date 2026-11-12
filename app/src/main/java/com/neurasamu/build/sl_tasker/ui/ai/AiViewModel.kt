@@ -39,6 +39,8 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
     private val scheduler = AlarmScheduler(app)
     private val blockPrefs = BlockPrefs(app)
 
+    private var currentJob: kotlinx.coroutines.Job? = null
+
     private val _messages = MutableStateFlow<List<AiMessage>>(emptyList())
     val messages: StateFlow<List<AiMessage>> = _messages
 
@@ -53,6 +55,13 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _lastRawResponse = MutableStateFlow<String?>(null)
     val lastRawResponse: StateFlow<String?> = _lastRawResponse
+
+    fun cancel() {
+        try { currentJob?.cancel() } catch (_: Throwable) {}
+        currentJob = null
+        _busy.value = false
+        _messages.value = _messages.value + AiMessage("info", "Request cancelled.")
+    }
 
     fun clearChat() {
         _messages.value = emptyList()
@@ -94,7 +103,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
         _lastRawRequest.value = null
         _lastRawResponse.value = null
 
-        viewModelScope.launch(Dispatchers.IO) {
+        currentJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val cfg = settings.config.first()
                 if (!cfg.isConfigured) {

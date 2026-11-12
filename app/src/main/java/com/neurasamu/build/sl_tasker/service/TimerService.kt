@@ -325,9 +325,9 @@ class TimerService : Service() {
                 updateOverlayUi()
             }
         }
-        val spacer = android.view.View(this)
-        expandedContainer.addView(spacer, android.widget.LinearLayout.LayoutParams(0, 1, 1f))
-        expandedContainer.addView(collapseBtn)
+
+        // Insert collapse button at LEFT (index 0) — "left side, near time"
+        expandedContainer.addView(collapseBtn, 0)
 
         val expandedParams = android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,

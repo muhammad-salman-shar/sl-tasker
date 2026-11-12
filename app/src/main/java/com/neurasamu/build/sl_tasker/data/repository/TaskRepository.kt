@@ -219,6 +219,12 @@ class TaskRepository(private val database: AppDatabase) {
                 playerStatsDao.setFocusLock(false)
             }
 
+            try {
+                com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
+                    "Task complete: +${gameResult.epGained} EP, +${gameResult.healthGained} HP"
+                )
+            } catch (_: Throwable) {}
+
             true
         }
     }
