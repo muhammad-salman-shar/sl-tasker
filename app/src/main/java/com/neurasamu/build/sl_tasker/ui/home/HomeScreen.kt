@@ -177,9 +177,10 @@ private fun StatCircle(
     primaryColor: Color
 ) {
     val transition = rememberInfiniteTransition(label = "circleAnim")
+    val isLite = com.neurasamu.build.sl_tasker.ui.theme.ThemeState.isLiteMode
     val pulse by transition.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.06f,
+        initialValue = if (isLite) 1f else 0.94f,
+        targetValue = if (isLite) 1f else 1.06f,
         animationSpec = infiniteRepeatable(
             animation = tween(1400, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
@@ -188,7 +189,7 @@ private fun StatCircle(
     )
     val rotation by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
+        targetValue = if (isLite) 0f else 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(8000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart

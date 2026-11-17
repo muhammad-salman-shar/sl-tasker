@@ -14,7 +14,7 @@ data class PenaltyResult(
 
 object PenaltyEngine {
 
-    const val MIN_HEALTH = 0
+    const val MIN_HEALTH = 5
     const val RECOVERY_THRESHOLD = 50
 
     fun penaltyPerMinute(difficulty: Difficulty): Int = when (difficulty) {

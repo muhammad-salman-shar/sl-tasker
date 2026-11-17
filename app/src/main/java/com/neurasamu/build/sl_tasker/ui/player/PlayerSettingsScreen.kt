@@ -200,6 +200,30 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
             Spacer(Modifier.height(10.dp))
 
             SettingsCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("BATTERY SAVER (LITE GLASS)", color = TextPrimary, fontSize = 12.sp)
+                        Text("Disable heavy animations", color = TextMuted, fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = ThemeState.isLiteMode,
+                        onCheckedChange = { isLite ->
+                            ThemeState.isLiteMode = isLite
+                            try {
+                                context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                                    .edit().putBoolean("lite_mode", isLite).apply()
+                            } catch (_: Throwable) {}
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DarkCard,
+                            checkedTrackColor = PrimaryManaBlue
+                        )
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
                 Text("APPEARANCE", color = PrimaryManaBlue, fontSize = 11.sp)
                 Spacer(Modifier.height(8.dp))
                 Row(

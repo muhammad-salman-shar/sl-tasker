@@ -135,6 +135,7 @@ class TimerService : Service() {
             totalSeconds = minutes * 60,
             startedAtMillis = System.currentTimeMillis(),
             elapsedBeforePauseSeconds = 0,
+            elapsedRealtimeAtStart = android.os.SystemClock.elapsedRealtime(),
             isPaused = false,
             accentColorArgb = accent,
             durationMinutes = minutes
@@ -164,7 +165,8 @@ class TimerService : Service() {
         if (!t.isPaused) return
         val resumed = t.copy(
             isPaused = false,
-            startedAtMillis = System.currentTimeMillis()
+            startedAtMillis = System.currentTimeMillis(),
+            elapsedRealtimeAtStart = android.os.SystemClock.elapsedRealtime()
         )
         TimerRuntime.set(resumed)
         scope.launch { store?.save(resumed) }

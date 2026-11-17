@@ -354,7 +354,13 @@ class TaskRepository(private val database: AppDatabase) {
                     if (elapsedMin <= 0) continue
                     val perMin = PenaltyEngine.penaltyPerMinute(task.difficulty)
                     val damage = perMin * elapsedMin
-                    val newHealth = (stats.health - damage).coerceAtLeast(0)
+                    
+                    // If user is already at the floor, stop draining to prevent soft-lock
+                    if (stats.health <= com.neurasamu.build.sl_tasker.domain.engine.PenaltyEngine.MIN_HEALTH) {
+                        continue
+                    }
+                    
+                    val newHealth = (stats.health - damage).coerceAtLeast(com.neurasamu.build.sl_tasker.domain.engine.PenaltyEngine.MIN_HEALTH)
                     stats = stats.copy(
                         health = newHealth,
                         recoveryModeActive = newHealth < 50 || stats.recoveryModeActive

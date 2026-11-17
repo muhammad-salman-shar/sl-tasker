@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 object ThemeState {
     var mode by mutableStateOf(0)
     var isLight by mutableStateOf(false)
+    var isLiteMode by mutableStateOf(false)
 }
 
 // ==== RAW DARK PALETTE ====

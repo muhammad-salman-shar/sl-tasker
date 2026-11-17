@@ -10,14 +10,17 @@ data class ActiveTimer(
     val elapsedBeforePauseSeconds: Int,
     val isPaused: Boolean,
     val accentColorArgb: Int,
-    val durationMinutes: Int
+    val durationMinutes: Int,
+    val elapsedRealtimeAtStart: Long = android.os.SystemClock.elapsedRealtime()
 ) {
     fun remainingSeconds(): Int {
         return if (isPaused) {
             (totalSeconds - elapsedBeforePauseSeconds).coerceAtLeast(0)
         } else {
-            val elapsed = elapsedBeforePauseSeconds +
-                ((System.currentTimeMillis() - startedAtMillis) / 1000).toInt()
+            // Use monotonic clock (elapsedRealtime) instead of wall clock to prevent cheating
+            val elapsedRealNow = android.os.SystemClock.elapsedRealtime()
+            val elapsedRealSinceStart = (elapsedRealNow - elapsedRealtimeAtStart) / 1000
+            val elapsed = elapsedBeforePauseSeconds + elapsedRealSinceStart.toInt()
             (totalSeconds - elapsed).coerceAtLeast(0)
         }
     }
@@ -33,6 +36,7 @@ data class ActiveTimer(
         put("isPaused", isPaused)
         put("accentColorArgb", accentColorArgb)
         put("durationMinutes", durationMinutes)
+        put("elapsedRealtimeAtStart", elapsedRealtimeAtStart)
     }.toString()
 
     companion object {
@@ -46,7 +50,8 @@ data class ActiveTimer(
                 elapsedBeforePauseSeconds = o.optInt("elapsedBeforePauseSeconds", 0),
                 isPaused = o.optBoolean("isPaused", false),
                 accentColorArgb = o.optInt("accentColorArgb", 0xFF00E5FF.toInt()),
-                durationMinutes = o.optInt("durationMinutes", 1)
+                durationMinutes = o.optInt("durationMinutes", 1),
+                elapsedRealtimeAtStart = o.optLong("elapsedRealtimeAtStart", android.os.SystemClock.elapsedRealtime())
             )
         } catch (_: Throwable) { null }
     }

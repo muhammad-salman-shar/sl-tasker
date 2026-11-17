@@ -26,6 +26,7 @@ fun AmbientBackground(
     content: @Composable BoxScope.() -> Unit
 ) {
     val isLight = ThemeState.isLight
+    val isLite = ThemeState.isLiteMode
     val base = if (isLight) Color(0xFFEAF0FA) else Color(0xFF03060F)
     val blueA = if (isLight) 0.20f else 0.32f
     val violetA = if (isLight) 0.16f else 0.26f
@@ -38,6 +39,10 @@ fun AmbientBackground(
         animationSpec = infiniteRepeatable(tween(28000, easing = LinearEasing), RepeatMode.Restart),
         label = "t1"
     )
+    // Freeze time if lite mode is on
+    val t1Final = if (isLite) 0.5f else t1
+    val t2Final = if (isLite) 0.5f else t2
+    val t3Final = if (isLite) 0.5f else t3
     val t2 by transition.animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(19000, easing = LinearEasing), RepeatMode.Restart),
@@ -54,8 +59,8 @@ fun AmbientBackground(
             val w = size.width
             val h = size.height
 
-            val x1 = w * (0.20f + 0.14f * sin(t1 * 6.283f))
-            val y1 = h * (0.22f + 0.10f * cos(t1 * 4.0f))
+            val x1 = w * (0.20f + 0.14f * sin(t1Final * 6.283f))
+            val y1 = h * (0.22f + 0.10f * cos(t1Final * 4.0f))
             val r1 = w * 0.95f
             drawCircle(
                 Brush.radialGradient(
@@ -65,8 +70,8 @@ fun AmbientBackground(
                 radius = r1, center = Offset(x1, y1)
             )
 
-            val x2 = w * (0.78f + 0.09f * cos(t2 * 5.0f))
-            val y2 = h * (0.72f + 0.10f * sin(t2 * 3.5f))
+            val x2 = w * (0.78f + 0.09f * cos(t2Final * 5.0f))
+            val y2 = h * (0.72f + 0.10f * sin(t2Final * 3.5f))
             val r2 = w * 0.85f
             drawCircle(
                 Brush.radialGradient(
@@ -76,8 +81,8 @@ fun AmbientBackground(
                 radius = r2, center = Offset(x2, y2)
             )
 
-            val x3 = w * (0.55f + 0.15f * sin(t3 * 4.0f))
-            val y3 = h * (0.48f + 0.12f * cos(t3 * 3.0f))
+            val x3 = w * (0.55f + 0.15f * sin(t3Final * 4.0f))
+            val y3 = h * (0.48f + 0.12f * cos(t3Final * 3.0f))
             val r3 = w * 0.70f
             drawCircle(
                 Brush.radialGradient(
@@ -87,8 +92,8 @@ fun AmbientBackground(
                 radius = r3, center = Offset(x3, y3)
             )
 
-            val x4 = w * (0.85f + 0.07f * sin(t1 * 3.0f))
-            val y4 = h * (0.12f + 0.08f * cos(t1 * 5.0f))
+            val x4 = w * (0.85f + 0.07f * sin(t1Final * 3.0f))
+            val y4 = h * (0.12f + 0.08f * cos(t1Final * 5.0f))
             val r4 = w * 0.55f
             drawCircle(
                 Brush.radialGradient(
