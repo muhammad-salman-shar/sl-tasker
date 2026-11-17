@@ -39,10 +39,7 @@ fun AmbientBackground(
         animationSpec = infiniteRepeatable(tween(28000, easing = LinearEasing), RepeatMode.Restart),
         label = "t1"
     )
-    // Freeze time if lite mode is on
-    val t1Final = if (isLite) 0.5f else t1
-    val t2Final = if (isLite) 0.5f else t2
-    val t3Final = if (isLite) 0.5f else t3
+
     val t2 by transition.animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(19000, easing = LinearEasing), RepeatMode.Restart),
@@ -53,6 +50,11 @@ fun AmbientBackground(
         animationSpec = infiniteRepeatable(tween(33000, easing = LinearEasing), RepeatMode.Restart),
         label = "t3"
     )
+    
+    // Freeze time if lite mode is on
+    val t1Final = if (isLite) 0.5f else t1
+    val t2Final = if (isLite) 0.5f else t2
+    val t3Final = if (isLite) 0.5f else t3
 
     Box(modifier = modifier.fillMaxSize().background(base)) {
         Canvas(modifier = Modifier.fillMaxSize()) {
