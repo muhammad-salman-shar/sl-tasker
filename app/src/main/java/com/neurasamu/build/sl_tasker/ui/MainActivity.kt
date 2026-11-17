@@ -93,6 +93,8 @@ import com.neurasamu.build.sl_tasker.util.SystemEvents
 import com.neurasamu.build.sl_tasker.ui.viewmodel.DailyQuestViewModel
 
 class MainActivity : ComponentActivity() {
+    private var lastReminderRescheduleAt = 0L
+
 
     private val taskViewModel: TaskViewModel by viewModels { TaskViewModel.Factory(application) }
     private val statsViewModel: StatsViewModel by viewModels { StatsViewModel.Factory(application) }
@@ -157,6 +159,37 @@ class MainActivity : ComponentActivity() {
                 val svc = Intent(this, com.neurasamu.build.sl_tasker.service.TimerService::class.java)
                 svc.action = com.neurasamu.build.sl_tasker.service.TimerService.ACTION_SHOW_OVERLAY
                 startService(svc)
+            }
+        } catch (_: Throwable) {}
+
+        // Run cleanup + penalty check every time app becomes visible
+        try {
+            lifecycleScope.launch {
+                try {
+                    val db = com.neurasamu.build.sl_tasker.data.db.AppDatabase.getInstance(applicationContext)
+                    val repo = com.neurasamu.build.sl_tasker.data.repository.TaskRepository(db)
+                    val now = System.currentTimeMillis()
+                    repo.applyOverduePenalties(now)
+                    repo.performCleanup(now)
+
+                    // Reschedule upcoming task reminders (idempotent, debounced 5 min)
+                    if (System.currentTimeMillis() - lastReminderRescheduleAt > 5L * 60L * 1000L) {
+                        lastReminderRescheduleAt = System.currentTimeMillis()
+                        try {
+                            val scheduler = com.neurasamu.build.sl_tasker.domain.scheduler.AlarmScheduler(applicationContext)
+                            val upcoming = db.occurrenceDao().getUpcomingPendingOccurrences(now)
+                            val taskDao = db.taskDao()
+                            upcoming.take(50).forEach { occ ->
+                                try {
+                                    val task = taskDao.getTaskById(occ.taskId)
+                                    if (task != null && !task.archived) {
+                                        scheduler.scheduleReminder(occ.id, occ.scheduledAt, task.title)
+                                    }
+                                } catch (_: Throwable) {}
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                } catch (_: Throwable) {}
             }
         } catch (_: Throwable) {}
     }
@@ -317,13 +350,18 @@ fun MainAppScaffold(
         } catch (_: Throwable) {}
     }
     val appPrefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
-    androidx.compose.runtime.LaunchedEffect(currentLevel) {
+    androidx.compose.runtime.LaunchedEffect(pStats) {
+        // Wait until stats actually load from DB (avoid false level=1 race)
+        val stats = pStats ?: return@LaunchedEffect
+        val actualLevel = stats.level
         val savedLevel = appPrefs.getInt("last_seen_level", -1)
         if (savedLevel == -1) {
-            appPrefs.edit().putInt("last_seen_level", currentLevel).apply()
-        } else if (currentLevel > savedLevel) {
-            appPrefs.edit().putInt("last_seen_level", currentLevel).apply()
-            levelUpShown = currentLevel
+            // First-ever run: seed the level, no popup
+            appPrefs.edit().putInt("last_seen_level", actualLevel).apply()
+        } else if (actualLevel > savedLevel) {
+            // Genuine level up
+            appPrefs.edit().putInt("last_seen_level", actualLevel).apply()
+            levelUpShown = actualLevel
             SoundFx.levelUp()
             try {
                 val v = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator

@@ -87,6 +87,12 @@ class TaskViewModel(
         initialValue = emptyList()
     )
 
+    fun runCleanup() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try { taskRepository.performCleanup(System.currentTimeMillis()) } catch (_: Throwable) {}
+        }
+    }
+
     fun applyOverduePenalties() {
         viewModelScope.launch(Dispatchers.IO) {
             taskRepository.applyOverduePenalties(System.currentTimeMillis())

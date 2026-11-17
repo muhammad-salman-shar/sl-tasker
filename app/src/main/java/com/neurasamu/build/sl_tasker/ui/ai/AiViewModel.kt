@@ -26,6 +26,8 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import com.neurasamu.build.sl_tasker.data.block.BlockMode
 import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
+import com.neurasamu.build.sl_tasker.data.block.BlockPresets
+import com.neurasamu.build.sl_tasker.data.model.OccurrenceStatus
 
 data class AiMessage(val role: String, val text: String, val raw: String? = null)
 
@@ -411,11 +413,96 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 blockPrefs.setMode(bm)
                 _messages.value = _messages.value + AiMessage("info", "Block mode: ${bm.name}.")
             }
+            "list_pending" -> {
+                try {
+                    val pending = db.occurrenceDao().getUpcomingPendingOccurrences(0L)
+                    if (pending.isEmpty()) {
+                        _messages.value = _messages.value + AiMessage("assistant", "No pending tasks.")
+                    } else {
+                        val text = pending.take(10).joinToString("\n") { occ ->
+                            val t = taskRepo.getTaskById(occ.taskId)
+                            "• ${t?.title ?: "?"} (${t?.difficulty?.name ?: "?"})"
+                        }
+                        _messages.value = _messages.value + AiMessage("assistant", "Pending:\n$text")
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Error: ${e.message}")
+                }
+            }
+            "list_missed" -> {
+                try {
+                    val missedFlow = db.occurrenceDao().getOccurrencesByStatus(
+                        listOf(OccurrenceStatus.MISSED)
+                    )
+                    val snapshot = kotlinx.coroutines.flow.first(missedFlow)
+                    if (snapshot.isEmpty()) {
+                        _messages.value = _messages.value + AiMessage("assistant", "No missed tasks. Well done!")
+                    } else {
+                        val text = snapshot.take(10).joinToString("\n") { occ ->
+                            val t = taskRepo.getTaskById(occ.taskId)
+                            "• ${t?.title ?: "?"}"
+                        }
+                        _messages.value = _messages.value + AiMessage("assistant", "Missed (${snapshot.size}):\n$text")
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Error: ${e.message}")
+                }
+            }
+            "block_category" -> {
+                val cat = json.optString("category", "").trim()
+                val cats = cat.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                if (cats.isEmpty()) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Which category? social, ai, games, or entertainment?")
+                    return
+                }
+                try {
+                    val installed = installedPackages()
+                    val toBlock = mutableSetOf<String>()
+                    for (c in cats) {
+                        val preset = BlockPresets.byName(c)
+                        toBlock.addAll(BlockPresets.installedFrom(preset, installed))
+                    }
+                    if (toBlock.isEmpty()) {
+                        _messages.value = _messages.value + AiMessage("assistant", "None of those apps are installed on your phone.")
+                    } else {
+                        val current = blockPrefs.state.first()
+                        blockPrefs.setSelected(current.selectedPackages + toBlock)
+                        // Ensure Test mode is ON so the block actually triggers
+                        if (current.mode == BlockMode.OFF) blockPrefs.setMode(BlockMode.TEST)
+                        _messages.value = _messages.value + AiMessage("info",
+                            "Blocked ${toBlock.size} apps from: ${cats.joinToString(", ")}")
+                    }
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Error: ${e.message}")
+                }
+            }
+            "show_options" -> {
+                val opts = json.optJSONArray("options")
+                val sb = StringBuilder("I'm not sure — which do you want?\n")
+                if (opts != null) {
+                    for (i in 0 until opts.length()) {
+                        sb.append("${i + 1}. ${opts.optString(i)}\n")
+                    }
+                }
+                _messages.value = _messages.value + AiMessage("assistant", sb.toString().trim())
+            }
             else -> {
                 val reply = json.optString("reply").trim().ifBlank { "…" }
                 _messages.value = _messages.value + AiMessage("assistant", reply, raw = json.toString())
             }
         }
+    }
+
+    private fun installedPackages(): Set<String> {
+        return try {
+            val pm = getApplication<android.app.Application>().packageManager
+            val intent = android.content.Intent(android.content.Intent.ACTION_MAIN)
+                .addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+            @Suppress("DEPRECATION")
+            pm.queryIntentActivities(intent, 0)
+                .mapNotNull { it.activityInfo?.packageName }
+                .toSet()
+        } catch (_: Throwable) { emptySet() }
     }
 
     private fun parseHm(s: String): Pair<Int, Int>? {

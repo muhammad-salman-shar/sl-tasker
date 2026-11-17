@@ -59,4 +59,7 @@ interface OccurrenceDao {
 
     @Query("SELECT * FROM occurrences WHERE completedCleanupAt IS NOT NULL AND completedCleanupAt < :now AND status IN ('COMPLETED', 'MISSED')")
     suspend fun getCleanupCandidates(now: Long): List<OccurrenceEntity>
+
+    @Query("SELECT * FROM occurrences WHERE status = 'PENDING' AND scheduledAt > :now ORDER BY scheduledAt ASC")
+    suspend fun getUpcomingPendingOccurrences(now: Long): List<OccurrenceEntity>
 }

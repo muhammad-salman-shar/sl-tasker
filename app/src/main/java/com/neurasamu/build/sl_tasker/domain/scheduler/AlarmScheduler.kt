@@ -56,12 +56,15 @@ class AlarmScheduler(private val context: Context) {
             showIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        var scheduled = false
         try {
             alarmManager.setAlarmClock(
                 AlarmManager.AlarmClockInfo(triggerAt, showPi),
                 pendingIntent
             )
-        } catch (_: Throwable) {
+            scheduled = true
+        } catch (_: Throwable) {}
+        if (!scheduled) {
             scheduleExact(triggerAt, pendingIntent)
         }
 
@@ -193,26 +196,41 @@ class AlarmScheduler(private val context: Context) {
     }
 
     private fun scheduleExact(triggerAtMillis: Long, pendingIntent: PendingIntent) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
+        // Always try exact first — even without SCHEDULE_EXACT_ALARM permission,
+        // many OEMs still allow setExactAndAllowWhileIdle for alarm-style use.
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerAtMillis,
                     pendingIntent
                 )
-            } else {
+                return
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerAtMillis,
+                    pendingIntent
+                )
+                return
+            }
+        } catch (_: Throwable) {}
+
+        // Last resort: inexact (may fire up to 15 min late)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerAtMillis,
                     pendingIntent
                 )
+            } else {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                triggerAtMillis,
-                pendingIntent
-            )
-        }
+        } catch (_: Throwable) {}
     }
 }

@@ -29,7 +29,9 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 val db = AppDatabase.getInstance(context)
                 val occ = db.occurrenceDao().getOccurrenceById(occurrenceId)
-                if (occ == null || occ.status != OccurrenceStatus.PENDING) {
+                // Only skip if task was actually COMPLETED. MISSED tasks should still notify
+                // (user needs to know about the missed task).
+                if (occ == null || occ.status == OccurrenceStatus.COMPLETED) {
                     return@launch
                 }
                 showNotification(context, occurrenceId, taskTitle)

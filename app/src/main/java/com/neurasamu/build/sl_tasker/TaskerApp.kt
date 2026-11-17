@@ -51,7 +51,7 @@ class TaskerApp : Application() {
 
     private fun scheduleCleanupWorker() {
         val work = PeriodicWorkRequestBuilder<CleanupWorker>(
-            30, TimeUnit.MINUTES
+            5, TimeUnit.MINUTES
         ).build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "CleanupWorker",
