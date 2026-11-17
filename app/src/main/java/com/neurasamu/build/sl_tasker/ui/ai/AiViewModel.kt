@@ -415,15 +415,16 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
             }
             "list_pending" -> {
                 try {
-                    val pending = db.occurrenceDao().getUpcomingPendingOccurrences(0L)
+                    val pending = db.occurrenceDao().getUpcomingPendingOccurrences(System.currentTimeMillis())
                     if (pending.isEmpty()) {
                         _messages.value = _messages.value + AiMessage("assistant", "No pending tasks.")
                     } else {
-                        val text = pending.take(10).joinToString("\n") { occ ->
-                            val t = taskRepo.getTaskById(occ.taskId)
-                            "• ${t?.title ?: "?"} (${t?.difficulty?.name ?: "?"})"
+                        val lines = mutableListOf<String>()
+                        for (occ in pending.take(10)) {
+                            val tt = taskRepo.getTaskById(occ.taskId)
+                            lines.add("• ${tt?.title ?: "?"} (${tt?.difficulty?.name ?: "?"})")
                         }
-                        _messages.value = _messages.value + AiMessage("assistant", "Pending:\n$text")
+                        _messages.value = _messages.value + AiMessage("assistant", "Pending:\n" + lines.joinToString("\n"))
                     }
                 } catch (e: Throwable) {
                     _messages.value = _messages.value + AiMessage("assistant", "Error: ${e.message}")
@@ -434,15 +435,16 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     val missedFlow = db.occurrenceDao().getOccurrencesByStatus(
                         listOf(OccurrenceStatus.MISSED)
                     )
-                    val snapshot = kotlinx.coroutines.flow.first(missedFlow)
+                    val snapshot = missedFlow.first()
                     if (snapshot.isEmpty()) {
                         _messages.value = _messages.value + AiMessage("assistant", "No missed tasks. Well done!")
                     } else {
-                        val text = snapshot.take(10).joinToString("\n") { occ ->
-                            val t = taskRepo.getTaskById(occ.taskId)
-                            "• ${t?.title ?: "?"}"
+                        val lines = mutableListOf<String>()
+                        for (occ in snapshot.take(10)) {
+                            val tt = taskRepo.getTaskById(occ.taskId)
+                            lines.add("• ${tt?.title ?: "?"}")
                         }
-                        _messages.value = _messages.value + AiMessage("assistant", "Missed (${snapshot.size}):\n$text")
+                        _messages.value = _messages.value + AiMessage("assistant", "Missed (${snapshot.size}):\n" + lines.joinToString("\n"))
                     }
                 } catch (e: Throwable) {
                     _messages.value = _messages.value + AiMessage("assistant", "Error: ${e.message}")
