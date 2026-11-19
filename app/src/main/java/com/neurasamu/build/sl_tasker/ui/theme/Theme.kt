@@ -33,40 +33,14 @@ private fun darkScheme() = darkColorScheme(
     outline = androidx.compose.ui.graphics.Color(0xFF1E2A45)
 )
 
-private fun lightScheme() = lightColorScheme(
-    primary = androidx.compose.ui.graphics.Color(0xFF2563EB),
-    onPrimary = TextOnBlue,
-    primaryContainer = androidx.compose.ui.graphics.Color(0xFFDBEAFE),
-    onPrimaryContainer = androidx.compose.ui.graphics.Color(0xFF0F1830),
-    secondary = androidx.compose.ui.graphics.Color(0xFFD97706),
-    onSecondary = TextOnBlue,
-    secondaryContainer = androidx.compose.ui.graphics.Color(0xFFFEF3C7),
-    onSecondaryContainer = androidx.compose.ui.graphics.Color(0xFF78350F),
-    tertiary = androidx.compose.ui.graphics.Color(0xFF0891B2),
-    onTertiary = TextOnBlue,
-    background = androidx.compose.ui.graphics.Color(0xFFF5F7FB),
-    onBackground = androidx.compose.ui.graphics.Color(0xFF0F1830),
-    surface = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-    onSurface = androidx.compose.ui.graphics.Color(0xFF0F1830),
-    surfaceVariant = androidx.compose.ui.graphics.Color(0xFFF0F2F7),
-    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF475569),
-    error = androidx.compose.ui.graphics.Color(0xFFDC2626),
-    onError = TextOnBlue,
-    outline = androidx.compose.ui.graphics.Color(0xFFE2E8F0)
-)
-
 @Composable
 fun SoloLevelingTheme(content: @Composable () -> Unit) {
-    // Determine effective theme
-    val systemDark = isSystemInDarkTheme()
-    val isLight = when (ThemeState.mode) {
-        1 -> false
-        2 -> true
-        else -> !systemDark
-    }
-    ThemeState.isLight = isLight
+    // Locked to Dark Theme only
+    val isLight = false
+    ThemeState.mode = 1
+    ThemeState.isLight = false
 
-    val scheme = if (isLight) lightScheme() else darkScheme()
+    val scheme = darkScheme()
 
     val view = LocalView.current
     if (!view.isInEditMode) {

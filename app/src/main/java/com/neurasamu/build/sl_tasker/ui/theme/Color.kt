@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
  * mode: 0 = follow system, 1 = always dark, 2 = always light
  */
 object ThemeState {
-    var mode by mutableStateOf(0)
+    var mode by mutableStateOf(1)
     var isLight by mutableStateOf(false)
     var isLiteMode by mutableStateOf(false)
 }
@@ -26,27 +26,16 @@ private val DarkTextPrimaryRaw = Color(0xFFE8EEF9)
 private val DarkTextSecondaryRaw = Color(0xFF8B9AB8)
 private val DarkTextMutedRaw = Color(0xFF5A6785)
 
-// ==== RAW LIGHT PALETTE ====
-private val LightBgRaw = Color(0xFFF5F7FB)
-private val LightBgDeepRaw = Color(0xFFEAEEF5)
-private val LightSurfaceRaw = Color(0xFFF0F2F7)
-private val LightCardRaw = Color(0xFFFFFFFF)
-private val LightCardElevatedRaw = Color(0xFFF8FAFC)
-private val LightBorderRaw = Color(0xFFE2E8F0)
-private val LightTextPrimaryRaw = Color(0xFF0F1830)
-private val LightTextSecondaryRaw = Color(0xFF475569)
-private val LightTextMutedRaw = Color(0xFF94A3B8)
-
-// ==== DYNAMIC COLORS (compose-aware getters) ====
-val DarkBackground: Color get() = if (ThemeState.isLight) LightBgRaw else DarkBgRaw
-val DarkBackgroundDeep: Color get() = if (ThemeState.isLight) LightBgDeepRaw else DarkBgDeepRaw
-val DarkSurface: Color get() = if (ThemeState.isLight) LightSurfaceRaw else DarkSurfaceRaw
-val DarkCard: Color get() = if (ThemeState.isLight) LightCardRaw else DarkCardRaw
-val DarkCardElevated: Color get() = if (ThemeState.isLight) LightCardElevatedRaw else DarkCardElevatedRaw
-val DarkBorder: Color get() = if (ThemeState.isLight) LightBorderRaw else DarkBorderRaw
-val TextPrimary: Color get() = if (ThemeState.isLight) LightTextPrimaryRaw else DarkTextPrimaryRaw
-val TextSecondary: Color get() = if (ThemeState.isLight) LightTextSecondaryRaw else DarkTextSecondaryRaw
-val TextMuted: Color get() = if (ThemeState.isLight) LightTextMutedRaw else DarkTextMutedRaw
+// ==== DARK-ONLY PALETTE ====
+val DarkBackground: Color get() = DarkBgRaw
+val DarkBackgroundDeep: Color get() = DarkBgDeepRaw
+val DarkSurface: Color get() = DarkSurfaceRaw
+val DarkCard: Color get() = DarkCardRaw
+val DarkCardElevated: Color get() = DarkCardElevatedRaw
+val DarkBorder: Color get() = DarkBorderRaw
+val TextPrimary: Color get() = DarkTextPrimaryRaw
+val TextSecondary: Color get() = DarkTextSecondaryRaw
+val TextMuted: Color get() = DarkTextMutedRaw
 
 // ==== STATIC BRAND (same in both themes) ====
 val PrimaryBlue = Color(0xFF3B82F6)
