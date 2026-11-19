@@ -30,10 +30,13 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > "${{ github.workspace }}/release-keystore.p12"
-            ls -lh "${{ github.workspace }}/release-keystore.p12"
+            echo "$KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > "${{ github.workspace }}/raw.p12"
+            openssl pkcs12 -in "${{ github.workspace }}/raw.p12" -passin env:KEYSTORE_PASSWORD -nodes -out "${{ github.workspace }}/tmp.pem"
+            openssl pkcs12 -export -in "${{ github.workspace }}/tmp.pem" -out "${{ github.workspace }}/release-keystore.p12" -name "$KEY_ALIAS" -passout env:KEYSTORE_PASSWORD -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+            rm -f "${{ github.workspace }}/raw.p12" "${{ github.workspace }}/tmp.pem"
             keytool -list -storetype PKCS12 -keystore "${{ github.workspace }}/release-keystore.p12" -storepass "$KEYSTORE_PASSWORD"
           fi
 
