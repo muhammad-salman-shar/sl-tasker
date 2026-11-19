@@ -7,6 +7,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -107,8 +110,9 @@ fun HomeScreen(
             )
         }
 
+        val isProUser by com.neurasamu.build.sl_tasker.security.LicenseManager.isProFlow.collectAsState()
         val incompleteQuests = dailyQuests.filter { !it.completed }
-        if (incompleteQuests.isNotEmpty()) {
+        if (isProUser && incompleteQuests.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
             DailyQuestSection(
                 quests = incompleteQuests,
@@ -178,6 +182,8 @@ private fun StatCircle(
 ) {
     val transition = rememberInfiniteTransition(label = "circleAnim")
     val isLite = com.neurasamu.build.sl_tasker.ui.theme.ThemeState.isLiteMode
+    val isPro by com.neurasamu.build.sl_tasker.security.LicenseManager.isProFlow.collectAsState()
+    val proAnim = isPro && !isLite
     val pulse by transition.animateFloat(
         initialValue = if (isLite) 1f else 0.94f,
         targetValue = if (isLite) 1f else 1.06f,
@@ -189,9 +195,9 @@ private fun StatCircle(
     )
     val rotation by transition.animateFloat(
         initialValue = 0f,
-        targetValue = if (isLite) 0f else 360f,
+        targetValue = if (proAnim) 360f else 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(8000, easing = LinearEasing),
+            animation = tween(2600, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "rot"
@@ -257,29 +263,44 @@ private fun StatCircle(
             )
         }
 
-        // Rotating outer arc accent
-        Canvas(modifier = Modifier.size(146.dp)) {
-            val stroke = 2.dp.toPx()
-            val inset = stroke / 2f + 6.dp.toPx()
-            val arcSize = Size(size.width - stroke - 12.dp.toPx(), size.height - stroke - 12.dp.toPx())
-            drawArc(
-                color = primaryColor.copy(alpha = 0.5f),
-                startAngle = rotation,
-                sweepAngle = 70f,
-                useCenter = false,
-                style = Stroke(width = stroke, cap = StrokeCap.Round),
-                topLeft = Offset(inset, inset),
-                size = arcSize
-            )
-            drawArc(
-                color = primaryColor.copy(alpha = 0.5f),
-                startAngle = rotation + 180f,
-                sweepAngle = 40f,
-                useCenter = false,
-                style = Stroke(width = stroke, cap = StrokeCap.Round),
-                topLeft = Offset(inset, inset),
-                size = arcSize
-            )
+        // PRO-only rotating orbiting light beam around both circles
+        if (proAnim) {
+            Canvas(modifier = Modifier.size(146.dp)) {
+                val stroke = 3.dp.toPx()
+                val inset = stroke / 2f + 5.dp.toPx()
+                val arcSize = Size(size.width - stroke - 10.dp.toPx(), size.height - stroke - 10.dp.toPx())
+                val lightBrush = Brush.sweepGradient(
+                    0.0f to Color.Transparent,
+                    0.55f to Color.Transparent,
+                    0.82f to primaryColor.copy(alpha = 0.55f),
+                    0.95f to primaryColor,
+                    1.0f to Color.White
+                )
+                rotate(degrees = rotation) {
+                    drawArc(
+                        brush = lightBrush,
+                        startAngle = 0f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        style = Stroke(width = stroke, cap = StrokeCap.Round),
+                        topLeft = Offset(inset, inset),
+                        size = arcSize
+                    )
+                    val radius = arcSize.width / 2f
+                    val tipX = size.width / 2f + radius
+                    val tipY = size.height / 2f
+                    drawCircle(
+                        color = primaryColor.copy(alpha = 0.45f),
+                        radius = stroke * 2.2f,
+                        center = Offset(tipX, tipY)
+                    )
+                    drawCircle(
+                        color = Color.White,
+                        radius = stroke * 0.9f,
+                        center = Offset(tipX, tipY)
+                    )
+                }
+            }
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

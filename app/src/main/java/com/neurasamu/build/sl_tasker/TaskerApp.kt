@@ -17,6 +17,7 @@ class TaskerApp : Application() {
         super.onCreate()
         com.neurasamu.build.sl_tasker.util.SoundFx.setup()
         com.neurasamu.build.sl_tasker.security.LicenseManager.init(this)
+        com.neurasamu.build.sl_tasker.util.HpAlertNotifier.init(this)
         createNotificationChannels()
         scheduleOverdueWorker()
         scheduleCleanupWorker()

@@ -248,6 +248,11 @@ class TaskRepository(private val database: AppDatabase) {
                 difficulty = task.difficulty
             )
             playerStatsDao.insertOrUpdate(penaltyResult.updatedStats)
+            com.neurasamu.build.sl_tasker.util.HpAlertNotifier.notifyHpDrop(
+                currentStats.health,
+                penaltyResult.updatedStats.health,
+                "Missed Quest: ${task.title}"
+            )
 
             eventDao.insertEvent(
                 EventEntity(
@@ -320,12 +325,18 @@ class TaskRepository(private val database: AppDatabase) {
                     // NO_TIME tasks: apply one-time penalty (no per-minute has run)
                     if (task.scheduleMode == ScheduleMode.NO_TIME) {
                         try {
+                            val oldHp = stats.health
                             val penaltyResult = PenaltyEngine.processMissedTask(
                                 currentStats = stats,
                                 priority = task.priority,
                                 difficulty = task.difficulty
                             )
                             stats = penaltyResult.updatedStats
+                            com.neurasamu.build.sl_tasker.util.HpAlertNotifier.notifyHpDrop(
+                                oldHp,
+                                stats.health,
+                                "Missed: ${task.title}"
+                            )
                         } catch (_: Throwable) {}
                     }
                     // Mark occurrence MISSED (TIME tasks: per-minute already drained; no extra)
@@ -361,10 +372,16 @@ class TaskRepository(private val database: AppDatabase) {
                         continue
                     }
                     
+                    val oldHp = stats.health
                     val newHealth = (stats.health - damage).coerceAtLeast(com.neurasamu.build.sl_tasker.domain.engine.PenaltyEngine.MIN_HEALTH)
                     stats = stats.copy(
                         health = newHealth,
                         recoveryModeActive = newHealth < 50 || stats.recoveryModeActive
+                    )
+                    com.neurasamu.build.sl_tasker.util.HpAlertNotifier.notifyHpDrop(
+                        oldHp,
+                        newHealth,
+                        "Overdue: ${task.title}"
                     )
                     occurrenceDao.updateOccurrence(
                         occ.copy(
@@ -393,12 +410,18 @@ class TaskRepository(private val database: AppDatabase) {
     suspend fun dropHealth(amount: Int): Int = withContext(Dispatchers.IO) {
         database.withTransaction {
             val stats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
+            val oldHp = stats.health
             val newHp = (stats.health - amount).coerceAtLeast(0)
             playerStatsDao.insertOrUpdate(
                 stats.copy(
                     health = newHp,
                     recoveryModeActive = newHp < 50 || stats.recoveryModeActive
                 )
+            )
+            com.neurasamu.build.sl_tasker.util.HpAlertNotifier.notifyHpDrop(
+                oldHp,
+                newHp,
+                "Penalty HP Drain"
             )
             newHp
         }

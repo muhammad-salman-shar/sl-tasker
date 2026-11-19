@@ -404,7 +404,15 @@ fun MainAppScaffold(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .clickable { showAiSheet = true },
+                            .clickable {
+                                if (com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()) {
+                                    showAiSheet = true
+                                } else {
+                                    com.neurasamu.build.sl_tasker.security.PaywallTrigger.show(
+                                        "AI Hub is a PRO feature. Upgrade to unlock your personal AI Hunter Assistant."
+                                    )
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         AiHubLogo(size = 34.dp)
