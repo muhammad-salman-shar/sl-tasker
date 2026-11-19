@@ -24,6 +24,7 @@ android {
             val ksPath = System.getenv("KEYSTORE_FILE")
             if (!ksPath.isNullOrBlank()) {
                 storeFile = file(ksPath)
+                storeType = "PKCS12"
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")

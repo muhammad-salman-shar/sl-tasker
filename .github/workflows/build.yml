@@ -26,12 +26,15 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Decode Release Keystore
+      - name: Decode and Verify Release Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > "${{ github.workspace }}/release-keystore.p12"
+            ls -lh "${{ github.workspace }}/release-keystore.p12"
+            keytool -list -storetype PKCS12 -keystore "${{ github.workspace }}/release-keystore.p12" -storepass "$KEYSTORE_PASSWORD"
           fi
 
       - name: Build Signed Release APK
