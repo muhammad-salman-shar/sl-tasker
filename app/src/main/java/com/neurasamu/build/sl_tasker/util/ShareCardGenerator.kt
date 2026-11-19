@@ -182,11 +182,19 @@ object ShareCardGenerator {
         // Name
         val name = profile?.name?.uppercase() ?: "PLAYER"
         val namePaint = Paint().apply {
-            color = Color.WHITE
             textSize = 64f
             typeface = black
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
+            if (com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()) {
+                shader = LinearGradient(
+                    0f, 0f, w.toFloat(), 0f,
+                    intArrayOf(0xFFFFD700.toInt(), 0xFFFFA500.toInt()),
+                    null, Shader.TileMode.CLAMP
+                )
+            } else {
+                color = Color.WHITE
+            }
         }
         c.drawText(name, w / 2f, 680f, namePaint)
 

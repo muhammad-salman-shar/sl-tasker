@@ -48,6 +48,8 @@ import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
+import com.neurasamu.build.sl_tasker.security.LicenseManager
+import com.neurasamu.build.sl_tasker.security.PaywallTrigger
 import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
 import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
 import android.content.Intent
@@ -86,7 +88,13 @@ fun DashboardScreen(
                         )
                     )
                     .border(1.dp, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f), CircleShape)
-                    .clickable { showCreateDialog = true },
+                    .clickable {
+                        if (!LicenseManager.isPro() && activeQuests.size >= 2) {
+                            PaywallTrigger.show("Free tier allows up to 2 active tasks. Upgrade to Pro for unlimited tasks.")
+                        } else {
+                            showCreateDialog = true
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.material3.Text(
@@ -300,6 +308,29 @@ fun DashboardScreen(
             existingTypes = taskTypes,
             onDeleteType = { taskViewModel.removeTaskType(it) },
             onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays ->
+                var blocked = false
+                if (!LicenseManager.isPro()) {
+                    when (difficulty) {
+                        com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> {
+                            if (LicenseManager.hasUsedHardTrial(ctx)) {
+                                PaywallTrigger.show("Your free Hard task trial is used. Upgrade to Pro for unlimited.")
+                                blocked = true
+                            } else {
+                                LicenseManager.markHardTrialUsed(ctx)
+                            }
+                        }
+                        com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> {
+                            if (LicenseManager.hasUsedCriticalTrial(ctx)) {
+                                PaywallTrigger.show("Your free Critical task trial is used. Upgrade to Pro for unlimited.")
+                                blocked = true
+                            } else {
+                                LicenseManager.markCriticalTrialUsed(ctx)
+                            }
+                        }
+                        else -> {}
+                    }
+                }
+                if (blocked) return@CreateQuestDialog
                 taskViewModel.createQuest(
                     title = title,
                     description = "",

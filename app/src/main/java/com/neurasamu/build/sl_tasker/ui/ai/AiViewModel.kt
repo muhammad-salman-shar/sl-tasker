@@ -96,6 +96,10 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun send(userText: String) {
+        if (!com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()) {
+            com.neurasamu.build.sl_tasker.security.PaywallTrigger.show("AI Hub is a Pro feature. Upgrade to unlock AI-powered tasks, alarms, and stats.")
+            return
+        }
         val trimmed = userText.trim()
         if (trimmed.isEmpty() || _busy.value) return
 

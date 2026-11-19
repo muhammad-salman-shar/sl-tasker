@@ -270,7 +270,7 @@ private fun IdentityCard(profile: PlayerProfile, onShare: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
-                IdentityField("NAME", profile.name.uppercase())
+                IdentityField("NAME", profile.name.uppercase(), gold = com.neurasamu.build.sl_tasker.security.LicenseManager.isPro())
                 Spacer(Modifier.height(10.dp))
                 IdentityField("GENDER", genderStr)
             }
@@ -284,12 +284,16 @@ private fun IdentityCard(profile: PlayerProfile, onShare: () -> Unit) {
 }
 
 @Composable
-private fun IdentityField(label: String, value: String, cyan: Boolean = false) {
+private fun IdentityField(label: String, value: String, cyan: Boolean = false, gold: Boolean = false) {
     Column {
         Text(label, color = TextMuted, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
         Text(
             value.ifBlank { "—" },
-            color = if (cyan) CyberCyan else TextPrimary,
+            color = when {
+                gold -> Color(0xFFFFD700)
+                cyan -> CyberCyan
+                else -> TextPrimary
+            },
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.SansSerif

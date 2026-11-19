@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.data.block.BlockMode
 import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
+import com.neurasamu.build.sl_tasker.security.LicenseManager
+import com.neurasamu.build.sl_tasker.security.PaywallTrigger
 import com.neurasamu.build.sl_tasker.data.block.PROTECTED_PACKAGES
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
@@ -363,7 +365,11 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                                 if (allSelected) {
                                     prefs.setSelected(emptySet())
                                 } else {
-                                    prefs.setSelected(selectablePkgs)
+                                    if (!LicenseManager.isPro()) {
+                                        PaywallTrigger.show("Blocking all apps requires Pro. Free tier allows 1 app.")
+                                    } else {
+                                        prefs.setSelected(selectablePkgs)
+                                    }
                                 }
                             }
                         }
@@ -434,7 +440,11 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                             checked = isChecked,
                             enabled = !isSelf,
                             onCheckedChange = { on ->
-                                if (!isSelf) scope.launch { prefs.togglePackage(row.pkg, on) }
+                                if (on && !isSelf && !LicenseManager.isPro() && s.selectedPackages.size >= 1) {
+                                    PaywallTrigger.show("Free users can only block 1 app. Upgrade to Pro for unlimited blocking.")
+                                } else {
+                                    if (!isSelf) scope.launch { prefs.togglePackage(row.pkg, on) }
+                                }
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = DarkCard,

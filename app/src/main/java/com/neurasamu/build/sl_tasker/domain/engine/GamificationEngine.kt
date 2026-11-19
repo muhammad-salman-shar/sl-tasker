@@ -20,7 +20,8 @@ object GamificationEngine {
     fun processQuestCompletion(
         currentStats: PlayerStatsEntity,
         difficulty: Difficulty,
-        streakBonusActive: Boolean = false
+        streakBonusActive: Boolean = false,
+        isPro: Boolean = true
     ): GamificationResult {
         val baseEp = when (difficulty) {
             Difficulty.MEDIUM -> 10
@@ -32,9 +33,13 @@ object GamificationEngine {
 
         val rawEp = currentStats.ep + totalEpGained
         val levelsGained = rawEp / EP_PER_LEVEL
-        val newEp = rawEp % EP_PER_LEVEL
-        val newLevel = currentStats.level + levelsGained
-        val leveledUp = levelsGained > 0
+        val rawLevel = currentStats.level + levelsGained
+
+        // FREE TIER: cap at Level 2. Free user cannot pass Level 2.
+        val isCapped = !isPro && rawLevel > 2
+        val newLevel = if (isCapped) 2 else rawLevel
+        val newEp = if (isCapped) EP_PER_LEVEL else rawEp % EP_PER_LEVEL
+        val leveledUp = levelsGained > 0 && !isCapped
 
         val healthRestored = when (difficulty) {
             Difficulty.MEDIUM -> 10

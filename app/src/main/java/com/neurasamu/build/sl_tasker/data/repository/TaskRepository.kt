@@ -83,7 +83,8 @@ class TaskRepository(private val database: AppDatabase) {
             val gameResult = GamificationEngine.processQuestCompletion(
                 currentStats = streakUpdated,
                 difficulty = task.difficulty,
-                streakBonusActive = true
+                streakBonusActive = true,
+                isPro = com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()
             )
 
             // Milestone bonus EP (goes into epModulo within level)

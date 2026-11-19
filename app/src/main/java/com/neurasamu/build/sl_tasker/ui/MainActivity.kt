@@ -91,6 +91,8 @@ import com.neurasamu.build.sl_tasker.util.SoundFx
 import kotlinx.coroutines.flow.collectLatest
 import com.neurasamu.build.sl_tasker.util.SystemEvents
 import com.neurasamu.build.sl_tasker.ui.viewmodel.DailyQuestViewModel
+import com.neurasamu.build.sl_tasker.security.PaywallTrigger
+import com.neurasamu.build.sl_tasker.ui.paywall.PaywallScreen
 
 class MainActivity : ComponentActivity() {
     private var lastReminderRescheduleAt = 0L
@@ -454,6 +456,15 @@ fun MainAppScaffold(
 
     if (showSettings) {
         PlayerSettingsScreen(onClose = { showSettings = false })
+    }
+
+    val paywallReason by PaywallTrigger.reason.collectAsState()
+    paywallReason?.let { reason ->
+        PaywallScreen(
+            reason = reason,
+            onClose = { PaywallTrigger.dismiss() },
+            onUnlocked = { PaywallTrigger.dismiss() }
+        )
     }
 
     levelUpShown?.let { lvl ->

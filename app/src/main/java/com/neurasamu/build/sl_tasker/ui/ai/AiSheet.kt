@@ -47,6 +47,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.neurasamu.build.sl_tasker.security.LicenseManager
+import com.neurasamu.build.sl_tasker.security.PaywallTrigger
 import com.neurasamu.build.sl_tasker.ui.components.AiHubLogo
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
@@ -104,7 +106,24 @@ fun AiSheet(
             AiHubLogo(size = 30.dp)
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("AI HUB", color = PrimaryManaBlue, fontSize = 13.sp, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("AI HUB", color = PrimaryManaBlue, fontSize = 13.sp, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
+                    Spacer(Modifier.width(6.dp))
+                    val isPro = androidx.compose.runtime.remember { LicenseManager.isPro(ctx) }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (isPro) androidx.compose.ui.graphics.Color(0xFFFBBF24) else androidx.compose.ui.graphics.Color(0xFFEF4444))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            if (isPro) "PRO" else "FREE",
+                            color = androidx.compose.ui.graphics.Color.Black,
+                            fontSize = 9.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
+                    }
+                }
                 Text(
                     if (config.isConfigured) config.model else "Not configured",
                     color = TextMuted,

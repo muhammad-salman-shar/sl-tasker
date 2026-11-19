@@ -16,6 +16,7 @@ class TaskerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         com.neurasamu.build.sl_tasker.util.SoundFx.setup()
+        com.neurasamu.build.sl_tasker.security.LicenseManager.init(this)
         createNotificationChannels()
         scheduleOverdueWorker()
         scheduleCleanupWorker()
