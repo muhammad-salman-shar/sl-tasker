@@ -134,7 +134,7 @@ fun PaywallScreen(
                 clipboard.setText(AnnotatedString(deviceToken))
                 val msg = "Hi! I want to buy SL Tasker PRO (Monthly Rs. 199). My Device ID: $deviceToken"
                 val intent = Intent(Intent.ACTION_VIEW).apply {
-                    data = Uri.parse("https://wa.me/923000000000?text=" + Uri.encode(msg))
+                    data = Uri.parse("https://wa.me/923272488207?text=" + Uri.encode(msg))
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 try { ctx.startActivity(intent) } catch (_: Throwable) {}
@@ -160,7 +160,7 @@ fun PaywallScreen(
                 clipboard.setText(AnnotatedString(deviceToken))
                 val msg = "Hi! I want to buy SL Tasker LIFETIME (Rs. 1,499). My Device ID: $deviceToken"
                 val intent = Intent(Intent.ACTION_VIEW).apply {
-                    data = Uri.parse("https://wa.me/923000000000?text=" + Uri.encode(msg))
+                    data = Uri.parse("https://wa.me/923272488207?text=" + Uri.encode(msg))
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 try { ctx.startActivity(intent) } catch (_: Throwable) {}
@@ -244,7 +244,7 @@ fun PaywallScreen(
         Spacer(Modifier.height(20.dp))
 
         Text(
-            "Payment via EasyPaisa / JazzCash / Raast. Activation code is bound to this device.",
+            "Payment via EasyPaisa / JazzCash / SadaPay / Raast. Activation code is bound to this device.",
             color = TextMuted,
             fontSize = 10.sp,
             modifier = Modifier.padding(horizontal = 8.dp)
