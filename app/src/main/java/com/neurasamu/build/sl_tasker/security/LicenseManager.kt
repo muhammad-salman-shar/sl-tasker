@@ -25,7 +25,9 @@ object LicenseManager {
     private const val KEY_TRIAL_HARD = "enc_trial_hard"
     private const val KEY_TRIAL_CRITICAL = "enc_trial_critical"
 
-    // In-memory cache to avoid Keystore roundtrips on every UI frame
+    // In-memory cache + reactive flow for instant UI badge updates
+    private val _isProFlow = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isProFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isProFlow
     @Volatile private var cachedPro: Boolean? = null
     @Volatile private var cachedTrialHard: Boolean? = null
     @Volatile private var cachedTrialCritical: Boolean? = null
@@ -35,6 +37,8 @@ object LicenseManager {
         appContext = ctx
         if (AntiTamper.isTampered(ctx)) {
             setPro(ctx, false)
+        } else {
+            _isProFlow.value = isPro(ctx)
         }
     }
 
@@ -78,16 +82,19 @@ object LicenseManager {
         if (AntiTamper.isTampered(context)) {
             if (cachedPro == true) setPro(context, false)
             cachedPro = false
+            _isProFlow.value = false
             return false
         }
         cachedPro?.let { return it }
         val v = decryptValue(context, KEY_PRO) == "1"
         cachedPro = v
+        _isProFlow.value = v
         return v
     }
 
     fun setPro(context: Context, value: Boolean) {
         cachedPro = value
+        _isProFlow.value = value
         encryptValue(context, KEY_PRO, if (value) "1" else "0")
     }
 
