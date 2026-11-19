@@ -69,7 +69,7 @@ fun PaywallScreen(
     var activationInput by remember { mutableStateOf("") }
     var activationError by remember { mutableStateOf<String?>(null) }
 
-    val deviceToken = remember { LicenseManager.generateActivationToken(ctx) }
+    val deviceToken = remember { LicenseManager.getDeviceId(ctx) }
 
     Column(
         modifier = Modifier
