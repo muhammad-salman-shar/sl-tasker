@@ -1,4 +1,4 @@
-name: Build Solo Leveling Tasker APK
+name: Build Solo Leveling Tasker Signed APK
 
 on:
   push:
@@ -26,8 +26,23 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Build Debug APK
+      - name: Decode Release Keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          echo "$KEYSTORE_BASE64" | tr -d '\n\r ' | base64 --decode > "${{ github.workspace }}/release-keystore.p12"
+
+      - name: Build Signed Release APK
+        env:
+          KEYSTORE_FILE: ${{ github.workspace }}/release-keystore.p12
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ ! -f "$KEYSTORE_FILE" ]; then
+            unset KEYSTORE_FILE
+          fi
           if [ -f "./gradlew" ]; then
             chmod +x ./gradlew
             ./gradlew assembleRelease --stacktrace
@@ -35,9 +50,9 @@ jobs:
             gradle assembleRelease --stacktrace
           fi
 
-      - name: Upload Debug APK Artifact
+      - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: sl-tasker-debug-apk
+          name: sl-tasker-release-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
