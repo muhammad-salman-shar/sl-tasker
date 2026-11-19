@@ -30,6 +30,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Share
+import kotlinx.coroutines.launch
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -88,7 +100,10 @@ fun StatsScreen(
     val events by statsViewModel.recentEvents.collectAsStateWithLifecycle()
 
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<PlayerProfile?>(null) }
+    var showEditProfile by remember { mutableStateOf(false) }
+    var showRankHall by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         try {
             PlayerProfileStore(ctx).profile.collect { p -> profile = p }
@@ -136,6 +151,7 @@ fun StatsScreen(
                     item {
                         IdentityCard(
                             profile = p,
+                            onEdit = { showEditProfile = true },
                             onShare = {
                                 try { ShareCardGenerator.share(ctx, stats, p) } catch (_: Throwable) {}
                             }
@@ -167,7 +183,8 @@ fun StatsScreen(
             item {
                 RankCard(
                     level = stats.level,
-                    streak = stats.streak
+                    streak = stats.streak,
+                    onClick = { showRankHall = true }
                 )
             }
 
@@ -236,48 +253,285 @@ fun StatsScreen(
                 }
             }
         }
+        if (showRankHall) {
+            RankShowcaseDialog(
+                currentLevel = stats.level,
+                onDismiss = { showRankHall = false }
+            )
+        }
+
+        val currentProfile = profile
+        if (showEditProfile && currentProfile != null) {
+            EditProfileDialog(
+                profile = currentProfile,
+                onDismiss = { showEditProfile = false },
+                onSave = { name, gender, age, playerId ->
+                    scope.launch {
+                        try {
+                            PlayerProfileStore(ctx).save(name, gender, age, playerId)
+                        } catch (_: Throwable) {}
+                        showEditProfile = false
+                    }
+                }
+            )
+        }
     }
 }
 
 @Composable
-private fun IdentityCard(profile: PlayerProfile, onShare: () -> Unit) {
+private fun EditProfileDialog(
+    profile: PlayerProfile,
+    onDismiss: () -> Unit,
+    onSave: (String, String, Int, String) -> Unit
+) {
+    var name by remember { mutableStateOf(profile.name) }
+    var playerId by remember { mutableStateOf(profile.playerId) }
+    var gender by remember { mutableStateOf(profile.gender.ifBlank { "Male" }) }
+    var ageText by remember { mutableStateOf(profile.age.toString()) }
+
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = Color(0xFFFFD700),
+        unfocusedBorderColor = CyberCyan.copy(alpha = 0.35f),
+        focusedTextColor = Color.White,
+        unfocusedTextColor = Color.White,
+        focusedLabelColor = Color(0xFFFFD700),
+        unfocusedLabelColor = TextMuted
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF0A1226),
+        title = {
+            Text(
+                "EDIT HUNTER PROFILE",
+                color = Color(0xFFFFD700),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.5.sp
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { if (it.length <= 24) name = it },
+                    label = { Text("Hunter Name") },
+                    singleLine = true,
+                    colors = fieldColors,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = playerId,
+                    onValueChange = { if (it.length <= 20) playerId = it },
+                    label = { Text("Player ID") },
+                    singleLine = true,
+                    colors = fieldColors,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = ageText,
+                    onValueChange = { ageText = it.filter { ch -> ch.isDigit() }.take(2) },
+                    label = { Text("Age (12-90)") },
+                    singleLine = true,
+                    colors = fieldColors,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Male", "Female", "Other").forEach { g ->
+                        val sel = gender.equals(g, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (sel) CyberCyan.copy(alpha = 0.22f) else DarkCard)
+                                .border(
+                                    1.dp,
+                                    if (sel) CyberCyan else Color(0xFF1E2A45),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { gender = g }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                g.uppercase(),
+                                color = if (sel) CyberCyan else TextMuted,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val safeName = name.trim().ifBlank { profile.name.ifBlank { "HUNTER" } }
+                    val safeId = playerId.trim().ifBlank { profile.playerId.ifBlank { safeName } }
+                    val safeAge = ageText.toIntOrNull()?.coerceIn(12, 90) ?: profile.age
+                    onSave(safeName, gender, safeAge, safeId)
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFFD700),
+                    contentColor = Color(0xFF0A0D14)
+                )
+            ) {
+                Text("SAVE", fontWeight = FontWeight.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL", color = TextMuted)
+            }
+        }
+    )
+}
+
+@Composable
+private fun IdentityCard(profile: PlayerProfile, onEdit: () -> Unit, onShare: () -> Unit) {
+    val isPro by com.neurasamu.build.sl_tasker.security.LicenseManager.isProFlow.collectAsState()
     val genderStr = when (profile.gender.lowercase()) {
         "male" -> "MALE"
         "female" -> "FEMALE"
         else -> profile.gender.uppercase()
     }
+    val goldBorder = Brush.linearGradient(
+        listOf(Color(0xFFFFF5B8), Color(0xFFFFD700), Color(0xFFB8860B), Color(0xFFFFD700))
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(DarkCard.copy(alpha = 0.7f))
-            .border(1.dp, CyberCyan.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .background(DarkCard.copy(alpha = 0.78f))
+            .border(
+                width = if (isPro) 1.3.dp else 1.dp,
+                brush = if (isPro) goldBorder else Brush.linearGradient(
+                    listOf(CyberCyan.copy(alpha = 0.25f), CyberCyan.copy(alpha = 0.12f))
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "PLAYER IDENTITY",
-                color = CyberCyan,
+                color = if (isPro) Color(0xFFFFD700) else CyberCyan,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onShare, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Rounded.Share, contentDescription = "Share", tint = CyberCyan, modifier = Modifier.size(18.dp))
+            IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Rounded.Edit,
+                    contentDescription = "Edit Profile",
+                    tint = Color(0xFFFFD700),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+            IconButton(onClick = onShare, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Rounded.Share,
+                    contentDescription = "Share",
+                    tint = CyberCyan,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
         Spacer(Modifier.height(12.dp))
+
+        // Premium Gold & Black Luxury Nameplate
+        LuxuryNameplate(
+            name = profile.name.uppercase().ifBlank { "HUNTER" },
+            isPro = isPro
+        )
+
+        Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
-                IdentityField("NAME", profile.name.uppercase(), gold = com.neurasamu.build.sl_tasker.security.LicenseManager.isPro())
-                Spacer(Modifier.height(10.dp))
-                IdentityField("GENDER", genderStr)
+                IdentityField("PLAYER ID", profile.playerId, cyan = true)
             }
             Column(modifier = Modifier.weight(1f)) {
-                IdentityField("PLAYER ID", profile.playerId, cyan = true)
-                Spacer(Modifier.height(10.dp))
+                IdentityField("GENDER", genderStr)
+            }
+            Column(modifier = Modifier.weight(0.6f)) {
                 IdentityField("AGE", profile.age.toString())
+            }
+        }
+    }
+}
+
+@Composable
+private fun LuxuryNameplate(name: String, isPro: Boolean) {
+    val goldBorder = Brush.linearGradient(
+        listOf(Color(0xFFFFF7CC), Color(0xFFFFD700), Color(0xFFB8860B), Color(0xFFFFE57F))
+    )
+    val goldText = Brush.linearGradient(
+        listOf(Color(0xFFFFFAD1), Color(0xFFFFD700), Color(0xFFFFA500))
+    )
+    val obsidianBg = Brush.horizontalGradient(
+        listOf(Color(0xFF040508), Color(0xFF12100A), Color(0xFF050609))
+    )
+
+    Column {
+        Text(
+            "NAME",
+            color = Color(0xFFD4AF37),
+            fontSize = 10.sp,
+            letterSpacing = 1.6.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(5.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(obsidianBg)
+                .border(1.4.dp, goldBorder, RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(22.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(goldBorder)
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = name,
+                style = TextStyle(
+                    brush = goldText,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.SansSerif,
+                    letterSpacing = 1.6.sp
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFFFFD700), Color(0xFFD97706))
+                        )
+                    )
+                    .padding(horizontal = 7.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = if (isPro) "PRO HUNTER" else "HUNTER",
+                    color = Color(0xFF06070A),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.8.sp
+                )
             }
         }
     }
@@ -302,81 +556,76 @@ private fun IdentityField(label: String, value: String, cyan: Boolean = false, g
 }
 
 @Composable
-private fun RankCard(level: Int, streak: Int) {
-    val rank = when {
-        level >= 20 -> "S"
-        level >= 15 -> "A"
-        level >= 10 -> "B"
-        level >= 5 -> "C"
-        level >= 3 -> "D"
-        else -> "E"
-    }
-
-    val transition = rememberInfiniteTransition(label = "rankPulse")
-    val pulse by transition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.9f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
+private fun RankCard(level: Int, streak: Int, onClick: () -> Unit) {
+    val tier = HunterRankSystem.forLevel(level)
+    val cardBorder = Brush.linearGradient(
+        listOf(tier.accent, tier.primary, tier.secondary)
     )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.horizontalGradient(
-                    listOf(CyberCyan.copy(alpha = 0.08f), Color.Transparent)
+                    listOf(
+                        tier.primary.copy(alpha = if (tier.isPremiumFrame) 0.22f else 0.10f),
+                        tier.frameBg.copy(alpha = 0.9f),
+                        DarkCard.copy(alpha = 0.75f)
+                    )
                 )
             )
-            .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-            .padding(16.dp),
+            .border(
+                width = if (tier.isPremiumFrame) 1.5.dp else 1.dp,
+                brush = cardBorder,
+                shape = RoundedCornerShape(18.dp)
+            )
+            .clickable { onClick() }
+            .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Rank badge with dashed border
-        Box(
-            modifier = Modifier.size(64.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Canvas(modifier = Modifier.size(64.dp)) {
-                drawCircle(
-                    color = CyberCyan.copy(alpha = 0.25f * (pulse + 0.2f)),
-                    radius = size.minDimension / 2f
-                )
-                drawCircle(
-                    color = CyberCyan,
-                    radius = size.minDimension / 2f - 2.dp.toPx(),
-                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                )
-            }
-            Text(
-                rank,
-                color = CyberCyan,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.SansSerif
-            )
-        }
+        HunterRankBadge(tier = tier, size = 72.dp, animate = true)
 
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(14.dp))
 
         Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "LEVEL $level",
+                    color = Color.White,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.SansSerif
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(tier.primary.copy(alpha = 0.25f))
+                        .border(0.8.dp, tier.accent, RoundedCornerShape(5.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        tier.code,
+                        color = tier.accent,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
+            Spacer(Modifier.height(2.dp))
             Text(
-                "LEVEL $level",
-                color = if (ThemeState.isLight) Color(0xFF0B1220) else Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.SansSerif
-            )
-            Text(
-                "RANK $rank HUNTER",
-                color = if (ThemeState.isLight) Color(0xFF2563EB) else CyberCyan,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
+                tier.title,
+                color = tier.accent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.sp
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                "Tap to view all 10 Hunter Ranks ›",
+                color = TextMuted,
+                fontSize = 10.sp
             )
         }
 
