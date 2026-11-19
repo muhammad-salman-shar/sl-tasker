@@ -31,7 +31,11 @@ object LicenseManager {
     @Volatile private var cachedTrialCritical: Boolean? = null
 
     fun init(context: Context) {
-        appContext = context.applicationContext
+        val ctx = context.applicationContext
+        appContext = ctx
+        if (AntiTamper.isTampered(ctx)) {
+            setPro(ctx, false)
+        }
     }
 
     /** Convenience — uses static context. Safe fallback: returns false if not init'd. */
@@ -57,6 +61,10 @@ object LicenseManager {
     }
 
     fun verifyActivationCode(context: Context, userInput: String): Boolean {
+        if (AntiTamper.isTampered(context)) {
+            setPro(context, false)
+            return false
+        }
         val expected = generateActivationToken(context)
         if (userInput.trim().uppercase() == expected) {
             setPro(context, true)
@@ -67,6 +75,11 @@ object LicenseManager {
 
     // ----- Pro Status -----
     fun isPro(context: Context): Boolean {
+        if (AntiTamper.isTampered(context)) {
+            if (cachedPro == true) setPro(context, false)
+            cachedPro = false
+            return false
+        }
         cachedPro?.let { return it }
         val v = decryptValue(context, KEY_PRO) == "1"
         cachedPro = v
