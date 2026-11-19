@@ -429,7 +429,7 @@ private fun IdentityCard(profile: PlayerProfile, onEdit: () -> Unit, onShare: ()
                 Icon(
                     Icons.Rounded.Edit,
                     contentDescription = "Edit Profile",
-                    tint = Color(0xFFFFD700),
+                    tint = if (isPro) Color(0xFFFFD700) else CyberCyan,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -445,11 +445,14 @@ private fun IdentityCard(profile: PlayerProfile, onEdit: () -> Unit, onShare: ()
         }
         Spacer(Modifier.height(12.dp))
 
-        // Premium Gold & Black Luxury Nameplate
-        LuxuryNameplate(
-            name = profile.name.uppercase().ifBlank { "HUNTER" },
-            isPro = isPro
-        )
+        if (isPro) {
+            LuxuryNameplate(
+                name = profile.name.uppercase().ifBlank { "HUNTER" },
+                isPro = true
+            )
+        } else {
+            IdentityField("NAME", profile.name.uppercase().ifBlank { "HUNTER" })
+        }
 
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth()) {

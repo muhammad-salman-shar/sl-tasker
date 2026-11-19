@@ -197,19 +197,37 @@ fun PaywallScreen(
 
         Spacer(Modifier.height(14.dp))
 
-        // Pro benefits strip
+        // Pro benefits value stack
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
                 .background(DarkCard.copy(alpha = 0.78f))
-                .border(1.dp, AccentGold.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .border(1.dp, AccentGold.copy(alpha = 0.28f), RoundedCornerShape(14.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            BenefitRow("Unlimited active tasks, Daily Quests & Full Level progression")
-            BenefitRow("AI Hunter Hub, Live HP-Drop alerts & Orbiting Pro Circle Glow")
-            BenefitRow("Gold-Black PRO Hunter Nameplate & All 10 Rank Tiers")
+            Text(
+                "EVERYTHING YOU UNLOCK WITH PRO",
+                color = AccentGold,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.2.sp
+            )
+            Spacer(Modifier.height(2.dp))
+            BenefitRow("Unlimited active quests (removes the 2-task free limit)")
+            BenefitRow("Daily Quests unlocked for bonus EP and HP recovery")
+            BenefitRow("Unlimited Level progression (breaks the Level 2 cap)")
+            BenefitRow("Unlimited Hard and Critical difficulty quests")
+            BenefitRow("Unlimited App Blocker slots during focus sessions")
+            BenefitRow("AI Hub: Interactive Chat Mode for instant guidance")
+            BenefitRow("AI Hub: Autonomous Agent Mode for smart task planning")
+            BenefitRow("AI Hub: Connect your own API key anytime")
+            BenefitRow("AI Hub: Run offline local AI models via SaMu Lab (neurasamu.com)")
+            BenefitRow("Live HP-Drop alert notifications on every drop until 0 HP")
+            BenefitRow("Orbiting light-beam Pro animation on HP and EP circles")
+            BenefitRow("Exclusive Gold and Black PRO Hunter Nameplate")
+            BenefitRow("Full 10-Tier Hunter Rank journey from E-Rank to Eternal Legend")
         }
 
         Spacer(Modifier.height(14.dp))
