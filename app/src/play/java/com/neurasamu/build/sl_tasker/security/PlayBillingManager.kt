@@ -145,7 +145,8 @@ object PlayBillingManager {
             .setProductList(subsList)
             .build()
 
-        client.queryProductDetailsAsync(subsParams) { result, detailsList ->
+        client.queryProductDetailsAsync(subsParams) { result, detailsResult ->
+            val detailsList = detailsResult.productDetailsList
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 var monthly = _uiState.value.monthlyPrice
                 var yearly = _uiState.value.yearlyPrice
@@ -184,7 +185,8 @@ object PlayBillingManager {
             .setProductList(inAppList)
             .build()
 
-        client.queryProductDetailsAsync(inAppParams) { result, detailsList ->
+        client.queryProductDetailsAsync(inAppParams) { result, detailsResult ->
+            val detailsList = detailsResult.productDetailsList
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 var lifetime = _uiState.value.lifetimePrice
                 synchronized(productMap) {
