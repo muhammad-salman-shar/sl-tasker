@@ -52,11 +52,15 @@ object AntiTamper {
         }
         cachedTampered?.let { return it }
 
-        val compromised = isDebuggableBuild(context) ||
-            isPackageCloned(context) ||
-            isSignatureMismatch(context) ||
-            isDeviceRooted() ||
-            hasPatchingTools(context)
+        val compromised = if (com.neurasamu.build.sl_tasker.BuildConfig.IS_PLAY_BUILD) {
+            isDebuggableBuild(context) || isPackageCloned(context)
+        } else {
+            isDebuggableBuild(context) ||
+                isPackageCloned(context) ||
+                isSignatureMismatch(context) ||
+                isDeviceRooted() ||
+                hasPatchingTools(context)
+        }
 
         cachedTampered = compromised
         return compromised

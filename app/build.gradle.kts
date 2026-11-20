@@ -7,13 +7,13 @@ plugins {
 
 android {
     namespace = "com.neurasamu.build.sl_tasker"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.neurasamu.build.sl_tasker"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 2
+        targetSdk = 36
+        versionCode = 3
         versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -29,6 +29,18 @@ android {
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
             }
+        }
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("direct") {
+            dimension = "distribution"
+            buildConfigField("boolean", "IS_PLAY_BUILD", "false")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "IS_PLAY_BUILD", "true")
         }
     }
 
@@ -53,6 +65,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -78,6 +91,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    "playImplementation"(libs.google.billing.ktx)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

@@ -219,8 +219,13 @@ class MainActivity : ComponentActivity() {
     private fun ensurePermQueueInitialized() {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         if (prefs.getString(permQueueKey, null) == null) {
+            val initialQueue = if (com.neurasamu.build.sl_tasker.BuildConfig.IS_PLAY_BUILD) {
+                ""
+            } else {
+                "exact_alarm,full_screen,overlay"
+            }
             prefs.edit()
-                .putString(permQueueKey, "exact_alarm,full_screen,battery,overlay")
+                .putString(permQueueKey, initialQueue)
                 .apply()
         }
     }

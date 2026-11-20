@@ -169,10 +169,10 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                         }
                     } catch (_: Throwable) {}
                 }
+                val showAccessibilityDisclosure = remember { androidx.compose.runtime.mutableStateOf(false) }
                 PermissionRow("Battery Optimization", hasBatteryOpt) {
                     try {
-                        val i = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:${context.packageName}")
+                        val i = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         context.startActivity(i)
@@ -190,12 +190,63 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                     } catch (_: Throwable) {}
                 }
                 PermissionRow("Accessibility Service", hasAccess) {
-                    try {
-                        val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    if (hasAccess) {
+                        try {
+                            val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(i)
+                        } catch (_: Throwable) {}
+                    } else {
+                        showAccessibilityDisclosure.value = true
+                    }
+                }
+                if (showAccessibilityDisclosure.value) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showAccessibilityDisclosure.value = false },
+                        containerColor = DarkCard,
+                        title = {
+                            Text(
+                                "Accessibility Service Disclosure",
+                                color = PrimaryManaBlue,
+                                fontSize = 15.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        },
+                        text = {
+                            Text(
+                                "SL Tasker uses Android's Accessibility Service API strictly for the optional App Blocker focus feature. When enabled, it checks only the active foreground app package name to block apps you selected during low-HP penalty mode or active Critical quests.\n\nSL Tasker does NOT read screen content, messages, passwords, or personal input, and never collects or transmits any accessibility data off your device. You can disable it anytime in Android Settings.",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                lineHeight = 17.sp
+                            )
+                        },
+                        confirmButton = {
+                            androidx.compose.material3.Button(
+                                onClick = {
+                                    showAccessibilityDisclosure.value = false
+                                    try {
+                                        val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(i)
+                                    } catch (_: Throwable) {}
+                                },
+                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    containerColor = PrimaryManaBlue
+                                )
+                            ) {
+                                Text("CONTINUE TO SETTINGS", fontSize = 11.sp)
+                            }
+                        },
+                        dismissButton = {
+                            androidx.compose.material3.TextButton(
+                                onClick = { showAccessibilityDisclosure.value = false }
+                            ) {
+                                Text("NOT NOW", color = TextMuted, fontSize = 11.sp)
+                            }
                         }
-                        context.startActivity(i)
-                    } catch (_: Throwable) {}
+                    )
                 }
             }
 

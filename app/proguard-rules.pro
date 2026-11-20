@@ -28,3 +28,7 @@
 
 # Kotlin Coroutines
 -dontwarn kotlinx.coroutines.**
+
+# Google Play Billing Library
+-keep class com.android.billingclient.api.** { *; }
+-dontwarn com.android.billingclient.**

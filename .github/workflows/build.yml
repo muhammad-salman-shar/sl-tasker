@@ -1,4 +1,4 @@
-name: Build Solo Leveling Tasker Signed APK
+name: Build SL Tasker Signed APK and Play AAB
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: '8.11.1'
 
       - name: Decode and Verify Release Keystore
         env:
@@ -40,7 +40,7 @@ jobs:
             keytool -list -storetype PKCS12 -keystore "${{ github.workspace }}/release-keystore.p12" -storepass "$KEYSTORE_PASSWORD"
           fi
 
-      - name: Build Signed Release APK
+      - name: Build Direct APK, Play AAB, and Play Test APK
         env:
           KEYSTORE_FILE: ${{ github.workspace }}/release-keystore.p12
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -52,14 +52,28 @@ jobs:
           fi
           if [ -f "./gradlew" ]; then
             chmod +x ./gradlew
-            ./gradlew assembleRelease --stacktrace
+            ./gradlew assembleDirectRelease bundlePlayRelease assemblePlayRelease --stacktrace
           else
-            gradle assembleRelease --stacktrace
+            gradle assembleDirectRelease bundlePlayRelease assemblePlayRelease --stacktrace
           fi
 
-      - name: Upload Signed Release APK
+      - name: Upload Direct Release APK (WhatsApp + Key)
         uses: actions/upload-artifact@v4
         with:
-          name: sl-tasker-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          name: sl-tasker-direct-release-apk
+          path: app/build/outputs/apk/direct/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload Play Store Release AAB (Google Play Billing)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sl-tasker-play-release-aab
+          path: app/build/outputs/bundle/playRelease/*.aab
+          if-no-files-found: error
+
+      - name: Upload Play Flavor Test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sl-tasker-play-test-apk
+          path: app/build/outputs/apk/play/release/*.apk
           if-no-files-found: error
