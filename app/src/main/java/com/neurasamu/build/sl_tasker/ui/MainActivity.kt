@@ -172,7 +172,7 @@ class MainActivity : ComponentActivity() {
                     val db = com.neurasamu.build.sl_tasker.data.db.AppDatabase.getInstance(applicationContext)
                     val repo = com.neurasamu.build.sl_tasker.data.repository.TaskRepository(db)
                     val now = System.currentTimeMillis()
-                    repo.applyOverduePenalties(now)
+                    // Overdue penalties are gated by AppRuntimeState (no HP loss while in-app or timer active)
                     repo.performCleanup(now)
 
                     // Reschedule upcoming task reminders (idempotent, debounced 5 min)

@@ -299,10 +299,42 @@ class TaskRepository(private val database: AppDatabase) {
         }
     }
 
-    suspend fun applyOverduePenalties(now: Long): Boolean = withContext(Dispatchers.IO) {
+    suspend fun freezeOverdueClock(now: Long) = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            val overdue = taskDao.getPendingOverdueOccurrences(now)
+            for (occ in overdue) {
+                val task = taskDao.getTaskById(occ.taskId) ?: continue
+                if (task.scheduleMode == ScheduleMode.TIME && occ.lastPenaltyAt < now) {
+                    occurrenceDao.updateOccurrence(occ.copy(lastPenaltyAt = now))
+                }
+            }
+        }
+    }
+
+    suspend fun applyOverduePenalties(
+        now: Long,
+        allowForegroundCatchup: Boolean = false
+    ): Boolean = withContext(Dispatchers.IO) {
+        val timerActive = com.neurasamu.build.sl_tasker.util.AppRuntimeState.hasActiveTimer()
+        val inForeground = com.neurasamu.build.sl_tasker.util.AppRuntimeState.isAppInForeground
+        val protected = timerActive || (inForeground && !allowForegroundCatchup)
+
         database.withTransaction {
             val overdue = taskDao.getPendingOverdueOccurrences(now)
             if (overdue.isEmpty()) return@withTransaction false
+
+            // Rule: Never deduct HP while user is inside SL Tasker or while any task is
+            // in progress (Start clicked, even if running in the background). Freeze the
+            // overdue clock so protected time never turns into retroactive HP loss later.
+            if (protected) {
+                for (occ in overdue) {
+                    val task = taskDao.getTaskById(occ.taskId) ?: continue
+                    if (task.scheduleMode == ScheduleMode.TIME && occ.lastPenaltyAt < now) {
+                        occurrenceDao.updateOccurrence(occ.copy(lastPenaltyAt = now))
+                    }
+                }
+                return@withTransaction false
+            }
             var stats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
             var changed = false
 

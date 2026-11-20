@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -23,36 +21,32 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
 import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
+import com.neurasamu.build.sl_tasker.ui.stats.HunterRankBadge
+import com.neurasamu.build.sl_tasker.ui.stats.HunterRankSystem
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
-import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
-import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.GoldWarning
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
-import com.neurasamu.build.sl_tasker.ui.theme.RankA
-import com.neurasamu.build.sl_tasker.ui.theme.RankB
-import com.neurasamu.build.sl_tasker.ui.theme.RankC
-import com.neurasamu.build.sl_tasker.ui.theme.RankD
-import com.neurasamu.build.sl_tasker.ui.theme.RankE
-import com.neurasamu.build.sl_tasker.ui.theme.RankS
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
-import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 
 @Composable
 fun HunterHud(
     stats: PlayerStatsEntity,
     modifier: Modifier = Modifier
 ) {
-    val rankLetter = getHunterRank(stats.level)
-    val rankColor = getHunterRankColor(rankLetter)
+    val tier = HunterRankSystem.forLevel(stats.level)
 
     val healthProgress by animateFloatAsState(
         targetValue = stats.health / 100f,
@@ -67,8 +61,23 @@ fun HunterHud(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(androidx.compose.ui.graphics.Brush.verticalGradient(if (ThemeState.isLight) listOf(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.88f), androidx.compose.ui.graphics.Color.White.copy(alpha = 0.62f)) else listOf(DarkCard.copy(alpha = 0.55f), DarkCard.copy(alpha = 0.28f))))
-            .border(1.dp, if (stats.recoveryModeActive) DangerPenaltyRed else DarkBorder, RoundedCornerShape(16.dp))
+            .background(
+                Brush.verticalGradient(
+                    if (ThemeState.isLight) {
+                        listOf(Color.White.copy(alpha = 0.88f), Color.White.copy(alpha = 0.62f))
+                    } else {
+                        listOf(
+                            tier.primary.copy(alpha = if (tier.isPremiumFrame) 0.16f else 0.08f),
+                            DarkCard.copy(alpha = 0.42f)
+                        )
+                    }
+                )
+            )
+            .border(
+                width = 1.dp,
+                color = if (stats.recoveryModeActive) DangerPenaltyRed else tier.primary.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(16.dp)
+            )
             .padding(16.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -77,32 +86,48 @@ fun HunterHud(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(DarkSurface)
-                            .border(2.dp, rankColor, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = rankLetter,
-                            style = MaterialTheme.typography.titleLarge,
-                            color = rankColor
-                        )
-                    }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    HunterRankBadge(
+                        tier = tier,
+                        size = 56.dp,
+                        animate = true
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "LEVEL ${stats.level}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.SansSerif,
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(tier.primary.copy(alpha = 0.25f))
+                                    .border(0.8.dp, tier.accent, RoundedCornerShape(5.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = tier.code,
+                                    color = tier.accent,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "LEVEL ${stats.level}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = if (stats.recoveryModeActive) "⚠️ RECOVERY MODE" else "RANK $rankLetter HUNTER",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (stats.recoveryModeActive) DangerPenaltyRed else TextSecondary
+                            text = if (stats.recoveryModeActive) "⚠️ RECOVERY MODE" else tier.title,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.8.sp,
+                            color = if (stats.recoveryModeActive) DangerPenaltyRed else tier.accent
                         )
                     }
                 }
@@ -167,22 +192,4 @@ fun HunterHud(
             )
         }
     }
-}
-
-private fun getHunterRank(level: Int): String = when {
-    level >= 70 -> "S"
-    level >= 50 -> "A"
-    level >= 35 -> "B"
-    level >= 20 -> "C"
-    level >= 10 -> "D"
-    else -> "E"
-}
-
-private fun getHunterRankColor(rank: String): Color = when (rank) {
-    "S" -> RankS
-    "A" -> RankA
-    "B" -> RankB
-    "C" -> RankC
-    "D" -> RankD
-    else -> RankE
 }
