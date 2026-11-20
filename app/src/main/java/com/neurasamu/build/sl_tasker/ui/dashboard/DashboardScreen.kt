@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -182,31 +183,11 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Type filter row (only on INCOMPLETE / COMPLETED)
-            if (subTab != 2 && taskTypes.isNotEmpty()) {
-                androidx.compose.foundation.lazy.LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    item {
-                        TypeChipSmall(
-                            label = "All",
-                            selected = selectedTypeFilter == null,
-                            onClick = { selectedTypeFilter = null }
-                        )
-                    }
-                    items(taskTypes.size) { i ->
-                        val ty = taskTypes[i]
-                        TypeChipSmall(
-                            label = ty,
-                            selected = selectedTypeFilter == ty,
-                            onClick = {
-                                selectedTypeFilter = if (selectedTypeFilter == ty) null else ty
-                            }
-                        )
-                    }
+            LaunchedEffect(taskTypes) {
+                val cur = selectedTypeFilter
+                if (cur != null && taskTypes.none { it.equals(cur, ignoreCase = true) }) {
+                    selectedTypeFilter = null
                 }
-                Spacer(modifier = Modifier.height(10.dp))
             }
 
             if (subTab == 2) {
@@ -218,6 +199,39 @@ fun DashboardScreen(
             }
 
             val rawList = if (subTab == 0) activeQuests else completedQuests
+
+            // WhatsApp-style category filter row (INCOMPLETE / COMPLETED)
+            if (taskTypes.isNotEmpty()) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    item(key = "__all__") {
+                        TypeChipSmall(
+                            label = "All",
+                            count = rawList.size,
+                            selected = selectedTypeFilter == null,
+                            onClick = { selectedTypeFilter = null }
+                        )
+                    }
+                    items(
+                        items = taskTypes,
+                        key = { it.lowercase() }
+                    ) { ty ->
+                        val catCount = rawList.count { it.task.userType.equals(ty, ignoreCase = true) }
+                        TypeChipSmall(
+                            label = ty,
+                            count = catCount,
+                            selected = selectedTypeFilter.equals(ty, ignoreCase = true),
+                            onClick = {
+                                selectedTypeFilter = if (selectedTypeFilter.equals(ty, ignoreCase = true)) null else ty
+                            }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
             val currentList = if (selectedTypeFilter == null) rawList
                               else rawList.filter {
                                   it.task.userType.equals(selectedTypeFilter, ignoreCase = true)
@@ -231,13 +245,21 @@ fun DashboardScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "NO ACTIVE QUESTS",
+                            text = when {
+                                selectedTypeFilter != null -> "NO ${selectedTypeFilter!!.uppercase()} QUESTS"
+                                subTab == 1 -> "NO COMPLETED QUESTS"
+                                else -> "NO ACTIVE QUESTS"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             color = TextPrimary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "All daily system objectives cleared. Stand by for awakening.",
+                            text = when {
+                                selectedTypeFilter != null -> "Tap + to add a task in $selectedTypeFilter or switch category."
+                                subTab == 1 -> "Completed quests will appear here."
+                                else -> "All daily system objectives cleared. Stand by for awakening."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextMuted
                         )
@@ -305,7 +327,9 @@ fun DashboardScreen(
     if (showCreateDialog) {
         CreateQuestDialog(
             onDismiss = { showCreateDialog = false },
+            initialType = selectedTypeFilter ?: "",
             existingTypes = taskTypes,
+            onAddType = { taskViewModel.addTaskType(it) },
             onDeleteType = { taskViewModel.removeTaskType(it) },
             onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays ->
                 var blocked = false
@@ -354,6 +378,7 @@ fun DashboardScreen(
             onDismiss = { editingTask = null },
             initialTask = task,
             existingTypes = taskTypes,
+            onAddType = { taskViewModel.addTaskType(it) },
             onDeleteType = { taskViewModel.removeTaskType(it) },
             onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays ->
                 taskViewModel.updateTaskFields(
@@ -377,10 +402,10 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun TypeChipSmall(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun TypeChipSmall(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
     val isLight = ThemeState.isLight
     val accent = com.neurasamu.build.sl_tasker.ui.theme.AccentGold
-    Box(
+    Row(
         modifier = Modifier
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
             .background(
@@ -388,9 +413,15 @@ private fun TypeChipSmall(label: String, selected: Boolean, onClick: () -> Unit)
                 else if (isLight) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
                 else com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
             )
-            .border(1.dp, if (selected) accent else com.neurasamu.build.sl_tasker.ui.theme.DarkBorder, androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+            .border(
+                1.dp,
+                if (selected) accent else com.neurasamu.build.sl_tasker.ui.theme.DarkBorder,
+                androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
+            )
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         androidx.compose.material3.Text(
             label,
@@ -398,5 +429,13 @@ private fun TypeChipSmall(label: String, selected: Boolean, onClick: () -> Unit)
             fontSize = 11.sp,
             fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal
         )
+        if (count > 0) {
+            androidx.compose.material3.Text(
+                "$count",
+                color = if (selected) accent else com.neurasamu.build.sl_tasker.ui.theme.TextMuted.copy(alpha = 0.75f),
+                fontSize = 10.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+            )
+        }
     }
 }

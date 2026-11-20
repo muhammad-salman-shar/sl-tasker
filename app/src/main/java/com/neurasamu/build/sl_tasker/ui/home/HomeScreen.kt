@@ -63,6 +63,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.compose.runtime.LaunchedEffect
+import kotlin.math.sin
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -180,99 +183,122 @@ private fun StatCircle(
     progress: Float,
     primaryColor: Color
 ) {
-    val transition = rememberInfiniteTransition(label = "circleAnim")
     val isLite = com.neurasamu.build.sl_tasker.ui.theme.ThemeState.isLiteMode
     val isPro by com.neurasamu.build.sl_tasker.security.LicenseManager.isProFlow.collectAsState()
     val proAnim = isPro && !isLite
-    val pulse by transition.animateFloat(
-        initialValue = if (isLite) 1f else 0.94f,
-        targetValue = if (isLite) 1f else 1.06f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-    val rotation by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = if (proAnim) 360f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rot"
-    )
-    val glow by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glow"
-    )
+
+    var pulse by remember { mutableFloatStateOf(1f) }
+    var rotation by remember { mutableFloatStateOf(0f) }
+    var glow by remember { mutableFloatStateOf(0.6f) }
+
+    LaunchedEffect(proAnim, isLite) {
+        if (isLite) {
+            pulse = 1f
+            rotation = 0f
+            glow = 0.6f
+            return@LaunchedEffect
+        }
+        val startNanos = System.nanoTime()
+        while (true) {
+            withFrameNanos {
+                val elapsedSec = (System.nanoTime() - startNanos) / 1_000_000_000.0
+                rotation = if (proAnim) (((elapsedSec / 2.6) * 360.0) % 360.0).toFloat() else 0f
+                val pulseWave = (sin(elapsedSec * Math.PI / 1.4).toFloat() + 1f) * 0.5f
+                pulse = 0.94f + 0.12f * pulseWave
+                val glowWave = (sin(elapsedSec * Math.PI / 1.2).toFloat() + 1f) * 0.5f
+                glow = 0.35f + 0.55f * glowWave
+            }
+        }
+    }
 
     Box(
-        modifier = Modifier
-            .size(130.dp)
-            .clip(CircleShape)
-            .background(DarkCard)
-            .border(1.dp, primaryColor.copy(alpha = 0.25f), CircleShape),
+        modifier = Modifier.size(144.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Outer breathing halo
-        Canvas(modifier = Modifier.size(130.dp)) {
+        // Outer breathing halo (unclipped so glow breathes smoothly)
+        Canvas(modifier = Modifier.size(144.dp)) {
             drawCircle(
-                color = primaryColor.copy(alpha = 0.20f * (glow + 0.4f)),
-                radius = (this.size.minDimension / 2f) * pulse
+                color = primaryColor.copy(alpha = 0.14f * (glow + 0.35f)),
+                radius = (128.dp.toPx() / 2f) * pulse
             )
         }
 
-        Canvas(modifier = Modifier.size(130.dp)) {
-            val stroke = 6.dp.toPx()
-            val inset = stroke / 2f
-            val arcSize = Size(size.width - stroke, size.height - stroke)
-            // Track
-            drawArc(
-                color = primaryColor.copy(alpha = 0.15f),
-                startAngle = -90f,
-                sweepAngle = 360f,
-                useCenter = false,
-                style = Stroke(width = stroke, cap = StrokeCap.Round),
-                topLeft = Offset(inset, inset),
-                size = arcSize
-            )
-            // Progress
-            drawArc(
-                color = primaryColor,
-                startAngle = -90f,
-                sweepAngle = 360f * progress.coerceIn(0f, 1f),
-                useCenter = false,
-                style = Stroke(width = stroke, cap = StrokeCap.Round),
-                topLeft = Offset(inset, inset),
-                size = arcSize
-            )
-            // Rotating dot on progress tip
-            val angleRad = Math.toRadians((-90f + 360f * progress.coerceIn(0f, 1f)).toDouble())
-            val cx = size.width / 2f + (size.width / 2f - stroke / 2f) * Math.cos(angleRad).toFloat()
-            val cy = size.height / 2f + (size.height / 2f - stroke / 2f) * Math.sin(angleRad).toFloat()
-            drawCircle(
-                color = primaryColor.copy(alpha = glow),
-                radius = stroke * 0.9f,
-                center = Offset(cx, cy)
-            )
+        // Inner circular meter face
+        Box(
+            modifier = Modifier
+                .size(128.dp)
+                .clip(CircleShape)
+                .background(DarkCard)
+                .border(1.dp, primaryColor.copy(alpha = 0.25f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(128.dp)) {
+                val stroke = 6.dp.toPx()
+                val inset = stroke / 2f
+                val arcSize = Size(size.width - stroke, size.height - stroke)
+                // Track
+                drawArc(
+                    color = primaryColor.copy(alpha = 0.15f),
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    topLeft = Offset(inset, inset),
+                    size = arcSize
+                )
+                // Progress
+                drawArc(
+                    color = primaryColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * progress.coerceIn(0f, 1f),
+                    useCenter = false,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    topLeft = Offset(inset, inset),
+                    size = arcSize
+                )
+                // Glowing dot on progress tip
+                val angleRad = Math.toRadians((-90f + 360f * progress.coerceIn(0f, 1f)).toDouble())
+                val cx = size.width / 2f + (size.width / 2f - stroke / 2f) * Math.cos(angleRad).toFloat()
+                val cy = size.height / 2f + (size.height / 2f - stroke / 2f) * Math.sin(angleRad).toFloat()
+                drawCircle(
+                    color = primaryColor.copy(alpha = glow),
+                    radius = stroke * 0.9f,
+                    center = Offset(cx, cy)
+                )
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = primaryColor,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = value,
+                    color = TextPrimary,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = label,
+                    color = TextMuted,
+                    fontSize = 10.sp
+                )
+            }
         }
 
-        // PRO-only rotating orbiting light beam around both circles
+        // PRO-only rotating orbiting light beam cleanly outside the ring
         if (proAnim) {
-            Canvas(modifier = Modifier.size(146.dp)) {
+            Canvas(modifier = Modifier.size(140.dp)) {
                 val stroke = 3.dp.toPx()
-                val inset = stroke / 2f + 5.dp.toPx()
-                val arcSize = Size(size.width - stroke - 10.dp.toPx(), size.height - stroke - 10.dp.toPx())
+                val inset = stroke / 2f + 2.dp.toPx()
+                val arcSize = Size(size.width - inset * 2f, size.height - inset * 2f)
                 val lightBrush = Brush.sweepGradient(
                     0.0f to Color.Transparent,
-                    0.55f to Color.Transparent,
-                    0.82f to primaryColor.copy(alpha = 0.55f),
+                    0.50f to Color.Transparent,
+                    0.80f to primaryColor.copy(alpha = 0.60f),
                     0.95f to primaryColor,
                     1.0f to Color.White
                 )
@@ -290,38 +316,17 @@ private fun StatCircle(
                     val tipX = size.width / 2f + radius
                     val tipY = size.height / 2f
                     drawCircle(
-                        color = primaryColor.copy(alpha = 0.45f),
+                        color = primaryColor.copy(alpha = 0.50f),
                         radius = stroke * 2.2f,
                         center = Offset(tipX, tipY)
                     )
                     drawCircle(
                         color = Color.White,
-                        radius = stroke * 0.9f,
+                        radius = stroke * 0.95f,
                         center = Offset(tipX, tipY)
                     )
                 }
             }
-        }
-
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = primaryColor,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = value,
-                color = TextPrimary,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = label,
-                color = TextMuted,
-                fontSize = 10.sp
-            )
         }
     }
 }

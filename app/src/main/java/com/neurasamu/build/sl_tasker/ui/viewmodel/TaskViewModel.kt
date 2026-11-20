@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,6 +37,17 @@ class TaskViewModel(
     private val alarmScheduler: AlarmScheduler,
     private val taskTypesStore: TaskTypesStore
 ) : AndroidViewModel(application) {
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val dbTypes = taskRepository.getAllTasks().first()
+                    .map { it.userType.trim() }
+                    .filter { it.isNotBlank() }
+                taskTypesStore.seedOnce(dbTypes)
+            } catch (_: Throwable) {}
+        }
+    }
 
     val completedQuests: StateFlow<List<TaskOccurrenceItem>> = combine(
         taskRepository.observeOccurrencesByStatus(listOf(OccurrenceStatus.COMPLETED)),

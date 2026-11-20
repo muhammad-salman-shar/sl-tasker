@@ -15,6 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,7 +73,9 @@ private val DayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 fun CreateQuestDialog(
     onDismiss: () -> Unit,
     initialTask: TaskEntity? = null,
+    initialType: String = "",
     existingTypes: List<String> = emptyList(),
+    onAddType: (String) -> Unit = {},
     onDeleteType: (String) -> Unit = {},
     onConfirm: (
         title: String,
@@ -114,10 +121,33 @@ fun CreateQuestDialog(
         mutableStateOf(if ((initialTask?.validityDays ?: 0) > 0) initialTask!!.validityDays.toString() else "")
     }
 
-    var selectedType by remember { mutableStateOf(initialTask?.userType ?: "") }
+    var selectedType by remember { mutableStateOf((initialTask?.userType ?: initialType).trim()) }
     var showNewTypeInput by remember { mutableStateOf(false) }
     var newTypeText by remember { mutableStateOf("") }
-    val knownTypes = remember(existingTypes) { existingTypes.filter { it.isNotBlank() }.distinct() }
+    var sessionAdded by remember { mutableStateOf<List<String>>(emptyList()) }
+    var sessionRemoved by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val typeRowState = rememberLazyListState()
+    val dialogScope = rememberCoroutineScope()
+    val knownTypes = remember(existingTypes, sessionAdded, sessionRemoved, initialTask?.userType, initialType) {
+        buildList {
+            existingTypes.forEach { t ->
+                val tr = t.trim()
+                if (tr.isNotBlank() && tr.lowercase() !in sessionRemoved && none { it.equals(tr, ignoreCase = true) }) {
+                    add(tr)
+                }
+            }
+            val seedType = (initialTask?.userType ?: initialType).trim()
+            if (seedType.isNotBlank() && seedType.lowercase() !in sessionRemoved && none { it.equals(seedType, ignoreCase = true) }) {
+                add(seedType)
+            }
+            sessionAdded.forEach { t ->
+                val tr = t.trim()
+                if (tr.isNotBlank() && tr.lowercase() !in sessionRemoved && none { it.equals(tr, ignoreCase = true) }) {
+                    add(tr)
+                }
+            }
+        }
+    }
 
     val difficultyColor = when (difficulty) {
         Difficulty.MEDIUM -> RankC
@@ -172,37 +202,43 @@ fun CreateQuestDialog(
                 // Type category
                 SectionLabel("TASK TYPE")
                 LazyRow(
+                    state = typeRowState,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    item {
+                    item(key = "__none__") {
                         TypeChip(
                             label = "None",
                             selected = selectedType.isBlank(),
                             onClick = { selectedType = "" }
                         )
                     }
-                    items(knownTypes) { t ->
+                    items(items = knownTypes, key = { it.lowercase() }) { t ->
                         TypeChip(
                             label = t,
                             selected = selectedType.equals(t, ignoreCase = true),
                             onClick = { selectedType = t },
                             onDelete = {
-                                if (selectedType == t) selectedType = ""
+                                val lc = t.lowercase()
+                                sessionRemoved = sessionRemoved + lc
+                                sessionAdded = sessionAdded.filterNot { it.equals(t, ignoreCase = true) }
+                                if (selectedType.equals(t, ignoreCase = true)) selectedType = ""
                                 onDeleteType(t)
                             }
                         )
                     }
-                    item {
+                    item(key = "__add_new__") {
                         TypeChip(
                             label = "+ New",
-                            selected = false,
+                            selected = showNewTypeInput,
+                            accentColor = PrimaryManaBlue,
+                            alwaysTinted = true,
                             onClick = { showNewTypeInput = !showNewTypeInput }
                         )
                     }
                 }
 
-                if (showNewTypeInput || knownTypes.isEmpty()) {
+                if (showNewTypeInput) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -214,11 +250,11 @@ fun CreateQuestDialog(
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AccentGold,
+                                focusedBorderColor = PrimaryManaBlue,
                                 unfocusedBorderColor = DarkBorder,
-                                focusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                                unfocusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                                focusedLabelColor = AccentGold,
+                                focusedTextColor = if (isLight) Color(0xFF0B1220) else TextPrimary,
+                                unfocusedTextColor = if (isLight) Color(0xFF0B1220) else TextPrimary,
+                                focusedLabelColor = PrimaryManaBlue,
                                 unfocusedLabelColor = TextMuted
                             )
                         )
@@ -227,15 +263,26 @@ fun CreateQuestDialog(
                             onClick = {
                                 val nt = newTypeText.trim()
                                 if (nt.isNotBlank()) {
-                                    selectedType = nt
+                                    val lc = nt.lowercase()
+                                    val existingMatch = knownTypes.firstOrNull { it.equals(nt, ignoreCase = true) }
+                                    val finalName = existingMatch ?: nt
+                                    sessionRemoved = sessionRemoved - lc
+                                    if (existingMatch == null) {
+                                        sessionAdded = sessionAdded + finalName
+                                    }
+                                    selectedType = finalName
                                     newTypeText = ""
-                                    showNewTypeInput = false
+                                    onAddType(finalName)
+                                    dialogScope.launch {
+                                        val targetIdx = (knownTypes.size + 1).coerceAtLeast(0)
+                                        typeRowState.animateScrollToItem(targetIdx)
+                                    }
                                 }
                             },
                             enabled = newTypeText.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = AccentGold,
-                                contentColor = androidx.compose.ui.graphics.Color(0xFF0B1220)
+                                containerColor = PrimaryManaBlue,
+                                contentColor = Color.White
                             ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -557,6 +604,13 @@ fun CreateQuestDialog(
                     val minutes = hour24 * 60 + mm
                     val csv = selectedDays.sorted().joinToString(",")
                     val dur = if (requiresTimer) durationText.toIntOrNull() ?: 0 else 0
+                    val pendingTyped = newTypeText.trim()
+                    val finalSelectedType = if (pendingTyped.isNotBlank()) {
+                        onAddType(pendingTyped)
+                        pendingTyped
+                    } else {
+                        selectedType.trim()
+                    }
                     onConfirm(
                         title,
                         difficulty,
@@ -565,7 +619,7 @@ fun CreateQuestDialog(
                         dur,
                         isRepeat,
                         allowEarly,
-                        selectedType,
+                        finalSelectedType,
                         scheduleMode,
                         validityDaysText.toIntOrNull()?.coerceAtLeast(0) ?: 0
                     )
@@ -600,20 +654,31 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit, onDelete: (() -> Unit)? = null) {
+private fun TypeChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+    accentColor: Color = AccentGold,
+    alwaysTinted: Boolean = false
+) {
     val isLight = ThemeState.isLight
-    val accent = AccentGold
+    val accent = accentColor
+    val active = selected || alwaysTinted
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(
-                if (selected) accent.copy(alpha = 0.22f)
-                else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
-                else DarkSurface
+                when {
+                    selected -> accent.copy(alpha = 0.28f)
+                    alwaysTinted -> accent.copy(alpha = 0.14f)
+                    isLight -> Color(0xFFF1F5F9)
+                    else -> DarkSurface
+                }
             )
             .border(
                 1.dp,
-                if (selected) accent else DarkBorder,
+                if (active) accent else DarkBorder,
                 RoundedCornerShape(20.dp)
             )
             .clickable { onClick() }
@@ -622,9 +687,9 @@ private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit, onDe
     ) {
         Text(
             text = label,
-            color = if (selected) accent else TextMuted,
+            color = if (active) accent else TextMuted,
             fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
         )
         if (onDelete != null) {
             Spacer(Modifier.width(4.dp))
