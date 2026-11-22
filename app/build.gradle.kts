@@ -13,7 +13,7 @@ android {
         applicationId = "com.neurasamu.build.sl_tasker"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

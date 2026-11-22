@@ -24,7 +24,7 @@ enum class PlayPlan(
 ) {
     MONTHLY("sl_tasker_pro_monthly", BillingClient.ProductType.SUBS, "Rs. 250"),
     YEARLY("sl_tasker_pro_yearly", BillingClient.ProductType.SUBS, "Rs. 2,700"),
-    LIFETIME("sl_tasker_pro_lifetime", BillingClient.ProductType.INAPP, "Rs. 5,000")
+    LIFETIME("sl_tasker_pro_lifetime_v2", BillingClient.ProductType.INAPP, "Rs. 5,000")
 }
 
 data class PlayBillingUiState(
