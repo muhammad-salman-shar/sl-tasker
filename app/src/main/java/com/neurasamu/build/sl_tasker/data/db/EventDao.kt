@@ -22,6 +22,9 @@ interface EventDao {
     @Query("SELECT * FROM events ORDER BY timestamp DESC LIMIT :limit")
     fun getRecentEvents(limit: Int = 50): Flow<List<EventEntity>>
 
+    @Query("SELECT * FROM events WHERE timestamp >= :sinceMillis ORDER BY timestamp DESC LIMIT :limit")
+    fun getEventsSince(sinceMillis: Long, limit: Int = 50): Flow<List<EventEntity>>
+
     @Query("SELECT * FROM events ORDER BY timestamp DESC")
     fun getAllEvents(): Flow<List<EventEntity>>
 }

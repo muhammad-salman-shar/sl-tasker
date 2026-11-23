@@ -1,5 +1,9 @@
 package com.neurasamu.build.sl_tasker.ui.components
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,38 +37,41 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.data.model.Difficulty
 import com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity
 import com.neurasamu.build.sl_tasker.data.model.OccurrenceStatus
 import com.neurasamu.build.sl_tasker.data.model.Priority
+import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 import com.neurasamu.build.sl_tasker.data.model.TaskEntity
+import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
+import com.neurasamu.build.sl_tasker.ui.theme.AccentCyan
+import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
-import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.GoldWarning
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
+import com.neurasamu.build.sl_tasker.ui.theme.PurpleMagic
 import com.neurasamu.build.sl_tasker.ui.theme.RankA
 import com.neurasamu.build.sl_tasker.ui.theme.RankC
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
+import com.neurasamu.build.sl_tasker.util.SoundFx
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.content.Context
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
-import androidx.compose.ui.platform.LocalContext
-import com.neurasamu.build.sl_tasker.util.SoundFx
-import com.neurasamu.build.sl_tasker.ui.components.NotchedShape
-import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
-import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -96,24 +103,43 @@ fun QuestCard(
         Difficulty.MEDIUM -> RankC
     }
 
+    val advanceLineColor = PurpleMagic
+    val cardBorderColor = when {
+        task.priority == Priority.CRITICAL -> DangerPenaltyRed
+        task.isAdvanced -> advanceLineColor
+        else -> DarkBorder
+    }
+
     val shape = NotchedShape(notch = 16.dp, corner = 12.dp)
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
             .background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
+                Brush.verticalGradient(
                     if (isLight)
-                        listOf(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f), androidx.compose.ui.graphics.Color.White.copy(alpha = 0.65f))
+                        listOf(Color.White.copy(alpha = 0.88f), Color.White.copy(alpha = 0.68f))
                     else
-                        listOf(DarkCard.copy(alpha = 0.55f), DarkCard.copy(alpha = 0.30f))
+                        listOf(DarkCard.copy(alpha = 0.58f), DarkCard.copy(alpha = 0.34f))
                 )
             )
             .border(
-                1.dp,
-                if (task.priority == Priority.CRITICAL) DangerPenaltyRed else DarkBorder,
-                shape
+                width = if (task.isAdvanced || task.priority == Priority.CRITICAL) 1.5.dp else 1.dp,
+                color = cardBorderColor,
+                shape = shape
             )
+            .drawWithContent {
+                drawContent()
+                if (task.isAdvanced) {
+                    val strokePx = 4.dp.toPx()
+                    drawLine(
+                        brush = Brush.verticalGradient(listOf(advanceLineColor, AccentCyan)),
+                        start = Offset(strokePx / 2f, 0f),
+                        end = Offset(strokePx / 2f, size.height),
+                        strokeWidth = strokePx
+                    )
+                }
+            }
             .combinedClickable(
                 onClick = {},
                 onLongClick = { menuOpen = true }
@@ -140,21 +166,43 @@ fun QuestCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(priorityColor.copy(alpha = 0.15f))
-                            .border(1.dp, priorityColor, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = task.priority.name,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = priorityColor,
-                            fontSize = 9.sp
-                        )
+                    if (task.isAdvanced) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(advanceLineColor.copy(alpha = 0.22f))
+                                .border(1.dp, advanceLineColor, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "ADV",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = advanceLineColor,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(priorityColor.copy(alpha = 0.15f))
+                                .border(1.dp, priorityColor, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = task.priority.name,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = priorityColor,
+                                fontSize = 9.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    val epGain = GamificationEngine.epRewardFor(task.difficulty)
+                    val hpGain = GamificationEngine.hpRewardFor(task.difficulty)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
@@ -163,7 +211,7 @@ fun QuestCard(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "${task.difficulty.name} (+${when(task.difficulty){ com.neurasamu.build.sl_tasker.data.model.Difficulty.MEDIUM -> 10; com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> 30; com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> 50 }} EP)",
+                            text = "${task.difficulty.name} (+${epGain} EP · +${hpGain} HP)",
                             style = MaterialTheme.typography.labelSmall,
                             color = difficultyColor,
                             fontSize = 9.sp
@@ -174,16 +222,16 @@ fun QuestCard(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(com.neurasamu.build.sl_tasker.ui.theme.AccentGold.copy(alpha = 0.15f))
-                                .border(1.dp, com.neurasamu.build.sl_tasker.ui.theme.AccentGold, RoundedCornerShape(4.dp))
+                                .background(AccentGold.copy(alpha = 0.15f))
+                                .border(1.dp, AccentGold, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = task.userType,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = com.neurasamu.build.sl_tasker.ui.theme.AccentGold,
+                                color = AccentGold,
                                 fontSize = 9.sp,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -206,7 +254,7 @@ fun QuestCard(
             Text(
                 text = task.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary
+                color = if (isLight) Color(0xFF0B1220) else TextPrimary
             )
 
             if (task.description.isNotBlank()) {
@@ -214,8 +262,26 @@ fun QuestCard(
                 Text(
                     text = task.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isLight) androidx.compose.ui.graphics.Color(0xFF475569) else TextSecondary
+                    color = if (isLight) Color(0xFF475569) else TextSecondary
                 )
+            }
+
+            if (task.isAdvanced && (!task.hpDropEnabled || task.requireQrProof || task.stepGoal > 0)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (!task.hpDropEnabled) {
+                        AdvanceMetaPill("SAFE · NO HP DROP", SuccessGreen)
+                    }
+                    if (task.requireQrProof) {
+                        AdvanceMetaPill("QR SEAL", AccentCyan)
+                    }
+                    if (task.stepGoal > 0) {
+                        AdvanceMetaPill("GOAL: ${task.stepGoal} STEPS", AccentGold)
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -309,5 +375,23 @@ fun QuestCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AdvanceMetaPill(label: String, accent: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(accent.copy(alpha = 0.14f))
+            .border(0.8.dp, accent.copy(alpha = 0.65f), RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = label,
+            color = accent,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }

@@ -40,7 +40,7 @@ interface OccurrenceDao {
     fun getAllOccurrences(): Flow<List<OccurrenceEntity>>
 
     @Query("SELECT * FROM occurrences WHERE taskId = :taskId AND status = 'PENDING'")
-    suspend fun getPendingByTask(taskId: Long): List<com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity>
+    suspend fun getPendingByTask(taskId: Long): List<OccurrenceEntity>
 
     @Query("DELETE FROM occurrences WHERE id = :id")
     suspend fun deleteOccurrenceById(id: Long)
@@ -56,6 +56,12 @@ interface OccurrenceDao {
 
     @Query("SELECT * FROM occurrences WHERE status = 'COMPLETED' AND completedCleanupAt IS NOT NULL AND completedCleanupAt < :now")
     suspend fun getCompletedToCleanup(now: Long): List<OccurrenceEntity>
+
+    @Query("SELECT * FROM occurrences WHERE status = 'COMPLETED' AND completedAt IS NOT NULL AND completedAt < :beforeMillis")
+    suspend fun getCompletedBefore(beforeMillis: Long): List<OccurrenceEntity>
+
+    @Query("SELECT * FROM occurrences WHERE status = 'MISSED'")
+    suspend fun getAllMissedOccurrences(): List<OccurrenceEntity>
 
     @Query("SELECT * FROM occurrences WHERE completedCleanupAt IS NOT NULL AND completedCleanupAt < :now AND status IN ('COMPLETED', 'MISSED')")
     suspend fun getCleanupCandidates(now: Long): List<OccurrenceEntity>

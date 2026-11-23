@@ -5,14 +5,18 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.neurasamu.build.sl_tasker.data.datastore.UserPreferences
 import com.neurasamu.build.sl_tasker.data.db.AppDatabase
 import com.neurasamu.build.sl_tasker.data.model.Difficulty
 import com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity
 import com.neurasamu.build.sl_tasker.data.model.OccurrenceStatus
 import com.neurasamu.build.sl_tasker.data.model.Priority
 import com.neurasamu.build.sl_tasker.data.model.RepeatRule
+import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 import com.neurasamu.build.sl_tasker.data.model.TaskEntity
+import com.neurasamu.build.sl_tasker.data.repository.StatsRepository
 import com.neurasamu.build.sl_tasker.data.repository.TaskRepository
+import com.neurasamu.build.sl_tasker.data.task.TaskTypesStore
 import com.neurasamu.build.sl_tasker.domain.scheduler.AlarmScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,8 +27,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.neurasamu.build.sl_tasker.data.task.TaskTypesStore
-import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 
 data class TaskOccurrenceItem(
     val task: TaskEntity,
@@ -37,6 +39,8 @@ class TaskViewModel(
     private val alarmScheduler: AlarmScheduler,
     private val taskTypesStore: TaskTypesStore
 ) : AndroidViewModel(application) {
+
+    private val userPreferences = UserPreferences(application)
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -54,7 +58,12 @@ class TaskViewModel(
         taskRepository.getAllTasks()
     ) { occurrences, tasks ->
         val taskMap = tasks.associateBy { it.id }
+        val midnightStart = StatsRepository.startOfTodayMidnightMillis()
         occurrences.mapNotNull { occurrence ->
+            val completedAt = occurrence.completedAt
+            if (completedAt != null && completedAt < midnightStart) {
+                return@mapNotNull null
+            }
             val task = taskMap[occurrence.taskId] ?: return@mapNotNull null
             TaskOccurrenceItem(task = task, occurrence = occurrence)
         }.sortedByDescending { it.occurrence.completedAt }
@@ -64,7 +73,7 @@ class TaskViewModel(
         initialValue = emptyList()
     )
 
-    val allOccurrences: StateFlow<List<com.neurasamu.build.sl_tasker.data.model.OccurrenceEntity>> =
+    val allOccurrences: StateFlow<List<OccurrenceEntity>> =
         taskRepository.observeAllOccurrences()
             .stateIn(
                 scope = viewModelScope,
@@ -72,7 +81,7 @@ class TaskViewModel(
                 initialValue = emptyList()
             )
 
-    val allActiveTasks: StateFlow<List<com.neurasamu.build.sl_tasker.data.model.TaskEntity>> =
+    val allActiveTasks: StateFlow<List<TaskEntity>> =
         taskRepository.getAllActiveTasks()
             .stateIn(
                 scope = viewModelScope,
@@ -101,13 +110,26 @@ class TaskViewModel(
 
     fun runCleanup() {
         viewModelScope.launch(Dispatchers.IO) {
-            try { taskRepository.performCleanup(System.currentTimeMillis()) } catch (_: Throwable) {}
+            try {
+                val autoDelete = runCatching {
+                    userPreferences.isAutoDeleteMissedTasksEnabled()
+                }.getOrDefault(false)
+                taskRepository.performCleanup(System.currentTimeMillis(), autoDeleteMissed = autoDelete)
+            } catch (_: Throwable) {}
         }
     }
 
     fun applyOverduePenalties() {
         viewModelScope.launch(Dispatchers.IO) {
-            taskRepository.applyOverduePenalties(System.currentTimeMillis())
+            try {
+                val autoDelete = runCatching {
+                    userPreferences.isAutoDeleteMissedTasksEnabled()
+                }.getOrDefault(false)
+                taskRepository.applyOverduePenalties(
+                    System.currentTimeMillis(),
+                    autoDeleteMissed = autoDelete
+                )
+            } catch (_: Throwable) {}
         }
     }
 
@@ -157,7 +179,11 @@ class TaskViewModel(
         allowEarlyComplete: Boolean,
         userType: String = "",
         scheduleMode: ScheduleMode = ScheduleMode.TIME,
-        validityDays: Int = 0
+        validityDays: Int = 0,
+        isAdvanced: Boolean = false,
+        hpDropEnabled: Boolean = true,
+        requireQrProof: Boolean = false,
+        stepGoal: Int = 0
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val existing = taskRepository.getTaskById(taskId) ?: return@launch
@@ -181,7 +207,11 @@ class TaskViewModel(
                 allowEarlyComplete = allowEarlyComplete,
                 userType = userType.trim(),
                 scheduleMode = scheduleMode,
-                validityDays = validityDays.coerceAtLeast(0)
+                validityDays = validityDays.coerceAtLeast(0),
+                isAdvanced = isAdvanced,
+                hpDropEnabled = hpDropEnabled,
+                requireQrProof = if (isAdvanced) requireQrProof else false,
+                stepGoal = if (isAdvanced) stepGoal.coerceAtLeast(0) else 0
             )
             taskRepository.updateTaskFields(updated)
 
@@ -223,11 +253,13 @@ class TaskViewModel(
         allowEarlyComplete: Boolean,
         userType: String = "",
         scheduleMode: ScheduleMode = ScheduleMode.TIME,
-        validityDays: Int = 0
+        validityDays: Int = 0,
+        isAdvanced: Boolean = false,
+        hpDropEnabled: Boolean = true,
+        requireQrProof: Boolean = false,
+        stepGoal: Int = 0
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            // IMPORTANT: isRepeat is user-intent, not "did they pick days".
-            // A single-day task with a specific day is still ONCE (no weekly loop).
             val repeatRuleVal = if (isRepeat) RepeatRule.CUSTOM else RepeatRule.ONCE
             val nowMs = System.currentTimeMillis()
             val scheduledAt: Long
@@ -261,7 +293,11 @@ class TaskViewModel(
                 reminderMinutesOfDay = reminderMinutesOfDay,
                 allowEarlyComplete = allowEarlyComplete,
                 scheduleMode = scheduleMode,
-                validityDays = validityDays.coerceAtLeast(0)
+                validityDays = validityDays.coerceAtLeast(0),
+                isAdvanced = isAdvanced,
+                hpDropEnabled = hpDropEnabled,
+                requireQrProof = if (isAdvanced) requireQrProof else false,
+                stepGoal = if (isAdvanced) stepGoal.coerceAtLeast(0) else 0
             )
             if (userType.isNotBlank()) {
                 try { taskTypesStore.addType(userType.trim()) } catch (_: Throwable) {}

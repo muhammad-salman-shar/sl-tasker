@@ -14,14 +14,14 @@ import com.neurasamu.build.sl_tasker.security.LicenseManager
 import com.neurasamu.build.sl_tasker.ui.MainActivity
 
 /**
- * Bullet-proof HP drop alert notifier for PRO users.
- * Fires on every actual HP decrease until HP reaches 0.
+ * Bullet-proof alert notifier for HP drop warnings and task auto-delete warnings.
  */
 object HpAlertNotifier {
 
     private const val CHANNEL_ID = "sl_hp_drop_alerts"
-    private const val CHANNEL_NAME = "HP Drop Alerts"
+    private const val CHANNEL_NAME = "HP Drop & Task Alerts"
     private const val NOTIF_ID = 9401
+    private const val WARN_PREFS = "sl_auto_delete_warnings"
 
     @Volatile
     private var appContext: Context? = null
@@ -42,13 +42,61 @@ object HpAlertNotifier {
                         CHANNEL_NAME,
                         NotificationManager.IMPORTANCE_HIGH
                     ).apply {
-                        description = "Live alerts whenever your Hunter HP drops"
+                        description = "Live alerts whenever your Hunter HP drops or tasks near expiry"
                         enableVibration(true)
                     }
                     nm.createNotificationChannel(ch)
                 }
             } catch (_: Throwable) {}
         }
+    }
+
+    fun notifyAutoDeleteWarning(occurrenceId: Long, taskTitle: String, minutesLeft: Int) {
+        val ctx = appContext ?: return
+        val key = "warned_$occurrenceId"
+        val prefs = ctx.getSharedPreferences(WARN_PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(key, false)) return
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                ctx,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) return
+        }
+
+        try {
+            ensureChannel(ctx)
+            prefs.edit().putBoolean(key, true).apply()
+
+            val safeMins = minutesLeft.coerceAtLeast(1)
+            val title = "Task Expiring Soon: $taskTitle"
+            val body = "Complete \"$taskTitle\" within $safeMins min or it will be auto-deleted as missed."
+
+            val openIntent = Intent(ctx, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                ctx,
+                (occurrenceId % 50_000L).toInt() + 9500,
+                openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notif = NotificationCompat.Builder(ctx, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .build()
+
+            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.notify((occurrenceId % 50_000L).toInt() + 9500, notif)
+        } catch (_: Throwable) {}
     }
 
     fun notifyHpDrop(oldHp: Int, newHp: Int, reason: String? = null) {

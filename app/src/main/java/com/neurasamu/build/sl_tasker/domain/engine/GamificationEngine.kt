@@ -17,17 +17,25 @@ object GamificationEngine {
     const val EP_PER_LEVEL = 90
     const val MAX_HEALTH = 100
 
+    fun hpRewardFor(difficulty: Difficulty): Int = when (difficulty) {
+        Difficulty.MEDIUM -> 10
+        Difficulty.HARD -> 40
+        Difficulty.CRITICAL -> 50
+    }
+
+    fun epRewardFor(difficulty: Difficulty): Int = when (difficulty) {
+        Difficulty.MEDIUM -> 10
+        Difficulty.HARD -> 30
+        Difficulty.CRITICAL -> 50
+    }
+
     fun processQuestCompletion(
         currentStats: PlayerStatsEntity,
         difficulty: Difficulty,
         streakBonusActive: Boolean = false,
         isPro: Boolean = true
     ): GamificationResult {
-        val baseEp = when (difficulty) {
-            Difficulty.MEDIUM -> 10
-            Difficulty.HARD -> 30
-            Difficulty.CRITICAL -> 50
-        }
+        val baseEp = epRewardFor(difficulty)
         val streakBonus = if (streakBonusActive && currentStats.streak >= 3) 2 else 0
         val totalEpGained = baseEp + streakBonus
 
@@ -41,11 +49,7 @@ object GamificationEngine {
         val newEp = if (isCapped) EP_PER_LEVEL else rawEp % EP_PER_LEVEL
         val leveledUp = levelsGained > 0 && !isCapped
 
-        val healthRestored = when (difficulty) {
-            Difficulty.MEDIUM -> 10
-            Difficulty.HARD -> 30
-            Difficulty.CRITICAL -> 50
-        }
+        val healthRestored = hpRewardFor(difficulty)
         val newHealth = min(MAX_HEALTH, currentStats.health + healthRestored)
 
         val updatedStats = currentStats.copy(

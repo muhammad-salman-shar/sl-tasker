@@ -1,8 +1,13 @@
 package com.neurasamu.build.sl_tasker.ui.player
 
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,13 +22,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,14 +55,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import com.neurasamu.build.sl_tasker.data.block.BlockMode
 import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
+import com.neurasamu.build.sl_tasker.data.block.PROTECTED_PACKAGES
+import com.neurasamu.build.sl_tasker.data.datastore.UserPreferences
 import com.neurasamu.build.sl_tasker.security.LicenseManager
 import com.neurasamu.build.sl_tasker.security.PaywallTrigger
-import com.neurasamu.build.sl_tasker.data.block.PROTECTED_PACKAGES
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
@@ -62,16 +76,9 @@ import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
-import kotlinx.coroutines.launch
-import androidx.activity.compose.BackHandler
+import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
-import android.app.AlarmManager
-import android.net.Uri
-import android.os.Build
-import android.os.PowerManager
-import androidx.core.app.NotificationManagerCompat
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import kotlinx.coroutines.launch
 
 data class AppRow(val pkg: String, val label: String)
 
@@ -80,7 +87,9 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { BlockPrefs(context) }
+    val userPrefs = remember { UserPreferences(context) }
     val state by prefs.state.collectAsState(initial = null)
+    val autoDeleteMissed by userPrefs.autoDeleteMissedTasksFlow.collectAsState(initial = false)
     var query by remember { mutableStateOf("") }
     val allApps = remember { loadInstalledApps(context) }
 
@@ -111,7 +120,7 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                     )
                 }
                 Text(
-                    text = "BLOCK SYSTEM",
+                    text = "SYSTEM & BLOCK SETTINGS",
                     style = MaterialTheme.typography.titleMedium,
                     color = PrimaryManaBlue,
                     fontSize = 16.sp
@@ -119,339 +128,121 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
             }
         }
     ) { pad ->
-        Column(
+        val s = state ?: return@Scaffold
+
+        val hasAccess = remember { isAccessibilityEnabled(context) }
+        val hasOverlay = remember {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
+        }
+        val hasBatteryOpt = remember {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            pm.isIgnoringBatteryOptimizations(context.packageName)
+        }
+        val hasExactAlarm = remember {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                am.canScheduleExactAlarms()
+            } else true
+        }
+        val hasNotif = remember {
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+        }
+        val showAccessibilityDisclosure = remember { mutableStateOf(false) }
+
+        val selectablePkgs = remember(allApps) {
+            allApps
+                .filter { it.pkg != "com.neurasamu.build.sl_tasker" }
+                .filterNot { it.pkg in PROTECTED_PACKAGES }
+                .map { it.pkg }
+                .toSet()
+        }
+        val allSelected = selectablePkgs.isNotEmpty() && selectablePkgs.all { it in s.selectedPackages }
+
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(pad)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            val s = state ?: return@Column
-
-            Spacer(Modifier.height(8.dp))
-
-            val hasAccess = remember { isAccessibilityEnabled(context) }
-            val hasOverlay = remember {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
-            }
-            val hasBatteryOpt = remember {
-                val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-                pm.isIgnoringBatteryOptimizations(context.packageName)
-            }
-            val hasExactAlarm = remember {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                    am.canScheduleExactAlarms()
-                } else true
-            }
-            val hasNotif = remember {
-                NotificationManagerCompat.from(context).areNotificationsEnabled()
-            }
-            SettingsCard {
-                Text("PERMISSIONS", color = PrimaryManaBlue, fontSize = 11.sp)
-                Spacer(Modifier.height(8.dp))
-                PermissionRow("Notifications", hasNotif) {
-                    try {
-                        val i = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(i)
-                    } catch (_: Throwable) {}
-                }
-                PermissionRow("Alarms & Reminders", hasExactAlarm) {
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            val i = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                data = Uri.parse("package:${context.packageName}")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(i)
-                        }
-                    } catch (_: Throwable) {}
-                }
-                val showAccessibilityDisclosure = remember { androidx.compose.runtime.mutableStateOf(false) }
-                PermissionRow("Battery Optimization", hasBatteryOpt) {
-                    try {
-                        val i = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(i)
-                    } catch (_: Throwable) {}
-                }
-                PermissionRow("Display Over Other Apps", hasOverlay) {
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            val i = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
-                                data = Uri.parse("package:${context.packageName}")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(i)
-                        }
-                    } catch (_: Throwable) {}
-                }
-                PermissionRow("Accessibility Service", hasAccess) {
-                    if (hasAccess) {
+            item {
+                SettingsCard {
+                    Text("PERMISSIONS", color = PrimaryManaBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    PermissionRow("Notifications", hasNotif) {
                         try {
-                            val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                            val i = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             context.startActivity(i)
                         } catch (_: Throwable) {}
-                    } else {
-                        showAccessibilityDisclosure.value = true
                     }
-                }
-                if (showAccessibilityDisclosure.value) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showAccessibilityDisclosure.value = false },
-                        containerColor = DarkCard,
-                        title = {
-                            Text(
-                                "Accessibility Service Disclosure",
-                                color = PrimaryManaBlue,
-                                fontSize = 15.sp,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                            )
-                        },
-                        text = {
-                            Text(
-                                "SL Tasker uses Android's Accessibility Service API strictly for the optional App Blocker focus feature. When enabled, it checks only the active foreground app package name to block apps you selected during low-HP penalty mode or active Critical quests.\n\nSL Tasker does NOT read screen content, messages, passwords, or personal input, and never collects or transmits any accessibility data off your device. You can disable it anytime in Android Settings.",
-                                color = TextPrimary,
-                                fontSize = 12.sp,
-                                lineHeight = 17.sp
-                            )
-                        },
-                        confirmButton = {
-                            androidx.compose.material3.Button(
-                                onClick = {
-                                    showAccessibilityDisclosure.value = false
-                                    try {
-                                        val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        }
-                                        context.startActivity(i)
-                                    } catch (_: Throwable) {}
-                                },
-                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                    containerColor = PrimaryManaBlue
-                                )
-                            ) {
-                                Text("CONTINUE TO SETTINGS", fontSize = 11.sp)
-                            }
-                        },
-                        dismissButton = {
-                            androidx.compose.material3.TextButton(
-                                onClick = { showAccessibilityDisclosure.value = false }
-                            ) {
-                                Text("NOT NOW", color = TextMuted, fontSize = 11.sp)
-                            }
-                        }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            SettingsCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("BATTERY SAVER (LITE GLASS)", color = TextPrimary, fontSize = 12.sp)
-                        Text("Disable heavy animations", color = TextMuted, fontSize = 10.sp)
-                    }
-                    Switch(
-                        checked = ThemeState.isLiteMode,
-                        onCheckedChange = { isLite ->
-                            ThemeState.isLiteMode = isLite
-                            try {
-                                context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
-                                    .edit().putBoolean("lite_mode", isLite).apply()
-                            } catch (_: Throwable) {}
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = DarkCard,
-                            checkedTrackColor = PrimaryManaBlue
-                        )
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            SettingsCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("TEST MODE", color = TextPrimary, fontSize = 12.sp)
-                        Text(
-                            "Blocks selected apps temporarily.",
-                            color = TextMuted,
-                            fontSize = 10.sp
-                        )
-                    }
-                    Switch(
-                        checked = s.mode == BlockMode.TEST,
-                        onCheckedChange = { on ->
-                            scope.launch {
-                                prefs.setMode(if (on) BlockMode.TEST else BlockMode.OFF)
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = DarkCard,
-                            checkedTrackColor = GoldWarning
-                        )
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            SettingsCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("STRICT MODE", color = TextPrimary, fontSize = 12.sp)
-                        Text(
-                            "Blocks all apps except protected.",
-                            color = TextMuted,
-                            fontSize = 10.sp
-                        )
-                    }
-                    Switch(
-                        checked = s.mode == BlockMode.STRICT,
-                        onCheckedChange = { on ->
-                            scope.launch {
-                                prefs.setMode(if (on) BlockMode.STRICT else BlockMode.OFF)
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = DarkCard,
-                            checkedTrackColor = DangerPenaltyRed
-                        )
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            val selectablePkgs = remember(allApps) {
-                allApps
-                    .filter { it.pkg != "com.neurasamu.build.sl_tasker" }
-                    .filterNot { it.pkg in PROTECTED_PACKAGES }
-                    .map { it.pkg }
-                    .toSet()
-            }
-            val allSelected = selectablePkgs.isNotEmpty() && selectablePkgs.all { it in s.selectedPackages }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "APP LIST",
-                    color = PrimaryManaBlue,
-                    fontSize = 11.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(DarkCard)
-                        .border(
-                            1.dp,
-                            if (allSelected) DangerPenaltyRed else DarkBorder,
-                            RoundedCornerShape(6.dp)
-                        )
-                        .clickable {
-                            scope.launch {
-                                if (allSelected) {
-                                    prefs.setSelected(emptySet())
-                                } else {
-                                    if (!LicenseManager.isPro()) {
-                                        PaywallTrigger.show("Blocking all apps requires Pro. Free tier allows 1 app.")
-                                    } else {
-                                        prefs.setSelected(selectablePkgs)
-                                    }
+                    PermissionRow("Alarms & Reminders", hasExactAlarm) {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                val i = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
+                                context.startActivity(i)
                             }
+                        } catch (_: Throwable) {}
+                    }
+                    PermissionRow("Battery Optimization", hasBatteryOpt) {
+                        try {
+                            val i = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(i)
+                        } catch (_: Throwable) {}
+                    }
+                    PermissionRow("Display Over Other Apps", hasOverlay) {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                val i = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(i)
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                    PermissionRow("Accessibility Service", hasAccess) {
+                        if (hasAccess) {
+                            try {
+                                val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(i)
+                            } catch (_: Throwable) {}
+                        } else {
+                            showAccessibilityDisclosure.value = true
                         }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = if (allSelected) "UNSELECT ALL" else "SELECT ALL",
-                        color = if (allSelected) DangerPenaltyRed else PrimaryManaBlue,
-                        fontSize = 10.sp
-                    )
+                    }
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Search,
-                        contentDescription = null,
-                        tint = TextMuted,
-                        modifier = Modifier.size(18.dp)
-                    )
-                },
-                placeholder = { Text("Search app", color = TextMuted, fontSize = 12.sp) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = PrimaryManaBlue,
-                    unfocusedBorderColor = DarkBorder,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    focusedContainerColor = DarkSurface,
-                    unfocusedContainerColor = DarkSurface
-                )
-            )
-            Spacer(Modifier.height(8.dp))
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                items(items = filtered, key = { it.pkg }) { row ->
-                    val isSelf = row.pkg == "com.neurasamu.build.sl_tasker"
-                    val isChecked = isSelf || row.pkg in s.selectedPackages
+            item {
+                SettingsCard {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(DarkCard)
-                            .border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            Text("AUTO-DELETE MISSED TASKS", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             Text(
-                                if (isSelf) "SL Tasker (LOCKED)" else row.label,
-                                color = if (isSelf) PrimaryManaBlue else TextPrimary,
-                                fontSize = 12.sp
+                                "Warns before expiry and auto-deletes missed tasks once time runs out",
+                                color = TextSecondary,
+                                fontSize = 10.sp
                             )
-                            Text(row.pkg, color = TextMuted, fontSize = 9.sp, maxLines = 1)
                         }
                         Switch(
-                            checked = isChecked,
-                            enabled = !isSelf,
-                            onCheckedChange = { on ->
-                                if (on && !isSelf && !LicenseManager.isPro() && s.selectedPackages.size >= 1) {
-                                    PaywallTrigger.show("Free users can only block 1 app. Upgrade to Pro for unlimited blocking.")
-                                } else {
-                                    if (!isSelf) scope.launch { prefs.togglePackage(row.pkg, on) }
+                            checked = autoDeleteMissed,
+                            onCheckedChange = { enabled ->
+                                scope.launch {
+                                    userPrefs.setAutoDeleteMissedTasks(enabled)
                                 }
                             },
                             colors = SwitchDefaults.colors(
@@ -462,6 +253,252 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                     }
                 }
             }
+
+            item {
+                SettingsCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("BATTERY SAVER (LITE GLASS)", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Disable heavy animations", color = TextSecondary, fontSize = 10.sp)
+                        }
+                        Switch(
+                            checked = ThemeState.isLiteMode,
+                            onCheckedChange = { isLite ->
+                                ThemeState.isLiteMode = isLite
+                                try {
+                                    context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                                        .edit().putBoolean("lite_mode", isLite).apply()
+                                } catch (_: Throwable) {}
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = DarkCard,
+                                checkedTrackColor = PrimaryManaBlue
+                            )
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingsCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("TEST MODE", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Blocks selected apps temporarily.",
+                                color = TextSecondary,
+                                fontSize = 10.sp
+                            )
+                        }
+                        Switch(
+                            checked = s.mode == BlockMode.TEST,
+                            onCheckedChange = { on ->
+                                scope.launch {
+                                    prefs.setMode(if (on) BlockMode.TEST else BlockMode.OFF)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = DarkCard,
+                                checkedTrackColor = GoldWarning
+                            )
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingsCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("STRICT MODE", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Blocks all apps except protected.",
+                                color = TextSecondary,
+                                fontSize = 10.sp
+                            )
+                        }
+                        Switch(
+                            checked = s.mode == BlockMode.STRICT,
+                            onCheckedChange = { on ->
+                                scope.launch {
+                                    prefs.setMode(if (on) BlockMode.STRICT else BlockMode.OFF)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = DarkCard,
+                                checkedTrackColor = DangerPenaltyRed
+                            )
+                        )
+                    }
+                }
+            }
+
+            item {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "APP LIST",
+                            color = PrimaryManaBlue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(DarkCard)
+                                .border(
+                                    1.dp,
+                                    if (allSelected) DangerPenaltyRed else DarkBorder,
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .clickable {
+                                    scope.launch {
+                                        if (allSelected) {
+                                            prefs.setSelected(emptySet())
+                                        } else {
+                                            if (!LicenseManager.isPro()) {
+                                                PaywallTrigger.show("Blocking all apps requires Pro. Free tier allows 1 app.")
+                                            } else {
+                                                prefs.setSelected(selectablePkgs)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = if (allSelected) "UNSELECT ALL" else "SELECT ALL",
+                                color = if (allSelected) DangerPenaltyRed else PrimaryManaBlue,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = null,
+                                tint = TextMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        placeholder = { Text("Search app", color = TextMuted, fontSize = 12.sp) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PrimaryManaBlue,
+                            unfocusedBorderColor = DarkBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedContainerColor = DarkSurface,
+                            unfocusedContainerColor = DarkSurface
+                        )
+                    )
+                }
+            }
+
+            items(items = filtered, key = { it.pkg }) { row ->
+                val isSelf = row.pkg == "com.neurasamu.build.sl_tasker"
+                val isChecked = isSelf || row.pkg in s.selectedPackages
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(DarkCard)
+                        .border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (isSelf) "SL Tasker (LOCKED)" else row.label,
+                            color = if (isSelf) PrimaryManaBlue else TextPrimary,
+                            fontSize = 12.sp
+                        )
+                        Text(row.pkg, color = TextMuted, fontSize = 9.sp, maxLines = 1)
+                    }
+                    Switch(
+                        checked = isChecked,
+                        enabled = !isSelf,
+                        onCheckedChange = { on ->
+                            if (on && !isSelf && !LicenseManager.isPro() && s.selectedPackages.size >= 1) {
+                                PaywallTrigger.show("Free users can only block 1 app. Upgrade to Pro for unlimited blocking.")
+                            } else {
+                                if (!isSelf) scope.launch { prefs.togglePackage(row.pkg, on) }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = DarkCard,
+                            checkedTrackColor = PrimaryManaBlue
+                        )
+                    )
+                }
+            }
+        }
+
+        if (showAccessibilityDisclosure.value) {
+            AlertDialog(
+                onDismissRequest = { showAccessibilityDisclosure.value = false },
+                containerColor = DarkCard,
+                title = {
+                    Text(
+                        "Accessibility Service Disclosure",
+                        color = PrimaryManaBlue,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        "SL Tasker uses Android's Accessibility Service API strictly for the optional App Blocker focus feature. When enabled, it checks only the active foreground app package name to block apps you selected during low-HP penalty mode or active Critical quests.\n\nSL Tasker does NOT read screen content, messages, passwords, or personal input, and never collects or transmits any accessibility data off your device. You can disable it anytime in Android Settings.",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showAccessibilityDisclosure.value = false
+                            try {
+                                val i = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(i)
+                            } catch (_: Throwable) {}
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PrimaryManaBlue
+                        )
+                    ) {
+                        Text("CONTINUE TO SETTINGS", fontSize = 11.sp)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showAccessibilityDisclosure.value = false }
+                    ) {
+                        Text("NOT NOW", color = TextMuted, fontSize = 11.sp)
+                    }
+                }
+            )
         }
     }
 }
@@ -492,7 +529,6 @@ private fun loadInstalledApps(context: Context): List<AppRow> {
         }
         .distinctBy { it.pkg }
         .sortedBy {
-            // SL Tasker always first
             if (it.pkg == "com.neurasamu.build.sl_tasker") "" else it.label.lowercase()
         }
 }
@@ -538,7 +574,7 @@ private fun PermissionRow(
                 if (granted) "MANAGE" else "GRANT",
                 color = PrimaryManaBlue,
                 fontSize = 10.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

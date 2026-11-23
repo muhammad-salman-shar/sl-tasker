@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.neurasamu.build.sl_tasker.data.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
@@ -25,6 +26,7 @@ class UserPreferences(private val context: Context) {
         val ALARM_DEFAULT_PIN = stringPreferencesKey("alarm_default_pin")
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val VIBRATION_ENABLED = booleanPreferencesKey("vibration_enabled")
+        val AUTO_DELETE_MISSED_TASKS = booleanPreferencesKey("auto_delete_missed_tasks")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data
@@ -74,6 +76,18 @@ class UserPreferences(private val context: Context) {
             preferences[VIBRATION_ENABLED] ?: true
         }
 
+    val autoDeleteMissedTasksFlow: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[AUTO_DELETE_MISSED_TASKS] ?: false
+        }
+
+    suspend fun isAutoDeleteMissedTasksEnabled(): Boolean {
+        return autoDeleteMissedTasksFlow.first()
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { preferences ->
             preferences[THEME_MODE] = mode.name
@@ -101,6 +115,12 @@ class UserPreferences(private val context: Context) {
     suspend fun setVibrationEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[VIBRATION_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setAutoDeleteMissedTasks(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_DELETE_MISSED_TASKS] = enabled
         }
     }
 }

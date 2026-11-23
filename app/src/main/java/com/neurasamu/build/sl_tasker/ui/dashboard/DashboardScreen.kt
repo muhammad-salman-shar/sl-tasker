@@ -1,10 +1,9 @@
 package com.neurasamu.build.sl_tasker.ui.dashboard
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import com.neurasamu.build.sl_tasker.ui.theme.liquidGlass
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,45 +14,44 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.launch
 import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
+import com.neurasamu.build.sl_tasker.data.repository.TaskRepository
+import com.neurasamu.build.sl_tasker.security.LicenseManager
+import com.neurasamu.build.sl_tasker.security.PaywallTrigger
 import com.neurasamu.build.sl_tasker.ui.components.CreateQuestDialog
 import com.neurasamu.build.sl_tasker.ui.components.HunterHud
 import com.neurasamu.build.sl_tasker.ui.components.QuestCard
-import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
-import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
-import com.neurasamu.build.sl_tasker.security.LicenseManager
-import com.neurasamu.build.sl_tasker.security.PaywallTrigger
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
 import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
-import android.content.Intent
+import kotlinx.coroutines.delay
 
 @Composable
 fun DashboardScreen(
@@ -65,7 +63,6 @@ fun DashboardScreen(
     val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
     var editingTask by remember { mutableStateOf<com.neurasamu.build.sl_tasker.data.model.TaskEntity?>(null) }
-    var timerItem by remember { mutableStateOf<com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem?>(null) }
     var subTab by remember { mutableStateOf(0) }
     var selectedTypeFilter by remember { mutableStateOf<String?>(null) }
     val taskTypes by taskViewModel.taskTypes.collectAsStateWithLifecycle()
@@ -74,6 +71,17 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
     val completedQuests by taskViewModel.completedQuests.collectAsStateWithLifecycle()
 
+    // Automatic 12:00 AM midnight clean-slate trigger while app is open
+    LaunchedEffect(Unit) {
+        while (true) {
+            val now = System.currentTimeMillis()
+            val nextMidnight = TaskRepository.nextMidnightMillis(now)
+            val waitMs = (nextMidnight - now + 1_500L).coerceAtLeast(5_000L)
+            delay(waitMs)
+            taskViewModel.runCleanup()
+        }
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -81,7 +89,7 @@ fun DashboardScreen(
             if (subTab != 2) Box(
                 modifier = Modifier
                     .size(58.dp)
-                    .shadow(8.dp, CircleShape) // standard shadow
+                    .shadow(8.dp, CircleShape)
                     .clip(CircleShape)
                     .background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
@@ -98,7 +106,7 @@ fun DashboardScreen(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                androidx.compose.material3.Text(
+                Text(
                     text = "+",
                     style = MaterialTheme.typography.titleLarge,
                     fontSize = 26.sp,
@@ -119,28 +127,27 @@ fun DashboardScreen(
             HunterHud(stats = playerStats)
 
             if (playerStats.health in 1..49) {
-                val active = playerStats.totalRecoveries
                 val needed = com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.TARGET_EP
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 12.dp)
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .background(com.neurasamu.build.sl_tasker.ui.theme.WarningOrange.copy(alpha = 0.15f))
-                        .border(1.dp, com.neurasamu.build.sl_tasker.ui.theme.WarningOrange, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                        .border(1.dp, com.neurasamu.build.sl_tasker.ui.theme.WarningOrange, RoundedCornerShape(10.dp))
                         .padding(12.dp)
                 ) {
                     Column {
-                        androidx.compose.material3.Text(
+                        Text(
                             "⚠ PENALTY DUNGEON",
                             color = com.neurasamu.build.sl_tasker.ui.theme.WarningOrange,
                             fontSize = 11.sp,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                             letterSpacing = 2.sp
                         )
-                        androidx.compose.material3.Text(
+                        Text(
                             "Health critical. Complete tasks to earn $needed EP and restore ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP.",
-                            color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
+                            color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else TextMuted,
                             fontSize = 10.sp,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -153,9 +160,9 @@ fun DashboardScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(DarkCard)
-                    .border(1.dp, com.neurasamu.build.sl_tasker.ui.theme.DarkBorder, androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                    .border(1.dp, com.neurasamu.build.sl_tasker.ui.theme.DarkBorder, RoundedCornerShape(10.dp))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -164,9 +171,9 @@ fun DashboardScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(8.dp))
                             .background(if (sel) PrimaryManaBlue.copy(alpha = 0.15f) else DarkCard)
-                            .border(1.dp, if (sel) PrimaryManaBlue else com.neurasamu.build.sl_tasker.ui.theme.DarkBorder, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .border(1.dp, if (sel) PrimaryManaBlue else com.neurasamu.build.sl_tasker.ui.theme.DarkBorder, RoundedCornerShape(8.dp))
                             .clickable { subTab = idx }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
@@ -200,7 +207,6 @@ fun DashboardScreen(
 
             val rawList = if (subTab == 0) activeQuests else completedQuests
 
-            // WhatsApp-style category filter row (INCOMPLETE / COMPLETED)
             if (taskTypes.isNotEmpty()) {
                 androidx.compose.foundation.lazy.LazyRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -233,9 +239,9 @@ fun DashboardScreen(
             }
 
             val currentList = if (selectedTypeFilter == null) rawList
-                              else rawList.filter {
-                                  it.task.userType.equals(selectedTypeFilter, ignoreCase = true)
-                              }
+            else rawList.filter {
+                it.task.userType.equals(selectedTypeFilter, ignoreCase = true)
+            }
             if (currentList.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -247,7 +253,7 @@ fun DashboardScreen(
                         Text(
                             text = when {
                                 selectedTypeFilter != null -> "NO ${selectedTypeFilter!!.uppercase()} QUESTS"
-                                subTab == 1 -> "NO COMPLETED QUESTS"
+                                subTab == 1 -> "NO COMPLETED QUESTS TODAY"
                                 else -> "NO ACTIVE QUESTS"
                             },
                             style = MaterialTheme.typography.titleMedium,
@@ -257,7 +263,7 @@ fun DashboardScreen(
                         Text(
                             text = when {
                                 selectedTypeFilter != null -> "Tap + to add a task in $selectedTypeFilter or switch category."
-                                subTab == 1 -> "Completed quests will appear here."
+                                subTab == 1 -> "Completed tasks clear automatically at 12:00 AM midnight."
                                 else -> "All daily system objectives cleared. Stand by for awakening."
                             },
                             style = MaterialTheme.typography.bodyMedium,
@@ -331,7 +337,7 @@ fun DashboardScreen(
             existingTypes = taskTypes,
             onAddType = { taskViewModel.addTaskType(it) },
             onDeleteType = { taskViewModel.removeTaskType(it) },
-            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays ->
+            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays, isAdvanced, hpDropEnabled, requireQrProof, stepGoal ->
                 var blocked = false
                 if (!LicenseManager.isPro()) {
                     when (difficulty) {
@@ -366,7 +372,11 @@ fun DashboardScreen(
                     allowEarlyComplete = allowEarly,
                     userType = userType,
                     scheduleMode = scheduleMode,
-                    validityDays = validityDays
+                    validityDays = validityDays,
+                    isAdvanced = isAdvanced,
+                    hpDropEnabled = hpDropEnabled,
+                    requireQrProof = requireQrProof,
+                    stepGoal = stepGoal
                 )
                 showCreateDialog = false
             }
@@ -380,7 +390,7 @@ fun DashboardScreen(
             existingTypes = taskTypes,
             onAddType = { taskViewModel.addTaskType(it) },
             onDeleteType = { taskViewModel.removeTaskType(it) },
-            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays ->
+            onConfirm = { title, difficulty, reminderMinutesOfDay, daysCsv, durationMinutes, isRepeat, allowEarly, userType, scheduleMode, validityDays, isAdvanced, hpDropEnabled, requireQrProof, stepGoal ->
                 taskViewModel.updateTaskFields(
                     taskId = task.id,
                     title = title,
@@ -393,7 +403,11 @@ fun DashboardScreen(
                     allowEarlyComplete = allowEarly,
                     userType = userType,
                     scheduleMode = scheduleMode,
-                    validityDays = validityDays
+                    validityDays = validityDays,
+                    isAdvanced = isAdvanced,
+                    hpDropEnabled = hpDropEnabled,
+                    requireQrProof = requireQrProof,
+                    stepGoal = stepGoal
                 )
                 editingTask = null
             }
@@ -407,7 +421,7 @@ private fun TypeChipSmall(label: String, count: Int, selected: Boolean, onClick:
     val accent = com.neurasamu.build.sl_tasker.ui.theme.AccentGold
     Row(
         modifier = Modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 if (selected) accent.copy(alpha = 0.22f)
                 else if (isLight) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
@@ -416,23 +430,23 @@ private fun TypeChipSmall(label: String, count: Int, selected: Boolean, onClick:
             .border(
                 1.dp,
                 if (selected) accent else com.neurasamu.build.sl_tasker.ui.theme.DarkBorder,
-                androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
+                RoundedCornerShape(20.dp)
             )
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        androidx.compose.material3.Text(
+        Text(
             label,
-            color = if (selected) accent else com.neurasamu.build.sl_tasker.ui.theme.TextMuted,
+            color = if (selected) accent else TextMuted,
             fontSize = 11.sp,
             fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal
         )
         if (count > 0) {
-            androidx.compose.material3.Text(
+            Text(
                 "$count",
-                color = if (selected) accent else com.neurasamu.build.sl_tasker.ui.theme.TextMuted.copy(alpha = 0.75f),
+                color = if (selected) accent else TextMuted.copy(alpha = 0.75f),
                 fontSize = 10.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
             )

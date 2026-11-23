@@ -9,15 +9,18 @@ import com.neurasamu.build.sl_tasker.data.model.OccurrenceStatus
 import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
 import com.neurasamu.build.sl_tasker.data.model.Priority
 import com.neurasamu.build.sl_tasker.data.model.RecoveryQuestEntity
+import com.neurasamu.build.sl_tasker.data.model.RepeatRule
+import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 import com.neurasamu.build.sl_tasker.data.model.TaskDebtEntity
 import com.neurasamu.build.sl_tasker.data.model.TaskEntity
-import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
 import com.neurasamu.build.sl_tasker.domain.engine.PenaltyEngine
 import com.neurasamu.build.sl_tasker.domain.engine.RecurrenceHelper
+import com.neurasamu.build.sl_tasker.util.HpAlertNotifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 class TaskRepository(private val database: AppDatabase) {
 
@@ -59,17 +62,18 @@ class TaskRepository(private val database: AppDatabase) {
             val occurrence = occurrenceDao.getOccurrenceById(occurrenceId) ?: return@withTransaction false
             if (occurrence.status == OccurrenceStatus.COMPLETED) return@withTransaction false
             val task = taskDao.getTaskById(occurrence.taskId) ?: return@withTransaction false
-            // Defense-in-depth time gate — UI prevents this, but enforce here too
             if (!task.allowEarlyComplete && System.currentTimeMillis() < occurrence.scheduledAt) {
                 return@withTransaction false
             }
             val currentStats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
 
             val nowMs = System.currentTimeMillis()
+            val midnightAt = nextMidnightMillis(nowMs)
+            val cleanupAt = minOf(nowMs + 24L * 60L * 60L * 1000L, midnightAt)
             val updatedOccurrence = occurrence.copy(
                 status = OccurrenceStatus.COMPLETED,
                 completedAt = nowMs,
-                completedCleanupAt = nowMs + 24L * 60L * 60L * 1000L
+                completedCleanupAt = cleanupAt
             )
             occurrenceDao.updateOccurrence(updatedOccurrence)
 
@@ -87,7 +91,6 @@ class TaskRepository(private val database: AppDatabase) {
                 isPro = com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()
             )
 
-            // Milestone bonus EP (goes into epModulo within level)
             var finalStats = gameResult.updatedStats
             val milestoneBonus = when (streakResult.milestoneReached) {
                 3 -> 5
@@ -107,6 +110,7 @@ class TaskRepository(private val database: AppDatabase) {
                     level = finalStats.level + extraLevels
                 )
             }
+
             // ---- Recovery quest update ----
             try {
                 val activeRecovery = recoveryQuestDao.getActiveRecoveryQuestsList()
@@ -131,13 +135,13 @@ class TaskRepository(private val database: AppDatabase) {
                         )
                         playerStatsDao.insertOrUpdate(finalStats)
                         com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
-                            "💚 RECOVERED! +${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP"
+                            "RECOVERED! +${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP"
                         )
                     } else {
                         recoveryQuestDao.updateRecoveryQuest(rq.copy(earnedEp = newEarned))
                         val remaining = rq.requiredEp - newEarned
                         com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
-                            "⚡ Recovery: $remaining EP to go"
+                            "Recovery: $remaining EP to go"
                         )
                     }
                 }
@@ -145,15 +149,14 @@ class TaskRepository(private val database: AppDatabase) {
 
             playerStatsDao.insertOrUpdate(finalStats)
 
-            // Notify via SystemEvents (survives across repository/UI)
             try {
                 if (streakResult.milestoneReached != null) {
                     com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
-                        "🔥 ${streakResult.milestoneReached}-day streak! +$milestoneBonus EP"
+                        "${streakResult.milestoneReached}-day streak! +$milestoneBonus EP"
                     )
                 } else if (streakResult.broken) {
                     com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
-                        "💔 Streak reset. Start again."
+                        "Streak reset. Start again."
                     )
                 }
             } catch (_: Throwable) {}
@@ -180,16 +183,11 @@ class TaskRepository(private val database: AppDatabase) {
 
             taskDebtDao.resolveDebt(occurrenceId)
 
-            if (task.repeatRule == com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE) {
-                // One-time task: archive it so it disappears from active lists
+            if (task.repeatRule == RepeatRule.ONCE) {
                 taskDao.archiveTask(task.id)
             } else if (task.scheduleMode == ScheduleMode.NO_TIME) {
-                // NO_TIME repeat: do NOT create next occurrence here.
-                // Cleanup worker will create a fresh instance after 24h of completed retention.
+                // NO_TIME repeat: Cleanup worker spawns fresh instance at midnight / 24h reset.
             } else {
-                // Repeat task: only create a next occurrence if none exists AND the
-                // calculated next time is strictly in the future (prevents duplicates
-                // and phantom same-time occurrences).
                 val now = System.currentTimeMillis()
                 val existingNext = occurrenceDao.getNextPendingOccurrence(task.id, now)
                 if (existingNext == null) {
@@ -198,8 +196,6 @@ class TaskRepository(private val database: AppDatabase) {
                         repeatRule = task.repeatRule,
                         customRepeatDays = task.customRepeatDays
                     )
-                    // Ensure the next occurrence is strictly after the one we just completed
-                    // AND after now — prevents infinite same-time loops on repeat tasks.
                     val minNext = maxOf(now, occurrence.scheduledAt + 60_000L)
                     if (nextScheduled != null && nextScheduled >= minNext) {
                         val durationMillis = task.durationMinutes * 60 * 1000L
@@ -230,29 +226,37 @@ class TaskRepository(private val database: AppDatabase) {
         }
     }
 
-    suspend fun markOccurrenceMissed(occurrenceId: Long): Boolean = withContext(Dispatchers.IO) {
+    suspend fun markOccurrenceMissed(
+        occurrenceId: Long,
+        autoDeleteMissed: Boolean = false
+    ): Boolean = withContext(Dispatchers.IO) {
         database.withTransaction {
             val occurrence = occurrenceDao.getOccurrenceById(occurrenceId) ?: return@withTransaction false
             val task = taskDao.getTaskById(occurrence.taskId) ?: return@withTransaction false
             val currentStats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
 
-            val updatedOccurrence = occurrence.copy(
-                status = OccurrenceStatus.MISSED,
-                penaltyAppliedCount = occurrence.penaltyAppliedCount + 1
-            )
-            occurrenceDao.updateOccurrence(updatedOccurrence)
-
-            val penaltyResult = PenaltyEngine.processMissedTask(
-                currentStats = currentStats,
-                priority = task.priority,
-                difficulty = task.difficulty
-            )
-            playerStatsDao.insertOrUpdate(penaltyResult.updatedStats)
-            com.neurasamu.build.sl_tasker.util.HpAlertNotifier.notifyHpDrop(
-                currentStats.health,
-                penaltyResult.updatedStats.health,
-                "Missed Quest: ${task.title}"
-            )
+            var healthLost = 0
+            var recoveryTriggered = false
+            if (task.hpDropEnabled) {
+                val penaltyResult = PenaltyEngine.processMissedTask(
+                    currentStats = currentStats,
+                    priority = task.priority,
+                    difficulty = task.difficulty
+                )
+                healthLost = penaltyResult.healthLost
+                recoveryTriggered = penaltyResult.recoveryModeTriggered
+                playerStatsDao.insertOrUpdate(penaltyResult.updatedStats)
+                HpAlertNotifier.notifyHpDrop(
+                    currentStats.health,
+                    penaltyResult.updatedStats.health,
+                    "Missed Quest: ${task.title}"
+                )
+            } else {
+                // HP Drop disabled for this task: still count totalMissed, zero HP loss
+                playerStatsDao.insertOrUpdate(
+                    currentStats.copy(totalMissed = currentStats.totalMissed + 1)
+                )
+            }
 
             eventDao.insertEvent(
                 EventEntity(
@@ -260,21 +264,31 @@ class TaskRepository(private val database: AppDatabase) {
                     taskId = task.id,
                     type = EventType.OCCURRENCE_MISSED,
                     epDelta = 0,
-                    healthDelta = -penaltyResult.healthLost,
-                    note = "Missed Quest: ${task.title}"
+                    healthDelta = -healthLost,
+                    note = if (autoDeleteMissed) "Auto-deleted missed: ${task.title}" else "Missed Quest: ${task.title}"
                 )
             )
 
-            taskDebtDao.insertDebt(
-                TaskDebtEntity(
-                    taskId = task.id,
-                    occurrenceId = occurrenceId,
-                    originalDeadline = occurrence.deadlineAt
+            if (autoDeleteMissed) {
+                handleAutoDeleteMissedOccurrence(occurrence, task)
+            } else {
+                val updatedOccurrence = occurrence.copy(
+                    status = OccurrenceStatus.MISSED,
+                    penaltyAppliedCount = occurrence.penaltyAppliedCount + 1,
+                    completedCleanupAt = System.currentTimeMillis() + 24L * 60L * 60L * 1000L
                 )
-            )
+                occurrenceDao.updateOccurrence(updatedOccurrence)
 
-            if (penaltyResult.recoveryModeTriggered) {
-                // Only create if no active recovery quest exists
+                taskDebtDao.insertDebt(
+                    TaskDebtEntity(
+                        taskId = task.id,
+                        occurrenceId = occurrenceId,
+                        originalDeadline = occurrence.deadlineAt
+                    )
+                )
+            }
+
+            if (recoveryTriggered) {
                 val existing = recoveryQuestDao.getActiveRecoveryQuestsList()
                 if (existing.isEmpty()) {
                     recoveryQuestDao.insertRecoveryQuest(
@@ -285,7 +299,7 @@ class TaskRepository(private val database: AppDatabase) {
                         )
                     )
                     com.neurasamu.build.sl_tasker.util.SystemEvents.toast(
-                        "⚠️ PENALTY ZONE: Earn ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.TARGET_EP} EP to restore ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP"
+                        "PENALTY ZONE: Earn ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.TARGET_EP} EP to restore ${com.neurasamu.build.sl_tasker.domain.engine.RecoveryEngine.HP_RESTORE} HP"
                     )
                 }
             }
@@ -313,7 +327,8 @@ class TaskRepository(private val database: AppDatabase) {
 
     suspend fun applyOverduePenalties(
         now: Long,
-        allowForegroundCatchup: Boolean = false
+        allowForegroundCatchup: Boolean = false,
+        autoDeleteMissed: Boolean = false
     ): Boolean = withContext(Dispatchers.IO) {
         val timerActive = com.neurasamu.build.sl_tasker.util.AppRuntimeState.hasActiveTimer()
         val inForeground = com.neurasamu.build.sl_tasker.util.AppRuntimeState.isAppInForeground
@@ -323,9 +338,21 @@ class TaskRepository(private val database: AppDatabase) {
             val overdue = taskDao.getPendingOverdueOccurrences(now)
             if (overdue.isEmpty()) return@withTransaction false
 
-            // Rule: Never deduct HP while user is inside SL Tasker or while any task is
-            // in progress (Start clicked, even if running in the background). Freeze the
-            // overdue clock so protected time never turns into retroactive HP loss later.
+            // Still fire approaching auto-delete warnings even while user is in-app
+            if (autoDeleteMissed) {
+                for (occ in overdue) {
+                    val task = taskDao.getTaskById(occ.taskId) ?: continue
+                    val expiresAt = computeExpiryMillis(occ, task)
+                    if (expiresAt != null && now < expiresAt) {
+                        val remainingMs = expiresAt - now
+                        if (remainingMs <= 15L * 60L * 1000L) {
+                            val minsLeft = ((remainingMs + 59_999L) / 60_000L).toInt().coerceAtLeast(1)
+                            HpAlertNotifier.notifyAutoDeleteWarning(occ.id, task.title, minsLeft)
+                        }
+                    }
+                }
+            }
+
             if (protected) {
                 for (occ in overdue) {
                     val task = taskDao.getTaskById(occ.taskId) ?: continue
@@ -335,6 +362,7 @@ class TaskRepository(private val database: AppDatabase) {
                 }
                 return@withTransaction false
             }
+
             var stats = playerStatsDao.getPlayerStats() ?: PlayerStatsEntity()
             var changed = false
 
@@ -344,18 +372,11 @@ class TaskRepository(private val database: AppDatabase) {
                 // NO_TIME + lifetime: never missed, never penalized
                 if (task.scheduleMode == ScheduleMode.NO_TIME && task.validityDays == 0) continue
 
-                // Determine if truly expired
-                val expired: Boolean = when (task.scheduleMode) {
-                    ScheduleMode.NO_TIME -> {
-                        val expiresAt = occ.createdAt + task.validityDays.toLong() * 24L * 60L * 60L * 1000L
-                        now >= expiresAt
-                    }
-                    ScheduleMode.TIME -> now >= occ.deadlineAt + 30L * 60L * 1000L
-                }
+                val expiresAt = computeExpiryMillis(occ, task) ?: continue
+                val expired = now >= expiresAt
 
                 if (expired) {
-                    // NO_TIME tasks: apply one-time penalty (no per-minute has run)
-                    if (task.scheduleMode == ScheduleMode.NO_TIME) {
+                    if (task.scheduleMode == ScheduleMode.NO_TIME && task.hpDropEnabled) {
                         try {
                             val oldHp = stats.health
                             val penaltyResult = PenaltyEngine.processMissedTask(
@@ -364,20 +385,16 @@ class TaskRepository(private val database: AppDatabase) {
                                 difficulty = task.difficulty
                             )
                             stats = penaltyResult.updatedStats
-                            com.neurasamu.build.sl_tasker.util.HpAlertNotifier.notifyHpDrop(
+                            HpAlertNotifier.notifyHpDrop(
                                 oldHp,
                                 stats.health,
                                 "Missed: ${task.title}"
                             )
                         } catch (_: Throwable) {}
+                    } else if (task.scheduleMode == ScheduleMode.NO_TIME) {
+                        stats = stats.copy(totalMissed = stats.totalMissed + 1)
                     }
-                    // Mark occurrence MISSED (TIME tasks: per-minute already drained; no extra)
-                    occurrenceDao.updateOccurrence(
-                        occ.copy(
-                            status = OccurrenceStatus.MISSED,
-                            completedCleanupAt = now + 24L * 60L * 60L * 1000L
-                        )
-                    )
+
                     try {
                         eventDao.insertEvent(
                             EventEntity(
@@ -386,31 +403,52 @@ class TaskRepository(private val database: AppDatabase) {
                                 type = EventType.OCCURRENCE_MISSED,
                                 epDelta = 0,
                                 healthDelta = 0,
-                                note = "Missed: " + task.title
+                                note = if (autoDeleteMissed) "Auto-deleted missed: ${task.title}" else "Missed: ${task.title}"
                             )
                         )
                     } catch (_: Throwable) {}
+
+                    if (autoDeleteMissed) {
+                        handleAutoDeleteMissedOccurrence(occ, task)
+                    } else {
+                        occurrenceDao.updateOccurrence(
+                            occ.copy(
+                                status = OccurrenceStatus.MISSED,
+                                completedCleanupAt = now + 24L * 60L * 60L * 1000L
+                            )
+                        )
+                    }
                     changed = true
                 } else if (task.scheduleMode == ScheduleMode.TIME) {
-                    // Ongoing per-minute penalty for TIME tasks not yet expired
+                    // Approaching auto-delete warning (within 15 minutes of expiry)
+                    if (autoDeleteMissed) {
+                        val remainingMs = expiresAt - now
+                        if (remainingMs <= 15L * 60L * 1000L) {
+                            val minsLeft = ((remainingMs + 59_999L) / 60_000L).toInt().coerceAtLeast(1)
+                            HpAlertNotifier.notifyAutoDeleteWarning(occ.id, task.title, minsLeft)
+                        }
+                    }
+
+                    // Ongoing per-minute HP penalty ONLY when hpDropEnabled is true
+                    if (!task.hpDropEnabled) continue
+
                     val since = if (occ.lastPenaltyAt == 0L) occ.scheduledAt else occ.lastPenaltyAt
                     val elapsedMin = ((now - since) / 60_000L).toInt()
                     if (elapsedMin <= 0) continue
                     val perMin = PenaltyEngine.penaltyPerMinute(task.difficulty)
                     val damage = perMin * elapsedMin
-                    
-                    // If user is already at the floor, stop draining to prevent soft-lock
-                    if (stats.health <= com.neurasamu.build.sl_tasker.domain.engine.PenaltyEngine.MIN_HEALTH) {
+
+                    if (stats.health <= PenaltyEngine.MIN_HEALTH) {
                         continue
                     }
-                    
+
                     val oldHp = stats.health
-                    val newHealth = (stats.health - damage).coerceAtLeast(com.neurasamu.build.sl_tasker.domain.engine.PenaltyEngine.MIN_HEALTH)
+                    val newHealth = (stats.health - damage).coerceAtLeast(PenaltyEngine.MIN_HEALTH)
                     stats = stats.copy(
                         health = newHealth,
                         recoveryModeActive = newHealth < 50 || stats.recoveryModeActive
                     )
-                    com.neurasamu.build.sl_tasker.util.HpAlertNotifier.notifyHpDrop(
+                    HpAlertNotifier.notifyHpDrop(
                         oldHp,
                         newHealth,
                         "Overdue: ${task.title}"
@@ -432,6 +470,46 @@ class TaskRepository(private val database: AppDatabase) {
         }
     }
 
+    private suspend fun handleAutoDeleteMissedOccurrence(occ: OccurrenceEntity, task: TaskEntity) {
+        occurrenceDao.deleteOccurrenceById(occ.id)
+        if (task.repeatRule == RepeatRule.ONCE) {
+            taskDao.archiveTask(task.id)
+        } else {
+            // Keep recurring task alive by scheduling its next cycle
+            val now = System.currentTimeMillis()
+            val existingNext = occurrenceDao.getNextPendingOccurrence(task.id, now)
+            if (existingNext == null) {
+                val nextScheduled = RecurrenceHelper.calculateNextOccurrence(
+                    baseScheduledAt = occ.scheduledAt,
+                    repeatRule = task.repeatRule,
+                    customRepeatDays = task.customRepeatDays
+                )
+                val minNext = maxOf(now, occ.scheduledAt + 60_000L)
+                if (nextScheduled != null && nextScheduled >= minNext) {
+                    val durationMillis = task.durationMinutes * 60L * 1000L
+                    occurrenceDao.insertOccurrence(
+                        OccurrenceEntity(
+                            taskId = task.id,
+                            scheduledAt = nextScheduled,
+                            deadlineAt = nextScheduled + durationMillis,
+                            durationMinutes = task.durationMinutes
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun computeExpiryMillis(occ: OccurrenceEntity, task: TaskEntity): Long? {
+        return when (task.scheduleMode) {
+            ScheduleMode.NO_TIME -> {
+                if (task.validityDays <= 0) null
+                else occ.createdAt + task.validityDays.toLong() * 24L * 60L * 60L * 1000L
+            }
+            ScheduleMode.TIME -> occ.deadlineAt + 30L * 60L * 1000L
+        }
+    }
+
     suspend fun getPendingOccurrencesForTask(taskId: Long): List<OccurrenceEntity> =
         withContext(Dispatchers.IO) { occurrenceDao.getPendingByTask(taskId) }
 
@@ -450,7 +528,7 @@ class TaskRepository(private val database: AppDatabase) {
                     recoveryModeActive = newHp < 50 || stats.recoveryModeActive
                 )
             )
-            com.neurasamu.build.sl_tasker.util.HpAlertNotifier.notifyHpDrop(
+            HpAlertNotifier.notifyHpDrop(
                 oldHp,
                 newHp,
                 "Penalty HP Drain"
@@ -485,19 +563,30 @@ class TaskRepository(private val database: AppDatabase) {
             occurrenceDao.getOverdueOccurrences(currentTimeMillis)
         }
 
-    suspend fun performCleanup(now: Long): Int = withContext(Dispatchers.IO) {
+    /**
+     * Cleans up completed tasks after 24h OR at the 12:00 AM midnight boundary
+     * so every morning starts with a clean task board.
+     */
+    suspend fun performCleanup(now: Long, autoDeleteMissed: Boolean = false): Int = withContext(Dispatchers.IO) {
         database.withTransaction {
-            val candidates = occurrenceDao.getCleanupCandidates(now)
+            val midnightStart = StatsRepository.startOfTodayMidnightMillis(now)
+            val candidates = occurrenceDao.getCleanupCandidates(now).toMutableList()
+
+            // Also include any COMPLETED occurrences from before today's 12:00 AM midnight
+            val oldCompleted = occurrenceDao.getCompletedBefore(midnightStart)
+            val seenIds = candidates.map { it.id }.toMutableSet()
+            for (c in oldCompleted) {
+                if (seenIds.add(c.id)) candidates.add(c)
+            }
+
             var deleted = 0
             for (occ in candidates) {
                 try {
                     val task = taskDao.getTaskById(occ.taskId)
-                    // Only COMPLETED + Repeat tasks get a fresh instance
                     if (occ.status == OccurrenceStatus.COMPLETED &&
                         task != null &&
-                        task.repeatRule != com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE
+                        task.repeatRule != RepeatRule.ONCE
                     ) {
-                        // Only create if no PENDING already exists for this task
                         val existingPending = taskDao.getPendingOverdueOccurrences(Long.MAX_VALUE)
                             .any { it.taskId == task.id && it.status == OccurrenceStatus.PENDING }
                         if (!existingPending) {
@@ -535,11 +624,39 @@ class TaskRepository(private val database: AppDatabase) {
                     }
                     occurrenceDao.deleteOccurrenceById(occ.id)
                     deleted++
-                } catch (_: Throwable) {
-                    // Skip this one, continue
+                } catch (_: Throwable) {}
+            }
+
+            if (autoDeleteMissed) {
+                val missedList = occurrenceDao.getAllMissedOccurrences()
+                for (mOcc in missedList) {
+                    try {
+                        val t = taskDao.getTaskById(mOcc.taskId)
+                        if (t != null) {
+                            handleAutoDeleteMissedOccurrence(mOcc, t)
+                        } else {
+                            occurrenceDao.deleteOccurrenceById(mOcc.id)
+                        }
+                        deleted++
+                    } catch (_: Throwable) {}
                 }
             }
+
             deleted
+        }
+    }
+
+    companion object {
+        fun nextMidnightMillis(nowMillis: Long = System.currentTimeMillis()): Long {
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = nowMillis
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            return cal.timeInMillis
         }
     }
 }

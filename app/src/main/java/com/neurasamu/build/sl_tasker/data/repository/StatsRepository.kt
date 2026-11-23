@@ -12,6 +12,7 @@ import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 class StatsRepository(private val database: AppDatabase) {
 
@@ -32,8 +33,14 @@ class StatsRepository(private val database: AppDatabase) {
         }
     }
 
-    fun getRecentEvents(limit: Int = 30): Flow<List<EventEntity>> =
-        eventDao.getRecentEvents(limit)
+    /**
+     * Recent Activity displays events from the current 24-hour / 12:00 AM midnight cycle,
+     * clearing cleanly every midnight while preserving lifetime counters in PlayerStatsEntity.
+     */
+    fun getRecentEvents(limit: Int = 30): Flow<List<EventEntity>> {
+        val midnightStart = startOfTodayMidnightMillis()
+        return eventDao.getEventsSince(midnightStart, limit)
+    }
 
     fun getActiveRecoveryQuests(): Flow<List<RecoveryQuestEntity>> =
         recoveryQuestDao.getActiveRecoveryQuests()
@@ -68,6 +75,19 @@ class StatsRepository(private val database: AppDatabase) {
             )
 
             true
+        }
+    }
+
+    companion object {
+        fun startOfTodayMidnightMillis(nowMillis: Long = System.currentTimeMillis()): Long {
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = nowMillis
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            return cal.timeInMillis
         }
     }
 }

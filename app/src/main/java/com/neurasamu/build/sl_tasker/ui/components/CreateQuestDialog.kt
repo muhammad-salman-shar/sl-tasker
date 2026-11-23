@@ -8,17 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import kotlinx.coroutines.launch
-import androidx.compose.ui.graphics.Color
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,9 +24,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -42,30 +38,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.data.model.Difficulty
+import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
 import com.neurasamu.build.sl_tasker.data.model.TaskEntity
+import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
 import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
+import com.neurasamu.build.sl_tasker.ui.theme.PurpleMagic
 import com.neurasamu.build.sl_tasker.ui.theme.RankA
 import com.neurasamu.build.sl_tasker.ui.theme.RankC
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
+import com.neurasamu.build.sl_tasker.ui.theme.TextOnBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
-import com.neurasamu.build.sl_tasker.data.model.ScheduleMode
+import kotlinx.coroutines.launch
 
 private val DayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
@@ -87,11 +89,21 @@ fun CreateQuestDialog(
         allowEarlyComplete: Boolean,
         userType: String,
         scheduleMode: ScheduleMode,
-        validityDays: Int
+        validityDays: Int,
+        isAdvanced: Boolean,
+        hpDropEnabled: Boolean,
+        requireQrProof: Boolean,
+        stepGoal: Int
     ) -> Unit
 ) {
     val isEdit = initialTask != null
     val isLight = ThemeState.isLight
+    val primaryTextColor = if (isLight) Color(0xFF0B1220) else TextPrimary
+    val mutedTextColor = if (isLight) Color(0xFF475569) else TextSecondary
+    val inactiveSurfaceColor = if (isLight) Color(0xFFF1F5F9) else DarkSurface
+
+    // Top-Middle Dual Tab State: false = Simple, true = Advance
+    var isAdvanceTab by remember { mutableStateOf(initialTask?.isAdvanced ?: false) }
 
     var title by remember { mutableStateOf(initialTask?.title ?: "") }
     var difficulty by remember { mutableStateOf(initialTask?.difficulty ?: Difficulty.MEDIUM) }
@@ -121,6 +133,13 @@ fun CreateQuestDialog(
         mutableStateOf(if ((initialTask?.validityDays ?: 0) > 0) initialTask!!.validityDays.toString() else "")
     }
 
+    // Advance-only controls
+    var hpDropEnabled by remember { mutableStateOf(initialTask?.hpDropEnabled ?: true) }
+    var requireQrProof by remember { mutableStateOf(initialTask?.requireQrProof ?: false) }
+    var stepGoalText by remember {
+        mutableStateOf(if ((initialTask?.stepGoal ?: 0) > 0) initialTask!!.stepGoal.toString() else "")
+    }
+
     var selectedType by remember { mutableStateOf((initialTask?.userType ?: initialType).trim()) }
     var showNewTypeInput by remember { mutableStateOf(false) }
     var newTypeText by remember { mutableStateOf("") }
@@ -129,7 +148,7 @@ fun CreateQuestDialog(
     val typeRowState = rememberLazyListState()
     val dialogScope = rememberCoroutineScope()
     val knownTypes = remember(existingTypes, sessionAdded, sessionRemoved, initialTask?.userType, initialType) {
-        buildList<String> {
+        buildList {
             existingTypes.forEach { t ->
                 val tr = t.trim()
                 if (tr.isNotBlank() && tr.lowercase() !in sessionRemoved && none { it.equals(tr, ignoreCase = true) }) {
@@ -154,26 +173,69 @@ fun CreateQuestDialog(
         Difficulty.HARD -> RankA
         Difficulty.CRITICAL -> DangerPenaltyRed
     }
+    val tabAccent = if (isAdvanceTab) PurpleMagic else PrimaryManaBlue
     val requiresTimer = difficulty != Difficulty.MEDIUM
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = if (isLight)
-            androidx.compose.ui.graphics.Color.White.copy(alpha = 0.95f)
-        else
-            DarkCard.copy(alpha = 0.95f),
+        containerColor = if (isLight) Color.White.copy(alpha = 0.97f) else DarkCard.copy(alpha = 0.97f),
         modifier = Modifier
             .shadow(24.dp, RoundedCornerShape(24.dp))
-            .border(1.dp, if (isLight) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp)),
+            .border(
+                width = if (isAdvanceTab) 1.5.dp else 1.dp,
+                color = if (isAdvanceTab) PurpleMagic else Color.White.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(24.dp)
+            ),
         shape = RoundedCornerShape(24.dp),
         title = {
-            Text(
-                text = if (isEdit) "EDIT TASK" else "NEW TASK",
-                style = MaterialTheme.typography.titleMedium,
-                color = PrimaryManaBlue,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (isEdit) "EDIT TASK" else "CREATE TASK",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = tabAccent,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(10.dp))
+                // Top-Middle Side-by-Side Simple | Advance Dual Tab Switcher
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(0.86f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(inactiveSurfaceColor)
+                        .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(false to "Simple", true to "Advance").forEach { (advFlag, tabLabel) ->
+                        val selected = isAdvanceTab == advFlag
+                        val pillBg = when {
+                            selected && advFlag -> PurpleMagic
+                            selected && !advFlag -> PrimaryManaBlue
+                            else -> Color.Transparent
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(pillBg)
+                                .clickable { isAdvanceTab = advFlag }
+                                .padding(vertical = 7.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = tabLabel,
+                                color = if (selected) TextOnBlue else mutedTextColor,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
         },
         text = {
             Column(
@@ -182,7 +244,7 @@ fun CreateQuestDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Title
+                // 1. Title
                 OutlinedTextField(
                     value = title,
                     onValueChange = { if (it.length <= 50) title = it },
@@ -190,16 +252,16 @@ fun CreateQuestDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryManaBlue,
+                        focusedBorderColor = tabAccent,
                         unfocusedBorderColor = DarkBorder,
-                        focusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                        unfocusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                        focusedLabelColor = PrimaryManaBlue,
-                        unfocusedLabelColor = TextMuted
+                        focusedTextColor = primaryTextColor,
+                        unfocusedTextColor = primaryTextColor,
+                        focusedLabelColor = tabAccent,
+                        unfocusedLabelColor = mutedTextColor
                     )
                 )
 
-                // Type category
+                // 2. Task Type
                 SectionLabel("TASK TYPE")
                 LazyRow(
                     state = typeRowState,
@@ -231,7 +293,7 @@ fun CreateQuestDialog(
                         TypeChip(
                             label = "+ New",
                             selected = showNewTypeInput,
-                            accentColor = PrimaryManaBlue,
+                            accentColor = tabAccent,
                             alwaysTinted = true,
                             onClick = { showNewTypeInput = !showNewTypeInput }
                         )
@@ -250,12 +312,12 @@ fun CreateQuestDialog(
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = PrimaryManaBlue,
+                                focusedBorderColor = tabAccent,
                                 unfocusedBorderColor = DarkBorder,
-                                focusedTextColor = if (isLight) Color(0xFF0B1220) else TextPrimary,
-                                unfocusedTextColor = if (isLight) Color(0xFF0B1220) else TextPrimary,
-                                focusedLabelColor = PrimaryManaBlue,
-                                unfocusedLabelColor = TextMuted
+                                focusedTextColor = primaryTextColor,
+                                unfocusedTextColor = primaryTextColor,
+                                focusedLabelColor = tabAccent,
+                                unfocusedLabelColor = mutedTextColor
                             )
                         )
                         Spacer(Modifier.width(8.dp))
@@ -281,8 +343,8 @@ fun CreateQuestDialog(
                             },
                             enabled = newTypeText.isNotBlank(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = PrimaryManaBlue,
-                                contentColor = Color.White
+                                containerColor = tabAccent,
+                                contentColor = TextOnBlue
                             ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -291,7 +353,7 @@ fun CreateQuestDialog(
                     }
                 }
 
-                // Difficulty
+                // 3. Schedule
                 SectionLabel("SCHEDULE")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -303,19 +365,15 @@ fun CreateQuestDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isSel) PrimaryManaBlue.copy(alpha = 0.2f)
-                                    else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
-                                    else DarkSurface
-                                )
-                                .border(1.dp, if (isSel) PrimaryManaBlue else DarkBorder, RoundedCornerShape(8.dp))
+                                .background(if (isSel) tabAccent.copy(alpha = 0.2f) else inactiveSurfaceColor)
+                                .border(1.dp, if (isSel) tabAccent else DarkBorder, RoundedCornerShape(8.dp))
                                 .clickable { isRepeat = flag }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 label,
-                                color = if (isSel) PrimaryManaBlue else TextMuted,
+                                color = if (isSel) tabAccent else mutedTextColor,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium
                             )
@@ -335,24 +393,21 @@ fun CreateQuestDialog(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(CircleShape)
-                                    .background(
-                                        if (sel) PrimaryManaBlue.copy(alpha = 0.2f)
-                                        else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
-                                        else DarkSurface
-                                    )
-                                    .border(1.dp, if (sel) PrimaryManaBlue else DarkBorder, CircleShape)
+                                    .background(if (sel) tabAccent.copy(alpha = 0.2f) else inactiveSurfaceColor)
+                                    .border(1.dp, if (sel) tabAccent else DarkBorder, CircleShape)
                                     .clickable {
                                         selectedDays = if (sel) selectedDays - idx else selectedDays + idx
                                     }
                                     .padding(vertical = 8.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(d, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 11.sp)
+                                Text(d, color = if (sel) tabAccent else mutedTextColor, fontSize = 11.sp)
                             }
                         }
                     }
                 }
-                
+
+                // 4. Schedule Mode
                 SectionLabel("SCHEDULE MODE")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -364,19 +419,15 @@ fun CreateQuestDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (sel) PrimaryManaBlue.copy(alpha = 0.2f)
-                                    else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
-                                    else DarkSurface
-                                )
-                                .border(1.dp, if (sel) PrimaryManaBlue else DarkBorder, RoundedCornerShape(8.dp))
+                                .background(if (sel) tabAccent.copy(alpha = 0.2f) else inactiveSurfaceColor)
+                                .border(1.dp, if (sel) tabAccent else DarkBorder, RoundedCornerShape(8.dp))
                                 .clickable { scheduleMode = m }
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 label,
-                                color = if (sel) PrimaryManaBlue else TextMuted,
+                                color = if (sel) tabAccent else mutedTextColor,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -384,7 +435,6 @@ fun CreateQuestDialog(
                     }
                 }
 
-                // No Time: validity input
                 if (scheduleMode == ScheduleMode.NO_TIME) {
                     SectionLabel("VALIDITY (optional, blank = lifetime)")
                     OutlinedTextField(
@@ -397,104 +447,101 @@ fun CreateQuestDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = AccentGold,
                             unfocusedBorderColor = DarkBorder,
-                            focusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                            unfocusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
+                            focusedTextColor = primaryTextColor,
+                            unfocusedTextColor = primaryTextColor,
                             focusedLabelColor = AccentGold,
-                            unfocusedLabelColor = TextMuted
+                            unfocusedLabelColor = mutedTextColor
                         )
                     )
                 }
 
-                
-
-                // Time
+                // 5. Time
                 if (scheduleMode == ScheduleMode.TIME) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SectionLabel("TIME")
-                    Spacer(Modifier.width(8.dp))
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(androidx.compose.ui.graphics.Color.Transparent)
-                            .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
-                    ) {
-                        listOf(false to "12h", true to "24h").forEach { (flag, label) ->
-                            val sel = is24h == flag
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(5.dp))
-                                    .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else androidx.compose.ui.graphics.Color.Transparent)
-                                    .clickable { is24h = flag }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Text(label, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 10.sp)
-                            }
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = hourText,
-                        onValueChange = { hourText = it.filter { c -> c.isDigit() }.take(2) },
-                        label = { Text(if (is24h) "HH" else "HH (1-12)") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryManaBlue,
-                            unfocusedBorderColor = DarkBorder,
-                            focusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                            unfocusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                            focusedLabelColor = PrimaryManaBlue,
-                            unfocusedLabelColor = TextMuted
-                        )
-                    )
-                    Text(":", color = TextPrimary, fontSize = 18.sp)
-                    OutlinedTextField(
-                        value = minuteText,
-                        onValueChange = { minuteText = it.filter { c -> c.isDigit() }.take(2) },
-                        label = { Text("MM") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryManaBlue,
-                            unfocusedBorderColor = DarkBorder,
-                            focusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                            unfocusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                            focusedLabelColor = PrimaryManaBlue,
-                            unfocusedLabelColor = TextMuted
-                        )
-                    )
-                    if (!is24h) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SectionLabel("TIME")
+                        Spacer(Modifier.width(8.dp))
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9) else DarkSurface)
                                 .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
                         ) {
-                            listOf("AM", "PM").forEach { t ->
-                                val sel = amPm == t
+                            listOf(false to "12h", true to "24h").forEach { (flag, label) ->
+                                val sel = is24h == flag
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(5.dp))
-                                        .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else androidx.compose.ui.graphics.Color.Transparent)
-                                        .clickable { amPm = t }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        .background(if (sel) tabAccent.copy(alpha = 0.2f) else Color.Transparent)
+                                        .clickable { is24h = flag }
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
-                                    Text(t, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 10.sp)
+                                    Text(label, color = if (sel) tabAccent else mutedTextColor, fontSize = 10.sp)
+                                }
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = hourText,
+                            onValueChange = { hourText = it.filter { c -> c.isDigit() }.take(2) },
+                            label = { Text(if (is24h) "HH" else "HH (1-12)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = tabAccent,
+                                unfocusedBorderColor = DarkBorder,
+                                focusedTextColor = primaryTextColor,
+                                unfocusedTextColor = primaryTextColor,
+                                focusedLabelColor = tabAccent,
+                                unfocusedLabelColor = mutedTextColor
+                            )
+                        )
+                        Text(":", color = primaryTextColor, fontSize = 18.sp)
+                        OutlinedTextField(
+                            value = minuteText,
+                            onValueChange = { minuteText = it.filter { c -> c.isDigit() }.take(2) },
+                            label = { Text("MM") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = tabAccent,
+                                unfocusedBorderColor = DarkBorder,
+                                focusedTextColor = primaryTextColor,
+                                unfocusedTextColor = primaryTextColor,
+                                focusedLabelColor = tabAccent,
+                                unfocusedLabelColor = mutedTextColor
+                            )
+                        )
+                        if (!is24h) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(inactiveSurfaceColor)
+                                    .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
+                            ) {
+                                listOf("AM", "PM").forEach { t ->
+                                    val sel = amPm == t
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(5.dp))
+                                            .background(if (sel) tabAccent.copy(alpha = 0.2f) else Color.Transparent)
+                                            .clickable { amPm = t }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(t, color = if (sel) tabAccent else mutedTextColor, fontSize = 10.sp)
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                } // end if TIME
-
+                // 6. Difficulty
                 SectionLabel("DIFFICULTY")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -507,55 +554,56 @@ fun CreateQuestDialog(
                             Difficulty.HARD -> RankA
                             Difficulty.CRITICAL -> DangerPenaltyRed
                         }
+                        val hpReward = GamificationEngine.hpRewardFor(d)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isSel) c.copy(alpha = 0.25f)
-                                    else if (isLight) androidx.compose.ui.graphics.Color(0xFFF1F5F9)
-                                    else DarkSurface
-                                )
+                                .background(if (isSel) c.copy(alpha = 0.25f) else inactiveSurfaceColor)
                                 .border(1.dp, if (isSel) c else DarkBorder, RoundedCornerShape(8.dp))
                                 .clickable { difficulty = d }
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = d.name,
-                                color = if (isSel) c else TextMuted,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = d.name,
+                                    color = if (isSel) c else mutedTextColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "+${hpReward} HP",
+                                    color = if (isSel) c else mutedTextColor.copy(alpha = 0.85f),
+                                    fontSize = 9.sp
+                                )
+                            }
                         }
                     }
                 }
 
-                // Schedule
-                
-                // Timer (for Hard/Critical)
                 if (requiresTimer) {
                     SectionLabel("TIMER (MINUTES)")
                     OutlinedTextField(
                         value = durationText,
                         onValueChange = { durationText = it.filter { c -> c.isDigit() }.take(4) },
-                        label = { Text("e.g. 60") },
+                        label = { Text("e.g. 30 or 60") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = difficultyColor,
                             unfocusedBorderColor = DarkBorder,
-                            focusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
-                            unfocusedTextColor = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
+                            focusedTextColor = primaryTextColor,
+                            unfocusedTextColor = primaryTextColor,
                             focusedLabelColor = difficultyColor,
-                            unfocusedLabelColor = TextMuted
+                            unfocusedLabelColor = mutedTextColor
                         )
                     )
                 }
 
-                // Completion
-                SectionLabel("COMPLETION")
+                // 7. Allow Complete
+                SectionLabel("ALLOW COMPLETE")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -563,13 +611,13 @@ fun CreateQuestDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "Allow complete anytime",
-                            color = if (isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary,
+                            color = primaryTextColor,
                             fontSize = 11.sp
                         )
                         Text(
                             if (allowEarly) "You can complete before scheduled time"
                             else "Locked until scheduled time",
-                            color = TextMuted,
+                            color = mutedTextColor,
                             fontSize = 9.sp
                         )
                     }
@@ -577,10 +625,128 @@ fun CreateQuestDialog(
                         checked = allowEarly,
                         onCheckedChange = { allowEarly = it },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = if (isLight) androidx.compose.ui.graphics.Color.White else DarkCard,
-                            checkedTrackColor = PrimaryManaBlue
+                            checkedThumbColor = TextOnBlue,
+                            checkedTrackColor = tabAccent
                         )
                     )
+                }
+
+                // ==== ADVANCE-ONLY CONTROLS ====
+                if (isAdvanceTab) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(PurpleMagic.copy(alpha = 0.45f))
+                    )
+                    Text(
+                        text = "ADVANCE CONTROLS",
+                        color = PurpleMagic,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+
+                    // HP Drop On/Off Toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(inactiveSurfaceColor)
+                            .border(1.dp, PurpleMagic.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "HP Drop Penalty",
+                                color = primaryTextColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                if (hpDropEnabled) "ON — Missing this task deducts HP"
+                                else "OFF — Safe mode (no HP lost if missed)",
+                                color = mutedTextColor,
+                                fontSize = 9.sp
+                            )
+                        }
+                        Switch(
+                            checked = hpDropEnabled,
+                            onCheckedChange = { hpDropEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = TextOnBlue,
+                                checkedTrackColor = PurpleMagic
+                            )
+                        )
+                    }
+
+                    // QR / Barcode Proof-of-Work
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(inactiveSurfaceColor)
+                            .border(1.dp, PurpleMagic.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "QR / Barcode Proof-of-Work",
+                                color = primaryTextColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "Require physical QR/barcode scan to complete",
+                                color = mutedTextColor,
+                                fontSize = 9.sp
+                            )
+                        }
+                        Switch(
+                            checked = requireQrProof,
+                            onCheckedChange = { requireQrProof = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = TextOnBlue,
+                                checkedTrackColor = PurpleMagic
+                            )
+                        )
+                    }
+
+                    // Step Counter Goal
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(inactiveSurfaceColor)
+                            .border(1.dp, PurpleMagic.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            "Step Counter Goal (optional)",
+                            color = primaryTextColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = stepGoalText,
+                            onValueChange = { stepGoalText = it.filter { c -> c.isDigit() }.take(6) },
+                            label = { Text("Target steps (e.g. 500, 2000)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PurpleMagic,
+                                unfocusedBorderColor = DarkBorder,
+                                focusedTextColor = primaryTextColor,
+                                unfocusedTextColor = primaryTextColor,
+                                focusedLabelColor = PurpleMagic,
+                                unfocusedLabelColor = mutedTextColor
+                            )
+                        )
+                    }
                 }
             }
         },
@@ -611,6 +777,7 @@ fun CreateQuestDialog(
                     } else {
                         selectedType.trim()
                     }
+                    val parsedSteps = if (isAdvanceTab) (stepGoalText.toIntOrNull()?.coerceAtLeast(0) ?: 0) else 0
                     onConfirm(
                         title,
                         difficulty,
@@ -621,13 +788,17 @@ fun CreateQuestDialog(
                         allowEarly,
                         finalSelectedType,
                         scheduleMode,
-                        validityDaysText.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                        validityDaysText.toIntOrNull()?.coerceAtLeast(0) ?: 0,
+                        isAdvanceTab,
+                        if (isAdvanceTab) hpDropEnabled else true,
+                        if (isAdvanceTab) requireQrProof else false,
+                        parsedSteps
                     )
                 },
                 enabled = valid,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = difficultyColor,
-                    contentColor = androidx.compose.ui.graphics.Color(0xFF0B1220)
+                    containerColor = tabAccent,
+                    contentColor = TextOnBlue
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -636,7 +807,7 @@ fun CreateQuestDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL", color = TextMuted, fontSize = 12.sp)
+                Text("CANCEL", color = mutedTextColor, fontSize = 12.sp)
             }
         }
     )

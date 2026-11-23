@@ -23,5 +23,9 @@ data class TaskEntity(
     val validityDays: Int = 0,
     val criticalTimerMinutes: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
-    val archived: Boolean = false
+    val archived: Boolean = false,
+    val isAdvanced: Boolean = false,
+    val hpDropEnabled: Boolean = true,
+    val requireQrProof: Boolean = false,
+    val stepGoal: Int = 0
 )
