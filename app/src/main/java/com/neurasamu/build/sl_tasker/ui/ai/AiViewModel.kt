@@ -6,12 +6,18 @@ import androidx.lifecycle.viewModelScope
 import com.neurasamu.build.sl_tasker.data.ai.AiApiClient
 import com.neurasamu.build.sl_tasker.data.ai.AiConfig
 import com.neurasamu.build.sl_tasker.data.ai.AiPrompt
+import com.neurasamu.build.sl_tasker.data.ai.AiProvider
 import com.neurasamu.build.sl_tasker.data.ai.AiSettings
+import com.neurasamu.build.sl_tasker.data.ai.AiTestResult
 import com.neurasamu.build.sl_tasker.data.ai.ChatMsg
+import com.neurasamu.build.sl_tasker.data.block.BlockMode
+import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
+import com.neurasamu.build.sl_tasker.data.block.BlockPresets
 import com.neurasamu.build.sl_tasker.data.db.AppDatabase
 import com.neurasamu.build.sl_tasker.data.model.AlarmEntity
 import com.neurasamu.build.sl_tasker.data.model.Difficulty
 import com.neurasamu.build.sl_tasker.data.model.DismissMethod
+import com.neurasamu.build.sl_tasker.data.model.OccurrenceStatus
 import com.neurasamu.build.sl_tasker.data.model.RepeatRule
 import com.neurasamu.build.sl_tasker.data.model.TaskEntity
 import com.neurasamu.build.sl_tasker.data.repository.AlarmRepository
@@ -24,12 +30,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import com.neurasamu.build.sl_tasker.data.block.BlockMode
-import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
-import com.neurasamu.build.sl_tasker.data.block.BlockPresets
-import com.neurasamu.build.sl_tasker.data.model.OccurrenceStatus
 
 data class AiMessage(val role: String, val text: String, val raw: String? = null)
+
+sealed class ConnectionTestState {
+    data object Idle : ConnectionTestState()
+    data object Testing : ConnectionTestState()
+    data class Done(val result: AiTestResult) : ConnectionTestState()
+}
 
 class AiViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -42,6 +50,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
     private val blockPrefs = BlockPrefs(app)
 
     private var currentJob: kotlinx.coroutines.Job? = null
+    private var testJob: kotlinx.coroutines.Job? = null
 
     private val _messages = MutableStateFlow<List<AiMessage>>(emptyList())
     val messages: StateFlow<List<AiMessage>> = _messages
@@ -58,6 +67,9 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
     private val _lastRawResponse = MutableStateFlow<String?>(null)
     val lastRawResponse: StateFlow<String?> = _lastRawResponse
 
+    private val _testState = MutableStateFlow<ConnectionTestState>(ConnectionTestState.Idle)
+    val testState: StateFlow<ConnectionTestState> = _testState
+
     fun cancel() {
         try { currentJob?.cancel() } catch (_: Throwable) {}
         currentJob = null
@@ -72,6 +84,33 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
         _lastRawResponse.value = null
     }
 
+    fun resetTestState() {
+        try { testJob?.cancel() } catch (_: Throwable) {}
+        _testState.value = ConnectionTestState.Idle
+    }
+
+    fun testConnection(
+        provider: AiProvider,
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        timeoutSec: Int
+    ) {
+        try { testJob?.cancel() } catch (_: Throwable) {}
+        _testState.value = ConnectionTestState.Testing
+        testJob = viewModelScope.launch(Dispatchers.IO) {
+            val draft = AiConfig(
+                provider = provider,
+                baseUrl = baseUrl.trim(),
+                apiKey = apiKey.trim(),
+                model = model.trim(),
+                timeoutSec = timeoutSec.coerceIn(10, 180)
+            )
+            val res = client.testConnection(draft)
+            _testState.value = ConnectionTestState.Done(res)
+        }
+    }
+
     val config = settings.config
 
     fun dismissError() { _error.value = null }
@@ -83,6 +122,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveConfig(
+        provider: AiProvider,
         baseUrl: String,
         key: String,
         model: String,
@@ -91,7 +131,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
         useJsonFormat: Boolean
     ) {
         viewModelScope.launch(Dispatchers.IO) {
-            settings.save(baseUrl, key, model, timeoutSec, useStream, useJsonFormat)
+            settings.save(provider, baseUrl, key, model, timeoutSec, useStream, useJsonFormat)
         }
     }
 
@@ -113,8 +153,12 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val cfg = settings.config.first()
                 if (!cfg.isConfigured) {
-                    _messages.value = _messages.value + AiMessage("error",
-                        "Configure API URL + Model in settings (top-right).")
+                    val missingHint = if (cfg.provider == AiProvider.GEMINI) {
+                        "Configure Gemini API Key + Model in settings (top-right)."
+                    } else {
+                        "Configure API URL + Model in settings (top-right)."
+                    }
+                    _messages.value = _messages.value + AiMessage("error", missingHint)
                     return@launch
                 }
 
@@ -124,7 +168,6 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     else AiPrompt.buildAgentPrompt()
                 )
                 val history: List<ChatMsg> = if (cfg.chatMode) {
-                    // Chat mode: full user/assistant history, plain text
                     _messages.value.mapNotNull { m ->
                         when (m.role) {
                             "user" -> ChatMsg("user", m.text)
@@ -133,33 +176,31 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                 } else {
-                    // Agent mode: single message, no history
                     listOf(ChatMsg("user", trimmed))
                 }
 
+                val resolvedUrl = try { client.resolveEndpoint(cfg) } catch (_: Exception) { cfg.baseUrl }
                 _lastRawRequest.value = buildString {
-                    append("URL: ").append(cfg.baseUrl).append('\n')
+                    append("Provider: ").append(cfg.provider.displayName).append('\n')
+                    append("Endpoint: ").append(resolvedUrl).append('\n')
                     append("Model: ").append(cfg.model).append('\n')
-                    append("Stream: ").append(cfg.useStream).append('\n')
-                    append("JSON mode: ").append(cfg.useJsonFormat).append('\n')
-                    val sysLen = if (cfg.chatMode) AiPrompt.buildChatPrompt().length else AiPrompt.buildAgentPrompt().length
-                    append("System prompt length: ").append(sysLen).append(" chars\n")
+                    append("Timeout: ").append(cfg.timeoutSec).append("s\n")
+                    append("Stream: ").append(cfg.useStream).append(" · JSON: ").append(cfg.useJsonFormat).append('\n')
                     append("Messages sent: ").append(history.size)
                 }
 
                 val raw = try {
                     client.chat(cfg, listOf(sysMsg) + history)
                 } catch (e: Exception) {
-                    _lastRawResponse.value = "NETWORK ERROR: ${e.message ?: "unknown"}"
-                    _messages.value = _messages.value + AiMessage("error",
-                        "Network error: ${e.message ?: "unknown"}")
+                    val friendly = client.formatNetworkError(e, cfg.timeoutSec)
+                    _lastRawResponse.value = "ERROR: $friendly"
+                    _messages.value = _messages.value + AiMessage("error", friendly)
                     return@launch
                 }
 
                 _lastRawResponse.value = raw
 
                 if (cfg.chatMode) {
-                    // Chat mode: display raw text directly
                     _messages.value = _messages.value + AiMessage("assistant", raw.trim())
                     return@launch
                 }
@@ -168,7 +209,8 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 val json = try {
                     JSONObject(cleaned)
                 } catch (_: Exception) {
-                    _messages.value = _messages.value + AiMessage("error",
+                    _messages.value = _messages.value + AiMessage(
+                        "error",
                         "Model did not return JSON.",
                         raw = raw.take(600)
                     )
@@ -196,8 +238,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
 
                 val time = parseHm(timeStr)
                 if (title.isBlank() || time == null) {
-                    _messages.value = _messages.value + AiMessage("assistant",
-                        "Need task title and time (HH:MM).")
+                    _messages.value = _messages.value + AiMessage("assistant", "Need task title and time (HH:MM).")
                     return
                 }
 
@@ -206,8 +247,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     "CRITICAL" -> Difficulty.CRITICAL
                     else -> Difficulty.MEDIUM
                 }
-                val dur = if (difficulty == Difficulty.MEDIUM) 0
-                          else durationMin.coerceAtLeast(1)
+                val dur = if (difficulty == Difficulty.MEDIUM) 0 else durationMin.coerceAtLeast(1)
 
                 val (hh, mm) = time
                 val reminderMin = hh * 60 + mm
@@ -231,8 +271,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 scheduler.scheduleReminder(occId, next, title)
 
                 val durText = if (dur > 0) ", ${dur} min" else ""
-                _messages.value = _messages.value + AiMessage("info",
-                    "Task created: \"$title\" at $timeStr ($difficulty$durText).")
+                _messages.value = _messages.value + AiMessage("info", "Task created: \"$title\" at $timeStr ($difficulty$durText).")
             }
             "create_alarm" -> {
                 val label = json.optString("label", "Alarm").trim().ifBlank { "Alarm" }
@@ -246,8 +285,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
 
                 val time = parseHm(timeStr)
                 if (time == null) {
-                    _messages.value = _messages.value + AiMessage("assistant",
-                        "Need alarm time (HH:MM).")
+                    _messages.value = _messages.value + AiMessage("assistant", "Need alarm time (HH:MM).")
                     return
                 }
                 val method = when (methodStr) {
@@ -258,18 +296,15 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 var pin = ""
                 if (method == DismissMethod.PIN) {
                     if (pinIn.length != 8 || !pinIn.all { it.isDigit() }) {
-                        _messages.value = _messages.value + AiMessage("assistant",
-                            "PIN must be exactly 8 digits.")
+                        _messages.value = _messages.value + AiMessage("assistant", "PIN must be exactly 8 digits.")
                         return
                     }
                     if (pinIn.startsWith("12345")) {
-                        _messages.value = _messages.value + AiMessage("assistant",
-                            "PIN cannot start with 12345.")
+                        _messages.value = _messages.value + AiMessage("assistant", "PIN cannot start with 12345.")
                         return
                     }
                     if (pinIn.toSet().size == 1) {
-                        _messages.value = _messages.value + AiMessage("assistant",
-                            "PIN cannot be all same digit.")
+                        _messages.value = _messages.value + AiMessage("assistant", "PIN cannot be all same digit.")
                         return
                     }
                     pin = pinIn
@@ -294,8 +329,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     if (method != DismissMethod.EASY) append(" • ${method.name}")
                     if (snoozeOn) append(" • snooze ${snoozeMin}m")
                 }
-                _messages.value = _messages.value + AiMessage("info",
-                    "Alarm set: \"$label\" at $timeStr$extra.")
+                _messages.value = _messages.value + AiMessage("info", "Alarm set: \"$label\" at $timeStr$extra.")
             }
             "delete_task" -> {
                 val title = json.optString("title").trim()
@@ -473,10 +507,11 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     } else {
                         val current = blockPrefs.state.first()
                         blockPrefs.setSelected(current.selectedPackages + toBlock)
-                        // Ensure Test mode is ON so the block actually triggers
                         if (current.mode == BlockMode.OFF) blockPrefs.setMode(BlockMode.TEST)
-                        _messages.value = _messages.value + AiMessage("info",
-                            "Blocked ${toBlock.size} apps from: ${cats.joinToString(", ")}")
+                        _messages.value = _messages.value + AiMessage(
+                            "info",
+                            "Blocked ${toBlock.size} apps from: ${cats.joinToString(", ")}"
+                        )
                     }
                 } catch (e: Throwable) {
                     _messages.value = _messages.value + AiMessage("assistant", "Error: ${e.message}")
@@ -521,23 +556,19 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun stripFences(raw: String): String {
+        val fence = "\u0060\u0060\u0060"
         var s = raw.trim()
-        // Remove markdown code fences
-        if (s.startsWith("```")) {
-            s = s.removePrefix("```json").removePrefix("```").trim()
-            if (s.endsWith("```")) s = s.dropLast(3).trim()
+        if (s.startsWith(fence)) {
+            s = s.removePrefix(fence + "json").removePrefix(fence).trim()
+            if (s.endsWith(fence)) s = s.dropLast(3).trim()
         }
-        // Handle a model that wrapped the JSON in a quoted string
         if (s.startsWith("\"") && s.endsWith("\"") && s.length > 2) {
             s = s.substring(1, s.length - 1)
         }
-        // Extract first {...} block
         val firstBrace = s.indexOf('{')
         val lastBrace = s.lastIndexOf('}')
-        val candidate = if (firstBrace >= 0 && lastBrace > firstBrace) {
+        return if (firstBrace >= 0 && lastBrace > firstBrace) {
             s.substring(firstBrace, lastBrace + 1)
         } else s
-        // If the model returned a JSON *string* containing JSON, try to unescape
-        return candidate
     }
 }

@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-        <domain includeSubdomains="true">10.0.2.2</domain>
+    <!-- Allow cleartext for dynamic LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x, *.local).
+         Android XML does not support IP wildcards; AiApiClient strictly enforces HTTPS for all public hosts. -->
+    <base-config cleartextTrafficPermitted="true" />
+
+    <!-- Explicitly enforce HTTPS for public AI & web domains -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">openai.com</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">openrouter.ai</domain>
+        <domain includeSubdomains="true">groq.com</domain>
+        <domain includeSubdomains="true">anthropic.com</domain>
+        <domain includeSubdomains="true">neurasamu.com</domain>
     </domain-config>
 </network-security-config>

@@ -7,85 +7,281 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
+import java.net.URI
 import java.net.URL
+import java.net.UnknownHostException
+import javax.net.ssl.SSLException
 
 data class ChatMsg(val role: String, val content: String)
+
+data class AiTestResult(
+    val success: Boolean,
+    val statusCode: Int? = null,
+    val endpoint: String = "",
+    val message: String,
+    val latencyMs: Long = 0L
+)
 
 class AiApiClient {
 
     suspend fun chat(config: AiConfig, messages: List<ChatMsg>): String =
         withContext(Dispatchers.IO) {
-            val endpoint = buildEndpoint(config.baseUrl)
-
-            val body = JSONObject().apply {
-                put("model", config.model)
-                put("temperature", 0.1)
-                put("max_tokens", 512)
-                if (config.useStream) put("stream", true)
-                if (config.useJsonFormat) {
-                    put("response_format", JSONObject().apply { put("type", "json_object") })
-                }
-                put("messages", JSONArray().apply {
-                    messages.forEach { m ->
-                        put(JSONObject().apply {
-                            put("role", m.role)
-                            put("content", m.content)
-                        })
-                    }
-                })
+            when (config.provider) {
+                AiProvider.GEMINI -> chatGemini(config, messages)
+                AiProvider.OPENAI_COMPATIBLE,
+                AiProvider.LOCAL_CUSTOM -> chatOpenAiCompat(config, messages)
             }
+        }
 
-            val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = config.timeoutSec * 1000
-                readTimeout = config.timeoutSec * 1000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Accept", "text/event-stream, application/json")
-                if (config.apiKey.isNotBlank()) {
-                    setRequestProperty("Authorization", "Bearer ${config.apiKey}")
-                }
+    suspend fun testConnection(config: AiConfig): AiTestResult =
+        withContext(Dispatchers.IO) {
+            val start = System.currentTimeMillis()
+            val endpoint = try {
+                resolveEndpoint(config)
+            } catch (e: Exception) {
+                return@withContext AiTestResult(
+                    success = false,
+                    message = e.message ?: "Invalid URL configuration"
+                )
             }
 
             try {
-                OutputStreamWriter(conn.outputStream, "UTF-8").use { w ->
-                    w.write(body.toString())
-                    w.flush()
+                val pingMessages = listOf(
+                    ChatMsg("system", "Reply with OK."),
+                    ChatMsg("user", "Ping")
+                )
+                val testCfg = config.copy(
+                    useStream = false,
+                    useJsonFormat = false,
+                    timeoutSec = config.timeoutSec.coerceIn(10, 90)
+                )
+                val reply = when (testCfg.provider) {
+                    AiProvider.GEMINI -> chatGemini(testCfg, pingMessages, maxTokens = 16)
+                    else -> chatOpenAiCompat(testCfg, pingMessages, maxTokens = 16)
                 }
-
-                val code = conn.responseCode
-                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-
-                if (code !in 200..299) {
-                    val errText = BufferedReader(InputStreamReader(stream, "UTF-8"))
-                        .use { it.readText() }
-                    throw RuntimeException("HTTP $code: ${errText.take(200)}")
-                }
-
-                val contentType = (conn.contentType ?: "").lowercase()
-                val reader = BufferedReader(InputStreamReader(stream, "UTF-8"))
-
-                val result = if (config.useStream && contentType.contains("text/event-stream")) {
-                    readSse(reader)
-                } else {
-                    // Even if stream was requested, some servers ignore it and send JSON.
-                    val whole = reader.readText()
-                    val trimmed = whole.trimStart()
-                    if (trimmed.startsWith("data:")) {
-                        // It's actually SSE in a single blob
-                        parseSseBlob(whole)
-                    } else {
-                        parseJsonWhole(whole)
-                    }
-                }
-
-                if (result.isBlank()) throw RuntimeException("Empty response")
-                result
-            } finally {
-                conn.disconnect()
+                val elapsed = System.currentTimeMillis() - start
+                AiTestResult(
+                    success = true,
+                    statusCode = 200,
+                    endpoint = endpoint,
+                    message = "Connected (HTTP 200) in ${elapsed}ms — Reply: \"${reply.trim().take(40)}\"",
+                    latencyMs = elapsed
+                )
+            } catch (e: HttpStatusException) {
+                val elapsed = System.currentTimeMillis() - start
+                AiTestResult(
+                    success = false,
+                    statusCode = e.code,
+                    endpoint = endpoint,
+                    message = formatHttpError(e.code, e.body),
+                    latencyMs = elapsed
+                )
+            } catch (e: Exception) {
+                val elapsed = System.currentTimeMillis() - start
+                AiTestResult(
+                    success = false,
+                    endpoint = endpoint,
+                    message = formatNetworkError(e, config.timeoutSec),
+                    latencyMs = elapsed
+                )
             }
         }
+
+    fun resolveEndpoint(config: AiConfig): String {
+        return when (config.provider) {
+            AiProvider.GEMINI -> buildGeminiEndpoint(config.baseUrl, config.model)
+            AiProvider.OPENAI_COMPATIBLE,
+            AiProvider.LOCAL_CUSTOM -> buildOpenAiEndpoint(config.baseUrl, config.provider)
+        }
+    }
+
+    private fun chatOpenAiCompat(
+        config: AiConfig,
+        messages: List<ChatMsg>,
+        maxTokens: Int = 512
+    ): String {
+        val endpoint = buildOpenAiEndpoint(config.baseUrl, config.provider)
+        val allowJsonFormat = config.useJsonFormat && !config.chatMode
+        val effectiveTimeoutMs = config.timeoutSec.coerceIn(10, 180) * 1000
+
+        return try {
+            executeOpenAiRequest(endpoint, config, messages, maxTokens, allowJsonFormat, effectiveTimeoutMs)
+        } catch (e: HttpStatusException) {
+            // Some local servers (Ollama/llama.cpp/LM Studio) reject response_format: json_object with HTTP 400
+            if (allowJsonFormat && e.code == 400 && e.body.contains("response_format", ignoreCase = true)) {
+                executeOpenAiRequest(endpoint, config, messages, maxTokens, false, effectiveTimeoutMs)
+            } else {
+                throw e
+            }
+        }
+    }
+
+    private fun executeOpenAiRequest(
+        endpoint: String,
+        config: AiConfig,
+        messages: List<ChatMsg>,
+        maxTokens: Int,
+        includeJsonFormat: Boolean,
+        timeoutMs: Int
+    ): String {
+        val body = JSONObject().apply {
+            put("model", config.model.trim())
+            put("temperature", if (config.chatMode) 0.6 else 0.1)
+            put("max_tokens", maxTokens)
+            if (config.useStream) put("stream", true)
+            if (includeJsonFormat) {
+                put("response_format", JSONObject().apply { put("type", "json_object") })
+            }
+            put("messages", JSONArray().apply {
+                messages.forEach { m ->
+                    put(JSONObject().apply {
+                        put("role", m.role)
+                        put("content", m.content)
+                    })
+                }
+            })
+        }
+
+        val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = timeoutMs
+            readTimeout = timeoutMs
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Accept", if (config.useStream) "text/event-stream, application/json" else "application/json")
+            if (config.apiKey.isNotBlank()) {
+                setRequestProperty("Authorization", "Bearer ${config.apiKey.trim()}")
+            }
+        }
+
+        try {
+            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { w ->
+                w.write(body.toString())
+                w.flush()
+            }
+
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+
+            if (code !in 200..299) {
+                val errText = stream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { r -> r.readText() } } ?: ""
+                throw HttpStatusException(code, errText)
+            }
+
+            val contentType = (conn.contentType ?: "").lowercase()
+            val reader = BufferedReader(InputStreamReader(stream, Charsets.UTF_8))
+
+            val result = if (config.useStream && contentType.contains("text/event-stream")) {
+                readSse(reader)
+            } else {
+                val whole = reader.readText()
+                val trimmed = whole.trimStart()
+                if (trimmed.startsWith("data:")) {
+                    parseSseBlob(whole)
+                } else {
+                    parseOpenAiJsonWhole(whole)
+                }
+            }
+
+            if (result.isBlank()) throw RuntimeException("Empty response from model")
+            return result
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun chatGemini(
+        config: AiConfig,
+        messages: List<ChatMsg>,
+        maxTokens: Int = 512
+    ): String {
+        if (config.apiKey.isBlank()) {
+            throw RuntimeException("Gemini API Key is required")
+        }
+        val endpoint = buildGeminiEndpoint(config.baseUrl, config.model)
+        val timeoutMs = config.timeoutSec.coerceIn(10, 180) * 1000
+
+        val systemText = messages.filter { it.role == "system" }.joinToString("\n") { it.content }.trim()
+        val contents = JSONArray()
+        messages.filter { it.role != "system" }.forEach { m ->
+            val geminiRole = if (m.role == "assistant") "model" else "user"
+            contents.put(JSONObject().apply {
+                put("role", geminiRole)
+                put("parts", JSONArray().apply {
+                    put(JSONObject().apply { put("text", m.content) })
+                })
+            })
+        }
+
+        val body = JSONObject().apply {
+            if (systemText.isNotBlank()) {
+                put("system_instruction", JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().apply { put("text", systemText) })
+                    })
+                })
+            }
+            put("contents", contents)
+            put("generationConfig", JSONObject().apply {
+                put("temperature", if (config.chatMode) 0.6 else 0.1)
+                put("maxOutputTokens", maxTokens)
+                if (config.useJsonFormat && !config.chatMode) {
+                    put("responseMimeType", "application/json")
+                }
+            })
+        }
+
+        val conn = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = timeoutMs
+            readTimeout = timeoutMs
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("x-goog-api-key", config.apiKey.trim())
+        }
+
+        try {
+            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { w ->
+                w.write(body.toString())
+                w.flush()
+            }
+
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+
+            if (code !in 200..299) {
+                val errText = stream?.let { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).use { r -> r.readText() } } ?: ""
+                throw HttpStatusException(code, errText)
+            }
+
+            val whole = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
+            val root = JSONObject(whole)
+            root.optJSONObject("error")?.let { err ->
+                throw RuntimeException("Gemini error: ${err.optString("message", "unknown")}")
+            }
+            val candidates = root.optJSONArray("candidates")
+                ?: throw RuntimeException("No candidates in Gemini response")
+            val first = candidates.optJSONObject(0)
+                ?: throw RuntimeException("Empty candidates in Gemini response")
+            val parts = first.optJSONObject("content")?.optJSONArray("parts")
+                ?: throw RuntimeException("No content parts in Gemini response")
+
+            val sb = StringBuilder()
+            for (i in 0 until parts.length()) {
+                val txt = parts.optJSONObject(i)?.optString("text", "") ?: ""
+                if (txt.isNotEmpty()) sb.append(txt)
+            }
+            val result = sb.toString()
+            if (result.isBlank()) throw RuntimeException("Empty response from Gemini")
+            return result
+        } finally {
+            conn.disconnect()
+        }
+    }
 
     private fun readSse(reader: BufferedReader): String {
         val sb = StringBuilder()
@@ -111,9 +307,8 @@ class AiApiClient {
         return sb.toString()
     }
 
-    private fun parseJsonWhole(text: String): String {
+    private fun parseOpenAiJsonWhole(text: String): String {
         val root = JSONObject(text)
-        // Some servers return {"error": {...}}
         root.optJSONObject("error")?.let { err ->
             throw RuntimeException("Server error: ${err.optString("message", "unknown")}")
         }
@@ -149,35 +344,123 @@ class AiApiClient {
     }
 
     /**
-     * Normalizes user-supplied base URL into a full /chat/completions endpoint.
-     * Handles common mistakes:
-     *   - 0.0.0.0      -> 127.0.0.1   (0.0.0.0 is a bind address, not routable)
-     *   - missing http:// -> prepend http://
-     *   - trailing slashes removed
-     *   - if URL already ends with /chat/completions, use as-is
-     *   - if URL ends with /v1 (or /v1/), append /chat/completions
-     *   - otherwise append /v1/chat/completions
+     * Smart URL Normalizer for OpenAI-compatible & Local/LAN servers.
+     * - Replaces 0.0.0.0 with 127.0.0.1
+     * - Prepends http:// for local/LAN hosts and https:// for public domains if scheme is missing
+     * - Enforces HTTPS for all public (non-private/LAN) domains
+     * - Handles trailing slashes, /v1, /v1/chat/completions cleanly
      */
-    private fun buildEndpoint(raw: String): String {
+    private fun buildOpenAiEndpoint(raw: String, provider: AiProvider): String {
         var s = raw.trim()
         if (s.isBlank()) throw RuntimeException("Base URL is empty")
 
-        if (!s.startsWith("http://") && !s.startsWith("https://")) {
-            s = "http://$s"
+        val hasScheme = s.startsWith("http://", ignoreCase = true) || s.startsWith("https://", ignoreCase = true)
+        if (!hasScheme) {
+            val hostGuess = s.substringBefore("/").substringBefore(":").lowercase()
+            val scheme = if (isPrivateOrLocalHost(hostGuess) || provider == AiProvider.LOCAL_CUSTOM) "http://" else "https://"
+            s = scheme + s
         }
 
-        // Replace 0.0.0.0 host with 127.0.0.1 (only the host part)
         s = s.replace("://0.0.0.0", "://127.0.0.1")
+
+        val uri = try {
+            URI(s)
+        } catch (_: Exception) {
+            throw RuntimeException("Invalid URL format: $s")
+        }
+        val host = uri.host?.lowercase() ?: throw RuntimeException("Missing host in URL: $s")
+
+        // Strict HTTPS guard for public internet hosts
+        if (uri.scheme.equals("http", ignoreCase = true) && !isPrivateOrLocalHost(host)) {
+            s = "https://" + s.substringAfter("://")
+        }
 
         while (s.endsWith("/")) s = s.dropLast(1)
 
-        if (s.endsWith("/chat/completions")) return s
-
-        if (s.endsWith("/v1")) return "$s/chat/completions"
+        if (s.endsWith("/chat/completions", ignoreCase = true)) return s
+        if (s.endsWith("/v1", ignoreCase = true)) return "$s/chat/completions"
 
         return "$s/v1/chat/completions"
     }
+
+    private fun buildGeminiEndpoint(rawBase: String, rawModel: String): String {
+        val model = rawModel.trim().removePrefix("models/")
+        if (model.isBlank()) throw RuntimeException("Gemini model name is empty (e.g. gemini-2.5-flash)")
+
+        var base = rawBase.trim().ifBlank { "https://generativelanguage.googleapis.com" }
+        if (!base.startsWith("http://", ignoreCase = true) && !base.startsWith("https://", ignoreCase = true)) {
+            base = "https://$base"
+        }
+        val uri = try { URI(base) } catch (_: Exception) { throw RuntimeException("Invalid Gemini URL: $base") }
+        val host = uri.host?.lowercase() ?: throw RuntimeException("Invalid Gemini host")
+        if (uri.scheme.equals("http", ignoreCase = true) && !isPrivateOrLocalHost(host)) {
+            base = "https://" + base.substringAfter("://")
+        }
+
+        while (base.endsWith("/")) base = base.dropLast(1)
+
+        if (base.contains(":generateContent", ignoreCase = true)) return base
+        if (base.endsWith("/v1beta", ignoreCase = true) || base.endsWith("/v1", ignoreCase = true)) {
+            return "$base/models/$model:generateContent"
+        }
+        return "$base/v1beta/models/$model:generateContent"
+    }
+
+    fun isPrivateOrLocalHost(host: String): Boolean {
+        val h = host.trim().lowercase().removePrefix("[").removeSuffix("]")
+        if (h == "localhost" || h == "127.0.0.1" || h == "0.0.0.0" || h == "::1" || h.endsWith(".local")) {
+            return true
+        }
+        if (h.startsWith("127.") || h.startsWith("10.") || h.startsWith("192.168.")) {
+            return true
+        }
+        if (h.startsWith("172.")) {
+            val second = h.split(".").getOrNull(1)?.toIntOrNull() ?: return false
+            if (second in 16..31) return true
+        }
+        return false
+    }
+
+    fun formatHttpError(code: Int, body: String): String {
+        val detail = extractErrorMessage(body)
+        val hint = when (code) {
+            400 -> "Bad Request — check model name or disable Force JSON mode"
+            401 -> "Unauthorized — check your API key"
+            403 -> "Forbidden — API key lacks permission for this model"
+            404 -> "Not Found — check Base URL or model name"
+            429 -> "Rate Limit / Quota Exceeded — try again later"
+            in 500..599 -> "Server Error ($code) — AI server crashed or overloaded"
+            else -> "HTTP $code"
+        }
+        return if (detail.isNotBlank()) "HTTP $code: $hint ($detail)" else "HTTP $code: $hint"
+    }
+
+    fun formatNetworkError(e: Throwable, timeoutSec: Int): String {
+        return when (e) {
+            is HttpStatusException -> formatHttpError(e.code, e.body)
+            is SocketTimeoutException -> "Timed out after ${timeoutSec}s — local model may still be loading. Try increasing timeout."
+            is ConnectException -> "Connection refused — make sure your local server (SaMu Lab / Ollama / LM Studio) is running and reachable on this IP & port."
+            is UnknownHostException -> "Host not found — check your internet connection or server address."
+            is SSLException -> "SSL/HTTPS error — check if your local server uses http:// instead of https://."
+            else -> e.message ?: "Unknown network error"
+        }
+    }
+
+    private fun extractErrorMessage(body: String): String {
+        if (body.isBlank()) return ""
+        return try {
+            val root = JSONObject(body)
+            val errObj = root.optJSONObject("error")
+            val msg = errObj?.optString("message", "")?.ifBlank { root.optString("message", "") }
+                ?: root.optString("message", "")
+            msg.trim().take(140)
+        } catch (_: Exception) {
+            body.trim().take(140)
+        }
+    }
 }
+
+class HttpStatusException(val code: Int, val body: String) : RuntimeException("HTTP $code: ${body.take(200)}")
 
 object AiPrompt {
 
