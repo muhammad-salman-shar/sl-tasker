@@ -362,9 +362,9 @@ fun DashboardScreen(
         com.neurasamu.build.sl_tasker.ui.components.QrScannerDialog(
             title = "PROOF-OF-WORK SCAN",
             subtitle = if (blockState.hasRegisteredSeal)
-                "Scan your registered seal (${blockState.sealLabel}) to verify "${qrItem.task.title}""
+                "Scan your registered seal (${blockState.sealLabel}) to verify \"${qrItem.task.title}\""
             else
-                "Scan any physical QR or barcode to verify "${qrItem.task.title}"",
+                "Scan any physical QR or barcode to verify \"${qrItem.task.title}\"",
             expectedCode = if (blockState.hasRegisteredSeal) blockState.sealCode else null,
             onDismiss = { pendingQrTaskItem = null },
             onScanned = {
