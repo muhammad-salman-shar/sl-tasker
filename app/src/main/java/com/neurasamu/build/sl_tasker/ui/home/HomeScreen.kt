@@ -89,8 +89,8 @@ fun HomeScreen(
     val activeQuests by taskViewModel.activeQuests.collectAsStateWithLifecycle()
     val completedQuests by taskViewModel.completedQuests.collectAsStateWithLifecycle()
     val stats by statsViewModel.playerStats.collectAsStateWithLifecycle()
-    val dailyQuests by dailyQuestViewModel.todayQuests.collectAsStateWithLifecycle()
-    val dailyCompleted by dailyQuestViewModel.completedTodayCount.collectAsStateWithLifecycle()
+    val dailyQuests by dailyQuestViewModel.quests.collectAsStateWithLifecycle()
+    val incompleteDailyQuests = remember(dailyQuests) { dailyQuests.filter { !it.completed } }
 
     var showDailyCongrats by remember { mutableStateOf(false) }
 
@@ -121,12 +121,13 @@ fun HomeScreen(
         }
 
         // 2. Daily Quests
-        item {
-            DailyQuestSection(
-                quests = dailyQuests,
-                completedCount = dailyCompleted,
-                onComplete = { dailyQuestViewModel.completeQuest(it) }
-            )
+        if (incompleteDailyQuests.isNotEmpty()) {
+            item {
+                DailyQuestSection(
+                    quests = incompleteDailyQuests,
+                    onComplete = { id -> dailyQuestViewModel.complete(id) }
+                )
+            }
         }
 
         // 3. Respectful Quick Routine Presets

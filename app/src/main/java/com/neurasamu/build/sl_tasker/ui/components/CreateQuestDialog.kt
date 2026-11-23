@@ -148,7 +148,7 @@ fun CreateQuestDialog(
     val typeRowState = rememberLazyListState()
     val dialogScope = rememberCoroutineScope()
     val knownTypes = remember(existingTypes, sessionAdded, sessionRemoved, initialTask?.userType, initialType) {
-        buildList {
+        buildList<String> {
             existingTypes.forEach { t ->
                 val tr = t.trim()
                 if (tr.isNotBlank() && tr.lowercase() !in sessionRemoved && none { it.equals(tr, ignoreCase = true) }) {

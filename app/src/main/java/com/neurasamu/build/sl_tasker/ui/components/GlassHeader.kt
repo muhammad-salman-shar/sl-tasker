@@ -74,7 +74,7 @@ fun GlassHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
-                color = Color(0xFFE8EEF9),
+                color = com.neurasamu.build.sl_tasker.ui.theme.TextPrimary,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )

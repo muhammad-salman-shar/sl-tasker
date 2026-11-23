@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -18,13 +19,23 @@ fun Modifier.liquidGlass(
     tintAlpha: Float = 0.07f,
     topAlpha: Float = 0.11f,
     bottomAlpha: Float = 0.04f,
+    fillTop: Float? = null,
+    fillBottom: Float? = null,
     borderWidth: Dp = 1.dp,
-    rimAlpha: Float = 0.28f
+    rimAlpha: Float = 0.28f,
+    shadowElevation: Dp = 0.dp
 ): Modifier {
     val isLight = ThemeState.isLight
     val cardBase = ThemeState.tokens.cardBg
     val borderCol = ThemeState.tokens.border
-    return this
+    val effectiveTop = fillTop ?: topAlpha
+    val effectiveBottom = fillBottom ?: bottomAlpha
+    val baseModifier = if (shadowElevation > 0.dp && !ThemeState.isLiteMode) {
+        this.shadow(elevation = shadowElevation, shape = shape, clip = false)
+    } else {
+        this
+    }
+    return baseModifier
         .clip(shape)
         .background(
             if (isLight) {
@@ -37,9 +48,9 @@ fun Modifier.liquidGlass(
             } else {
                 Brush.verticalGradient(
                     listOf(
-                        GlassFill.copy(alpha = topAlpha),
-                        GlassFill.copy(alpha = (topAlpha + bottomAlpha) * 0.5f),
-                        GlassFill.copy(alpha = bottomAlpha)
+                        GlassFill.copy(alpha = effectiveTop),
+                        GlassFill.copy(alpha = (effectiveTop + effectiveBottom) * 0.5f),
+                        GlassFill.copy(alpha = effectiveBottom)
                     )
                 )
             }
