@@ -3,23 +3,33 @@ package com.neurasamu.build.sl_tasker
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.os.Build
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.neurasamu.build.sl_tasker.util.StepTrackerManager
 import com.neurasamu.build.sl_tasker.worker.CleanupWorker
 import com.neurasamu.build.sl_tasker.worker.OverdueTaskWorker
 import java.util.concurrent.TimeUnit
 
 class TaskerApp : Application() {
 
+    companion object {
+        @Volatile
+        var appContext: Context? = null
+            private set
+    }
+
     override fun onCreate() {
         super.onCreate()
+        appContext = applicationContext
         com.neurasamu.build.sl_tasker.util.SoundFx.setup()
         com.neurasamu.build.sl_tasker.security.LicenseManager.init(this)
         com.neurasamu.build.sl_tasker.security.BillingBootstrap.init(this)
         com.neurasamu.build.sl_tasker.util.HpAlertNotifier.init(this)
         com.neurasamu.build.sl_tasker.util.AppRuntimeState.init(this)
+        StepTrackerManager.init(this)
         createNotificationChannels()
         scheduleOverdueWorker()
         scheduleCleanupWorker()

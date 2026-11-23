@@ -9,6 +9,7 @@ import android.widget.Toast
 import com.neurasamu.build.sl_tasker.data.block.BlockMode
 import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
 import com.neurasamu.build.sl_tasker.data.block.PROTECTED_PACKAGES
+import com.neurasamu.build.sl_tasker.data.datastore.UserPreferences
 import com.neurasamu.build.sl_tasker.data.db.AppDatabase
 import com.neurasamu.build.sl_tasker.data.repository.TaskRepository
 import com.neurasamu.build.sl_tasker.ui.block.BlockOverlayActivity
@@ -46,7 +47,6 @@ class AppBlockerAccessibilityService : AccessibilityService() {
         if (pkg == packageName) return
         if (pkg in PROTECTED_PACKAGES) return
 
-        // Per-package debounce only (800ms) — no global throttle
         val t = System.currentTimeMillis()
         if (pkg == lastBlockedPkg && t - lastBlockedAt < 800L) return
 
@@ -54,26 +54,29 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             try {
                 val now = System.currentTimeMillis()
 
-                // CRITICAL FIX: Refresh HP before deciding to block.
-                // This ensures stale HP (from when app was closed) gets updated.
-                // Throttled to once per 20s to avoid DB spam.
                 if (now - lastPenaltyCheckAt > 20_000L) {
                     lastPenaltyCheckAt = now
                     try {
-                        TaskRepository(database).applyOverduePenalties(now)
+                        val autoDel = runCatching {
+                            UserPreferences(applicationContext).isAutoDeleteMissedTasksEnabled()
+                        }.getOrDefault(false)
+                        TaskRepository(database).applyOverduePenalties(now, autoDeleteMissed = autoDel)
                     } catch (_: Throwable) {}
                 }
 
                 val state = blockPrefs.state.first()
+                if (state.isScrollSessionActive(now)) return@launch
+
                 val stats = database.playerStatsDao().getPlayerStats()
                 val health = stats?.health ?: 100
 
                 val testOn = state.mode == BlockMode.TEST
                 val strictOn = state.mode == BlockMode.STRICT
+                val sealLockOn = state.sealLockEnabled && state.hasRegisteredSeal
                 val healthLow = health < 40
 
                 val shouldBlock: Boolean = when {
-                    testOn -> pkg in state.selectedPackages
+                    testOn || sealLockOn -> pkg in state.selectedPackages
                     healthLow -> if (strictOn) true else pkg in state.selectedPackages
                     else -> false
                 }
@@ -82,7 +85,6 @@ class AppBlockerAccessibilityService : AccessibilityService() {
                 lastBlockedPkg = pkg
                 lastBlockedAt = System.currentTimeMillis()
 
-                // Launch overlay with retry (startActivity from a service can fail silently)
                 mainHandler.post { launchOverlayWithRetry(pkg, retries = 2) }
             } catch (_: Throwable) {}
         }

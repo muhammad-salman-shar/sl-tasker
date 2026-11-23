@@ -84,14 +84,45 @@ class TaskRepository(private val database: AppDatabase) {
                 lastStreakDayEpoch = streakResult.newLastDay
             )
 
+            val appCtx = com.neurasamu.build.sl_tasker.TaskerApp.appContext
+            val antiCheat = if (appCtx != null) {
+                com.neurasamu.build.sl_tasker.domain.engine.AntiCheatEngine.evaluateCompletion(
+                    context = appCtx,
+                    task = task,
+                    currentStats = streakUpdated,
+                    nowMillis = nowMs
+                )
+            } else null
+
+            val baseStatsForCalc = antiCheat?.updatedStatsWithShame ?: streakUpdated
             val gameResult = GamificationEngine.processQuestCompletion(
-                currentStats = streakUpdated,
+                currentStats = baseStatsForCalc,
                 difficulty = task.difficulty,
                 streakBonusActive = true,
                 isPro = com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()
             )
 
+            var actualEpGained = gameResult.epGained
+            var actualHpGained = gameResult.healthGained
             var finalStats = gameResult.updatedStats
+
+            if (antiCheat != null && antiCheat.isCheesed) {
+                val capHp = antiCheat.cappedHpReward ?: 5
+                val capEp = antiCheat.cappedEpReward ?: 3
+                val restoredHp = (baseStatsForCalc.health + capHp).coerceAtMost(GamificationEngine.MAX_HEALTH)
+                val rawCappedEp = baseStatsForCalc.ep + capEp
+                actualHpGained = capHp
+                actualEpGained = capEp
+                finalStats = baseStatsForCalc.copy(
+                    health = restoredHp,
+                    ep = rawCappedEp % GamificationEngine.EP_PER_LEVEL,
+                    totalCompleted = baseStatsForCalc.totalCompleted + 1,
+                    recoveryModeActive = if (restoredHp >= 50) false else baseStatsForCalc.recoveryModeActive
+                )
+                antiCheat.warningMessage?.let { warn ->
+                    try { com.neurasamu.build.sl_tasker.util.SystemEvents.toast(warn) } catch (_: Throwable) {}
+                }
+            }
             val milestoneBonus = when (streakResult.milestoneReached) {
                 3 -> 5
                 7 -> 15
@@ -166,8 +197,8 @@ class TaskRepository(private val database: AppDatabase) {
                     occurrenceId = occurrenceId,
                     taskId = task.id,
                     type = EventType.OCCURRENCE_COMPLETED,
-                    epDelta = gameResult.epGained,
-                    healthDelta = gameResult.healthGained,
+                    epDelta = actualEpGained,
+                    healthDelta = actualHpGained,
                     note = "Cleared Quest: ${task.title}"
                 )
             )

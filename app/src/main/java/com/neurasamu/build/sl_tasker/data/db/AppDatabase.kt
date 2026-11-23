@@ -27,7 +27,7 @@ import com.neurasamu.build.sl_tasker.data.model.TaskEntity
         AlarmEntity::class,
         DailyQuestEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -55,6 +55,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE player_stats ADD COLUMN shamingUntilMillis INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE player_stats ADD COLUMN shamingReason TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE player_stats ADD COLUMN cheatStrikeCount INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -62,7 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sl_tasker_database"
                 )
-                    .addMigrations(MIGRATION_7_8)
+                    .addMigrations(MIGRATION_7_8, MIGRATION_8_9)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

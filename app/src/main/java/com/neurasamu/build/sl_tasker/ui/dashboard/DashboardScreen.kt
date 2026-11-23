@@ -68,8 +68,42 @@ fun DashboardScreen(
     val taskTypes by taskViewModel.taskTypes.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     val blockPrefs = remember { BlockPrefs(ctx) }
+    val blockState by blockPrefs.state.collectAsStateWithLifecycle(initialValue = com.neurasamu.build.sl_tasker.data.block.BlockState())
+    val todaySteps by com.neurasamu.build.sl_tasker.util.StepTrackerManager.todaySteps.collectAsStateWithLifecycle()
+    var pendingQrTaskItem by remember { mutableStateOf<com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem?>(null) }
     val scope = rememberCoroutineScope()
     val completedQuests by taskViewModel.completedQuests.collectAsStateWithLifecycle()
+
+    fun launchTaskTimer(item: com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem) {
+        try {
+            val accent = when (item.task.difficulty) {
+                com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> 0xFFFF1744.toInt()
+                com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> 0xFFFB923C.toInt()
+                else -> 0xFF00E5FF.toInt()
+            }
+            val timer = com.neurasamu.build.sl_tasker.data.timer.ActiveTimer(
+                occurrenceId = item.occurrence.id,
+                taskTitle = item.task.title,
+                totalSeconds = (item.task.durationMinutes.coerceAtLeast(1)) * 60,
+                startedAtMillis = System.currentTimeMillis(),
+                elapsedBeforePauseSeconds = 0,
+                isPaused = false,
+                accentColorArgb = accent,
+                durationMinutes = item.task.durationMinutes.coerceAtLeast(1)
+            )
+            val svc = Intent(ctx, com.neurasamu.build.sl_tasker.service.TimerService::class.java)
+            svc.action = com.neurasamu.build.sl_tasker.service.TimerService.ACTION_START
+            svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_OCC_ID, timer.occurrenceId)
+            svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_TITLE, timer.taskTitle)
+            svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_MINUTES, timer.durationMinutes)
+            svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_ACCENT, timer.accentColorArgb)
+            androidx.core.content.ContextCompat.startForegroundService(ctx, svc)
+            ctx.startActivity(
+                Intent(ctx, com.neurasamu.build.sl_tasker.ui.timer.TimerActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: Throwable) {}
+    }
 
     // Automatic 12:00 AM midnight clean-slate trigger while app is open
     LaunchedEffect(Unit) {
@@ -286,40 +320,34 @@ fun DashboardScreen(
                         QuestCard(
                             task = item.task,
                             occurrence = item.occurrence,
+                            todaySteps = todaySteps,
                             onComplete = {
-                                taskViewModel.completeQuest(item.occurrence.id)
+                                if (item.task.isAdvanced && item.task.stepGoal > 0 && todaySteps < item.task.stepGoal) {
+                                    val rem = item.task.stepGoal - todaySteps
+                                    android.widget.Toast.makeText(
+                                        ctx,
+                                        "Walk $rem more steps to unlock completion!",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                } else if (item.task.isAdvanced && item.task.requireQrProof) {
+                                    pendingQrTaskItem = item
+                                } else {
+                                    taskViewModel.completeQuest(item.occurrence.id)
+                                }
                             },
                             onStart = {
-                                try {
-                                    val accent = when (item.task.difficulty) {
-                                        com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL ->
-                                            0xFFFF1744.toInt()
-                                        com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD ->
-                                            0xFFFB923C.toInt()
-                                        else -> 0xFF00E5FF.toInt()
-                                    }
-                                    val timer = com.neurasamu.build.sl_tasker.data.timer.ActiveTimer(
-                                        occurrenceId = item.occurrence.id,
-                                        taskTitle = item.task.title,
-                                        totalSeconds = (item.task.durationMinutes.coerceAtLeast(1)) * 60,
-                                        startedAtMillis = System.currentTimeMillis(),
-                                        elapsedBeforePauseSeconds = 0,
-                                        isPaused = false,
-                                        accentColorArgb = accent,
-                                        durationMinutes = item.task.durationMinutes.coerceAtLeast(1)
-                                    )
-                                    val svc = Intent(ctx, com.neurasamu.build.sl_tasker.service.TimerService::class.java)
-                                    svc.action = com.neurasamu.build.sl_tasker.service.TimerService.ACTION_START
-                                    svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_OCC_ID, timer.occurrenceId)
-                                    svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_TITLE, timer.taskTitle)
-                                    svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_MINUTES, timer.durationMinutes)
-                                    svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_ACCENT, timer.accentColorArgb)
-                                    androidx.core.content.ContextCompat.startForegroundService(ctx, svc)
-                                    ctx.startActivity(
-                                        Intent(ctx, com.neurasamu.build.sl_tasker.ui.timer.TimerActivity::class.java)
-                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    )
-                                } catch (_: Throwable) {}
+                                if (item.task.isAdvanced && item.task.stepGoal > 0 && todaySteps < item.task.stepGoal) {
+                                    val rem = item.task.stepGoal - todaySteps
+                                    android.widget.Toast.makeText(
+                                        ctx,
+                                        "Walk $rem more steps first ($todaySteps / ${item.task.stepGoal})!",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                } else if (item.task.isAdvanced && item.task.requireQrProof) {
+                                    pendingQrTaskItem = item
+                                } else {
+                                    launchTaskTimer(item)
+                                }
                             },
                             onEdit = { editingTask = item.task },
                             onDelete = { taskViewModel.deleteTask(item.task.id) }
@@ -328,6 +356,26 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    pendingQrTaskItem?.let { qrItem ->
+        com.neurasamu.build.sl_tasker.ui.components.QrScannerDialog(
+            title = "PROOF-OF-WORK SCAN",
+            subtitle = if (blockState.hasRegisteredSeal)
+                "Scan your registered seal (${blockState.sealLabel}) to verify "${qrItem.task.title}""
+            else
+                "Scan any physical QR or barcode to verify "${qrItem.task.title}"",
+            expectedCode = if (blockState.hasRegisteredSeal) blockState.sealCode else null,
+            onDismiss = { pendingQrTaskItem = null },
+            onScanned = {
+                pendingQrTaskItem = null
+                if (qrItem.task.difficulty != com.neurasamu.build.sl_tasker.data.model.Difficulty.MEDIUM) {
+                    launchTaskTimer(qrItem)
+                } else {
+                    taskViewModel.completeQuest(qrItem.occurrence.id)
+                }
+            }
+        )
     }
 
     if (showCreateDialog) {

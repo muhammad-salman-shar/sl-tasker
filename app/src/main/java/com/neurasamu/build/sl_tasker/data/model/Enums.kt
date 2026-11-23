@@ -66,7 +66,8 @@ enum class Category {
 enum class DismissMethod {
     EASY,
     PIN,
-    MATH
+    MATH,
+    QR
 }
 
 enum class ThemeMode {

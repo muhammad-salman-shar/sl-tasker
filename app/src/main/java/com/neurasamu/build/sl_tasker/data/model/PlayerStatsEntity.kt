@@ -19,5 +19,12 @@ data class PlayerStatsEntity(
     val totalMissed: Int = 0,
     val totalRecoveries: Int = 0,
     val highestEpMilestone: Int = 0,
-    val criticalActiveOccurrenceId: Long? = null
-)
+    val criticalActiveOccurrenceId: Long? = null,
+    val shamingUntilMillis: Long = 0L,
+    val shamingReason: String = "",
+    val cheatStrikeCount: Int = 0
+) {
+    fun isShamed(nowMillis: Long = System.currentTimeMillis()): Boolean {
+        return shamingUntilMillis > nowMillis && shamingReason.isNotBlank()
+    }
+}

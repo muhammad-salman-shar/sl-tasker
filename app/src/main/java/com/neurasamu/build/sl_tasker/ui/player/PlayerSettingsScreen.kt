@@ -90,6 +90,10 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
     val userPrefs = remember { UserPreferences(context) }
     val state by prefs.state.collectAsState(initial = null)
     val autoDeleteMissed by userPrefs.autoDeleteMissedTasksFlow.collectAsState(initial = false)
+    val todaySteps by com.neurasamu.build.sl_tasker.util.StepTrackerManager.todaySteps.collectAsState()
+    val sensorAvailable by com.neurasamu.build.sl_tasker.util.StepTrackerManager.sensorAvailable.collectAsState()
+    var showRegisterScanner by remember { mutableStateOf(false) }
+    var showGeneratedQr by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     val allApps = remember { loadInstalledApps(context) }
 
@@ -219,6 +223,127 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                SettingsCard {
+                    Text("PHYSICAL QR / BARCODE SEAL", color = com.neurasamu.build.sl_tasker.ui.theme.AccentCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        if (s.hasRegisteredSeal)
+                            "Registered: ${s.sealLabel} (${s.sealCode.take(18)})"
+                        else
+                            "Scan any household barcode/QR or generate an in-app QR to lock apps, alarms & tasks.",
+                        color = TextSecondary,
+                        fontSize = 10.sp
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showRegisterScanner = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = com.neurasamu.build.sl_tasker.ui.theme.AccentCyan,
+                                contentColor = DarkBackground
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("SCAN BARCODE/QR", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    val payload = if (s.sealCode.startsWith("SLTASKER-SEAL-")) s.sealCode
+                                    else com.neurasamu.build.sl_tasker.util.QrBarcodeHelper.generateSealPayload()
+                                    prefs.registerPhysicalSeal(payload, "SL Hunter QR Seal")
+                                    showGeneratedQr = true
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(com.neurasamu.build.sl_tasker.ui.theme.AccentGold)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("GENERATE / PRINT QR", color = com.neurasamu.build.sl_tasker.ui.theme.AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    if (s.hasRegisteredSeal) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Require Seal for App Blocker", color = TextPrimary, fontSize = 11.sp)
+                                Text("Keep blocked apps locked until seal scan or walk quota", color = TextSecondary, fontSize = 9.sp)
+                            }
+                            Switch(
+                                checked = s.sealLockEnabled,
+                                onCheckedChange = { enabled ->
+                                    scope.launch { prefs.setSealLockEnabled(enabled) }
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = DarkCard,
+                                    checkedTrackColor = com.neurasamu.build.sl_tasker.ui.theme.AccentCyan
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                val stepsToNext = com.neurasamu.build.sl_tasker.util.StepTrackerManager.STEPS_PER_REWARD -
+                    (todaySteps % com.neurasamu.build.sl_tasker.util.StepTrackerManager.STEPS_PER_REWARD)
+                val earnedMins = s.earnedScrollSeconds / 60
+                SettingsCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("WALK-TO-EARN (STEP COUNTER)", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = if (sensorAvailable)
+                                    "Today: $todaySteps steps · $stepsToNext steps to next +25 HP & +10m scroll"
+                                else
+                                    "Hardware step sensor unavailable on this device.",
+                                color = TextPrimary,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                text = "Earned Scroll Quota Bank: $earnedMins mins",
+                                color = com.neurasamu.build.sl_tasker.ui.theme.AccentGold,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        if (earnedMins >= 10) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        val ok = prefs.activateScrollUnlock(10, consumeEarnedQuota = true)
+                                        if (ok) {
+                                            android.widget.Toast.makeText(context, "10m scroll pass activated!", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SuccessGreen,
+                                    contentColor = DarkBackground
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("USE 10m", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -510,6 +635,30 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                     )
                 }
             }
+        }
+
+        if (showRegisterScanner) {
+            com.neurasamu.build.sl_tasker.ui.components.QrScannerDialog(
+                title = "REGISTER PHYSICAL SEAL",
+                subtitle = "Scan any household barcode (book, bottle, box) or QR code to set it as your lock key",
+                expectedCode = null,
+                onDismiss = { showRegisterScanner = false },
+                onScanned = { scannedValue ->
+                    showRegisterScanner = false
+                    scope.launch {
+                        prefs.registerPhysicalSeal(scannedValue, "Scanned Seal (${scannedValue.take(12)})")
+                        android.widget.Toast.makeText(context, "Physical Seal registered!", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+        }
+
+        if (showGeneratedQr && s.hasRegisteredSeal) {
+            com.neurasamu.build.sl_tasker.ui.components.GeneratedQrSealDialog(
+                payload = s.sealCode,
+                label = s.sealLabel,
+                onDismiss = { showGeneratedQr = false }
+            )
         }
 
         if (showAccessibilityDisclosure.value) {

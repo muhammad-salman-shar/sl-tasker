@@ -32,3 +32,11 @@
 # Google Play Billing Library
 -keep class com.android.billingclient.api.** { *; }
 -dontwarn com.android.billingclient.**
+
+
+# ML Kit Barcode, CameraX, and ZXing
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+-keep class androidx.camera.** { *; }
+-dontwarn androidx.camera.**
+-keep class com.google.zxing.** { *; }

@@ -1,5 +1,12 @@
 package com.neurasamu.build.sl_tasker.ui.alarm
 
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -34,41 +42,48 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.neurasamu.build.sl_tasker.data.block.BlockPrefs
+import com.neurasamu.build.sl_tasker.data.block.BlockState
 import com.neurasamu.build.sl_tasker.data.model.AlarmEntity
 import com.neurasamu.build.sl_tasker.data.model.DismissMethod
 import com.neurasamu.build.sl_tasker.data.model.RepeatRule
+import com.neurasamu.build.sl_tasker.ui.components.GeneratedQrSealDialog
+import com.neurasamu.build.sl_tasker.ui.components.QrScannerDialog
+import com.neurasamu.build.sl_tasker.ui.theme.AccentCyan
+import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
-import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
+import com.neurasamu.build.sl_tasker.ui.theme.TextOnBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.viewmodel.AlarmViewModel
+import com.neurasamu.build.sl_tasker.util.QrBarcodeHelper
+import kotlinx.coroutines.launch
 import java.util.Locale
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
-import android.media.RingtoneManager
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.IntentCompat
 
 @Composable
 fun AlarmScreen(
@@ -81,19 +96,19 @@ fun AlarmScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        containerColor = Color.Transparent,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showAddDialog = true },
                 containerColor = PrimaryManaBlue,
-                contentColor = DarkCard,
+                contentColor = TextOnBlue,
                 shape = CircleShape
             ) {
                 Text(
                     text = "+",
                     style = MaterialTheme.typography.titleLarge,
                     fontSize = 24.sp,
-                    color = DarkCard
+                    color = TextOnBlue
                 )
             }
         }
@@ -114,7 +129,7 @@ fun AlarmScreen(
             Text(
                 text = "Configure critical wake alarms and dismissal challenges",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else TextMuted
+                color = TextSecondary
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -130,13 +145,13 @@ fun AlarmScreen(
                         Text(
                             text = "NO ALARMS CONFIGURED",
                             style = MaterialTheme.typography.titleMedium,
-                            color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary
+                            color = TextPrimary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Tap + to initialize a wake-up schedule.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else TextMuted
+                            color = TextSecondary
                         )
                     }
                 }
@@ -231,7 +246,7 @@ private fun AlarmCard(
             .clip(shape)
             .background(
                 androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(DarkCard.copy(alpha = 0.92f), DarkCard.copy(alpha = 0.65f))
+                    listOf(DarkCard.copy(alpha = 0.94f), DarkCard.copy(alpha = 0.72f))
                 )
             )
             .border(1.dp, if (alarm.enabled) PrimaryManaBlue else DarkBorder, shape)
@@ -269,6 +284,7 @@ private fun AlarmCard(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                val methodLabel = if (alarm.dismissMethod == DismissMethod.QR) "QR / BARCODE SEAL (STRICT)" else alarm.dismissMethod.name
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
@@ -281,9 +297,9 @@ private fun AlarmCard(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "METHOD: ${alarm.dismissMethod.name}",
+                        text = "METHOD: $methodLabel",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (alarm.dismissMethod == DismissMethod.EASY) TextMuted else DangerPenaltyRed,
+                        color = if (alarm.dismissMethod == DismissMethod.EASY) TextSecondary else DangerPenaltyRed,
                         fontSize = 9.sp
                     )
                 }
@@ -338,6 +354,11 @@ private fun AddAlarmDialog(
         soundUri: String
     ) -> Unit
 ) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val blockPrefs = remember { BlockPrefs(ctx) }
+    val blockState by blockPrefs.state.collectAsState(initial = BlockState())
+
     val isEdit = initialAlarm != null
     var hourText by remember {
         val h = initialAlarm?.hour ?: 7
@@ -349,6 +370,11 @@ private fun AddAlarmDialog(
     var label by remember { mutableStateOf(initialAlarm?.label ?: "Wake Up Hunter") }
     var selectedMethod by remember { mutableStateOf(initialAlarm?.dismissMethod ?: DismissMethod.EASY) }
     var pinCode by remember { mutableStateOf(initialAlarm?.pinCode ?: "") }
+    var qrSealCode by remember {
+        mutableStateOf(
+            if (initialAlarm?.dismissMethod == DismissMethod.QR) initialAlarm.pinCode else ""
+        )
+    }
     var isRepeat by remember { mutableStateOf(initialAlarm?.repeatRule != RepeatRule.ONCE) }
     var selectedDays by remember {
         mutableStateOf(
@@ -362,7 +388,10 @@ private fun AddAlarmDialog(
     var snoozeText by remember { mutableStateOf((initialAlarm?.snoozeMinutes ?: 10).toString()) }
     var vibrate by remember { mutableStateOf(initialAlarm?.vibrate ?: true) }
     var pinError by remember { mutableStateOf("") }
-    val ctx = LocalContext.current
+    var showQrScanner by remember { mutableStateOf(false) }
+    var showGeneratedQr by remember { mutableStateOf(false) }
+    var showStrictQrWarningDialog by remember { mutableStateOf(false) }
+
     var soundUri by remember { mutableStateOf(initialAlarm?.soundUri ?: "") }
     val ringtoneLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -378,9 +407,40 @@ private fun AddAlarmDialog(
     }
     val dayShort = listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa")
 
+    fun commitAlarmSave() {
+        val rawH = hourText.toIntOrNull() ?: 7
+        val minute = (minuteText.toIntOrNull() ?: 0).coerceIn(0, 59)
+        val hour24 = if (is24h) {
+            rawH.coerceIn(0, 23)
+        } else {
+            val h12 = if (rawH == 0) 12 else rawH.coerceIn(1, 12)
+            when {
+                amPm == "AM" && h12 == 12 -> 0
+                amPm == "PM" && h12 != 12 -> h12 + 12
+                else -> h12
+            }
+        }
+        val csv = selectedDays.sorted().joinToString(",")
+        val storedSecret = if (selectedMethod == DismissMethod.QR) qrSealCode.trim() else pinCode.trim()
+        onConfirm(
+            hour24,
+            minute,
+            label.trim(),
+            selectedMethod,
+            storedSecret,
+            isRepeat || selectedDays.isNotEmpty(),
+            csv,
+            if (selectedMethod == DismissMethod.QR) false else snoozeEnabled,
+            (snoozeText.toIntOrNull() ?: 10).coerceAtLeast(1),
+            vibrate,
+            soundUri
+        )
+        onDismiss()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = if (ThemeState.isLight) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.95f) else DarkCard.copy(alpha = 0.95f),
+        containerColor = if (ThemeState.isLight) Color.White.copy(alpha = 0.97f) else DarkCard.copy(alpha = 0.97f),
         shape = RoundedCornerShape(16.dp),
         title = {
             Text(
@@ -395,8 +455,7 @@ private fun AddAlarmDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
-                // Schedule mode (Single / Repeat)
-                Text("SCHEDULE", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text("SCHEDULE", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -421,11 +480,10 @@ private fun AddAlarmDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Days selection
                 Text(
                     if (isRepeat) "DAYS (select 1+)" else "PICK A DAY (optional)",
                     style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
+                    color = TextSecondary
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
@@ -446,23 +504,18 @@ private fun AddAlarmDialog(
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(d, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 11.sp)
+                            Text(d, color = if (sel) PrimaryManaBlue else TextSecondary, fontSize = 11.sp)
                         }
                     }
-                }
-                if (isRepeat && selectedDays.size == 7) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Daily alarm (all 7 days)", color = PrimaryManaBlue, fontSize = 10.sp)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Time
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("TIME", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text("TIME", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                     Spacer(modifier = Modifier.width(8.dp))
                     Row(
                         modifier = Modifier
@@ -479,7 +532,7 @@ private fun AddAlarmDialog(
                                     .clickable { is24h = flag }
                                     .padding(horizontal = 10.dp, vertical = 4.dp)
                             ) {
-                                Text(txt, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 10.sp)
+                                Text(txt, color = if (sel) PrimaryManaBlue else TextSecondary, fontSize = 10.sp)
                             }
                         }
                     }
@@ -535,7 +588,7 @@ private fun AddAlarmDialog(
                                         .clickable { amPm = t }
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text(t, color = if (sel) PrimaryManaBlue else TextMuted, fontSize = 10.sp)
+                                    Text(t, color = if (sel) PrimaryManaBlue else TextSecondary, fontSize = 10.sp)
                                 }
                             }
                         }
@@ -560,58 +613,57 @@ private fun AddAlarmDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Snooze
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("SNOOZE", color = TextPrimary, fontSize = 12.sp)
-                        Text("Allow delaying this alarm", color = TextMuted, fontSize = 10.sp)
-                    }
-                    Switch(
-                        checked = snoozeEnabled,
-                        onCheckedChange = { snoozeEnabled = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = DarkCard,
-                            checkedTrackColor = PrimaryManaBlue
-                        )
-                    )
-                }
-                if (snoozeEnabled) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = snoozeText,
-                        onValueChange = { snoozeText = it.filter { c -> c.isDigit() }.take(3) },
-                        label = { Text("Snooze minutes", color = TextSecondary) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
+                if (selectedMethod != DismissMethod.QR) {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PrimaryManaBlue,
-                            unfocusedBorderColor = DarkBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("SNOOZE", color = TextPrimary, fontSize = 12.sp)
+                            Text("Allow delaying this alarm", color = TextSecondary, fontSize = 10.sp)
+                        }
+                        Switch(
+                            checked = snoozeEnabled,
+                            onCheckedChange = { snoozeEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = TextOnBlue,
+                                checkedTrackColor = PrimaryManaBlue
+                            )
                         )
-                    )
+                    }
+                    if (snoozeEnabled) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = snoozeText,
+                            onValueChange = { snoozeText = it.filter { c -> c.isDigit() }.take(3) },
+                            label = { Text("Snooze minutes", color = TextSecondary) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = PrimaryManaBlue,
+                                unfocusedBorderColor = DarkBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Vibrate
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("VIBRATE", color = TextPrimary, fontSize = 12.sp)
-                        Text("Vibrate when alarm rings", color = TextMuted, fontSize = 10.sp)
+                        Text("Vibrate when alarm rings", color = TextSecondary, fontSize = 10.sp)
                     }
                     Switch(
                         checked = vibrate,
                         onCheckedChange = { vibrate = it },
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = DarkCard,
+                            checkedThumbColor = TextOnBlue,
                             checkedTrackColor = PrimaryManaBlue
                         )
                     )
@@ -619,7 +671,7 @@ private fun AddAlarmDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Text("SOUND", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text("SOUND", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -652,29 +704,36 @@ private fun AddAlarmDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Text("DISMISS METHOD", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text("DISMISS METHOD", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     DismissMethod.entries.forEach { method ->
                         val isSelected = selectedMethod == method
+                        val activeCol = if (method == DismissMethod.QR) DangerPenaltyRed else PrimaryManaBlue
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
-                                .border(1.dp, if (isSelected) PrimaryManaBlue else DarkBorder, RoundedCornerShape(6.dp))
-                                .clickable { selectedMethod = method }
+                                .background(if (isSelected) activeCol.copy(alpha = 0.2f) else DarkSurface)
+                                .border(1.dp, if (isSelected) activeCol else DarkBorder, RoundedCornerShape(6.dp))
+                                .clickable {
+                                    selectedMethod = method
+                                    if (method == DismissMethod.QR && qrSealCode.isBlank() && blockState.hasRegisteredSeal) {
+                                        qrSealCode = blockState.sealCode
+                                    }
+                                }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = method.name,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isSelected) PrimaryManaBlue else TextSecondary,
-                                fontSize = 10.sp
+                                color = if (isSelected) activeCol else TextSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
                         }
                     }
@@ -705,12 +764,86 @@ private fun AddAlarmDialog(
                         Text(pinError, color = DangerPenaltyRed, fontSize = 10.sp)
                     }
                 }
+
+                if (selectedMethod == DismissMethod.QR) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(DangerPenaltyRed.copy(alpha = 0.14f))
+                            .border(1.dp, DangerPenaltyRed, RoundedCornerShape(10.dp))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = "STRICT PHYSICAL LOCK WARNING",
+                            color = DangerPenaltyRed,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            text = "Alarm will keep ringing until you physically scan this registered QR/Barcode. NO Skip, NO Forgot PIN, and NO Emergency Bypass.",
+                            color = TextPrimary,
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = if (qrSealCode.isNotBlank()) "Seal Key: ${qrSealCode.take(22)}" else "No QR/Barcode selected yet!",
+                            color = if (qrSealCode.isNotBlank()) AccentCyan else AccentGold,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Button(
+                                onClick = { showQrScanner = true },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = AccentCyan,
+                                    contentColor = DarkBackground
+                                ),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text("SCAN BARCODE/QR", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    val payload = if (qrSealCode.startsWith("SLTASKER-SEAL-")) qrSealCode
+                                    else if (blockState.sealCode.startsWith("SLTASKER-SEAL-")) blockState.sealCode
+                                    else QrBarcodeHelper.generateSealPayload()
+                                    qrSealCode = payload
+                                    scope.launch {
+                                        if (!blockState.hasRegisteredSeal) {
+                                            blockPrefs.registerPhysicalSeal(payload, "Alarm QR Seal")
+                                        }
+                                    }
+                                    showGeneratedQr = true
+                                },
+                                modifier = Modifier.weight(1f),
+                                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
+                                    brush = SolidColor(AccentGold)
+                                ),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text("GENERATE QR", color = AccentGold, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (pinError.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(pinError, color = DangerPenaltyRed, fontSize = 10.sp)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    // Validate PIN if method == PIN
                     if (selectedMethod == DismissMethod.PIN) {
                         val err = validatePin(pinCode)
                         if (err != null) {
@@ -718,53 +851,105 @@ private fun AddAlarmDialog(
                             return@Button
                         }
                     }
-                    pinError = ""
-                    val rawH = hourText.toIntOrNull() ?: 7
-                    val minute = (minuteText.toIntOrNull() ?: 0).coerceIn(0, 59)
-                    val hour24 = if (is24h) {
-                        rawH.coerceIn(0, 23)
-                    } else {
-                        val h12 = if (rawH == 0) 12 else rawH.coerceIn(1, 12)
-                        when {
-                            amPm == "AM" && h12 == 12 -> 0
-                            amPm == "PM" && h12 != 12 -> h12 + 12
-                            else -> h12
+                    if (selectedMethod == DismissMethod.QR) {
+                        if (qrSealCode.isBlank()) {
+                            pinError = "Please scan or generate a QR/Barcode seal first."
+                            return@Button
                         }
+                        pinError = ""
+                        showStrictQrWarningDialog = true
+                        return@Button
                     }
-                    val csv = if (isRepeat) selectedDays.sorted().joinToString(",") else selectedDays.sorted().joinToString(",")
-                    onConfirm(
-                        hour24,
-                        minute,
-                        label.trim(),
-                        selectedMethod,
-                        pinCode.trim(),
-                        isRepeat || selectedDays.isNotEmpty(),
-                        csv,
-                        snoozeEnabled,
-                        (snoozeText.toIntOrNull() ?: 10).coerceAtLeast(1),
-                        vibrate,
-                        soundUri
-                    )
-                    onDismiss()
+                    pinError = ""
+                    commitAlarmSave()
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryManaBlue,
-                    contentColor = DarkCard
+                    contentColor = TextOnBlue
                 ),
                 shape = RoundedCornerShape(6.dp)
             ) {
-                Text("SAVE", style = MaterialTheme.typography.labelLarge, color = DarkCard)
+                Text("SAVE", style = MaterialTheme.typography.labelLarge, color = TextOnBlue)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL", style = MaterialTheme.typography.labelLarge, color = TextMuted)
+                Text("CANCEL", style = MaterialTheme.typography.labelLarge, color = TextSecondary)
             }
         }
     )
+
+    if (showQrScanner) {
+        QrScannerDialog(
+            title = "SCAN ALARM QR / BARCODE",
+            subtitle = "Scan any household barcode or QR code that you will physically walk to when the alarm rings",
+            expectedCode = null,
+            onDismiss = { showQrScanner = false },
+            onScanned = { scanned ->
+                showQrScanner = false
+                qrSealCode = scanned
+                pinError = ""
+                scope.launch {
+                    if (!blockState.hasRegisteredSeal) {
+                        blockPrefs.registerPhysicalSeal(scanned, "Alarm Physical Seal")
+                    }
+                }
+            }
+        )
+    }
+
+    if (showGeneratedQr && qrSealCode.isNotBlank()) {
+        GeneratedQrSealDialog(
+            payload = qrSealCode,
+            label = "Alarm Physical QR Seal",
+            onDismiss = { showGeneratedQr = false }
+        )
+    }
+
+    if (showStrictQrWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showStrictQrWarningDialog = false },
+            containerColor = DarkCard,
+            title = {
+                Text(
+                    "CONFIRM STRICT PHYSICAL QR ALARM",
+                    color = DangerPenaltyRed,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Black
+                )
+            },
+            text = {
+                Text(
+                    "You are enabling Physical QR/Barcode Lock mode.\n\nWhen this alarm goes off, there will be NO Skip button, NO Snooze bypass, NO Forgot PIN, and NO Emergency Unlock. You MUST physically scan your registered QR/Barcode (${qrSealCode.take(20)}) to stop the alarm.\n\nMake sure you have printed or placed this barcode/QR in a reachable spot!",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showStrictQrWarningDialog = false
+                        commitAlarmSave()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DangerPenaltyRed,
+                        contentColor = TextOnBlue
+                    )
+                ) {
+                    Text("I UNDERSTAND · ENABLE", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStrictQrWarningDialog = false }) {
+                    Text("GO BACK", color = TextSecondary, fontSize = 11.sp)
+                }
+            }
+        )
+    }
 }
 
-private fun is24hInitial(a: com.neurasamu.build.sl_tasker.data.model.AlarmEntity?): Boolean = false
+private fun is24hInitial(a: AlarmEntity?): Boolean = false
 
 private fun validatePin(pin: String): String? {
     if (pin.length < 8) return "PIN must be 8 digits"
@@ -773,10 +958,10 @@ private fun validatePin(pin: String): String? {
     return null
 }
 
-private fun getRingtoneLabel(ctx: android.content.Context, uri: String): String {
+private fun getRingtoneLabel(ctx: Context, uri: String): String {
     if (uri.isBlank()) return "Default alarm tone"
     return try {
-        val r = android.media.RingtoneManager.getRingtone(ctx, Uri.parse(uri))
+        val r = RingtoneManager.getRingtone(ctx, Uri.parse(uri))
         r?.getTitle(ctx) ?: "Custom tone"
     } catch (_: Throwable) {
         "Custom tone"

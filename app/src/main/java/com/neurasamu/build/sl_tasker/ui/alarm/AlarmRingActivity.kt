@@ -8,13 +8,13 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,12 +46,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.neurasamu.build.sl_tasker.domain.scheduler.AlarmScheduler
 import com.neurasamu.build.sl_tasker.service.AlarmService
+import com.neurasamu.build.sl_tasker.ui.components.QrScannerDialog
+import com.neurasamu.build.sl_tasker.ui.theme.AccentCyan
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
 import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
@@ -60,6 +63,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.SoloLevelingTheme
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
+import com.neurasamu.build.sl_tasker.ui.theme.TextOnBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
 import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 import kotlin.math.abs
@@ -105,6 +109,11 @@ class AlarmRingActivity : ComponentActivity() {
         }
     }
 
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        // Strict wake-up alarm: never allow back button dismissal.
+    }
+
     private fun turnScreenOnAndKeyguard() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -115,9 +124,9 @@ class AlarmRingActivity : ComponentActivity() {
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
     }
@@ -148,7 +157,6 @@ class AlarmRingActivity : ComponentActivity() {
                     return
                 }
             }
-            // Fallback: no device lock configured
             dismissAlarm()
         } catch (_: Throwable) {
             dismissAlarm()
@@ -174,27 +182,27 @@ fun AlarmRingContent(
     onDismissConfirmed: () -> Unit,
     onSnoozeConfirmed: () -> Unit
 ) {
+    val isQrStrict = dismissMethod.equals("QR", ignoreCase = true)
     var inputVal by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var showChallenge by remember { mutableStateOf(false) }
-    var pendingAction by remember { mutableStateOf("") } // "dismiss" or "snooze"
+    var showQrScanner by remember { mutableStateOf(isQrStrict) }
+    var pendingAction by remember { mutableStateOf("") }
 
     val num1 by remember { mutableIntStateOf((12..49).random()) }
     val num2 by remember { mutableIntStateOf((11..49).random()) }
     val expectedAnswer = num1 + num2
     val needsChallenge = dismissMethod.contains("PIN", ignoreCase = true) ||
-            dismissMethod.contains("MATH", ignoreCase = true)
+        dismissMethod.contains("MATH", ignoreCase = true)
 
-    // Drag offsets
     var dragY by remember { mutableFloatStateOf(0f) }
     var dragX by remember { mutableFloatStateOf(0f) }
-
     val dragThreshold = 260f
 
     fun executePendingAction(action: String) {
         when (action) {
             "dismiss" -> onDismissConfirmed()
-            "snooze" -> if (snoozeEnabled) onSnoozeConfirmed() else errorMessage = "Snooze disabled."
+            "snooze" -> if (snoozeEnabled && !isQrStrict) onSnoozeConfirmed() else errorMessage = "Snooze disabled."
         }
     }
 
@@ -213,6 +221,9 @@ fun AlarmRingContent(
 
     fun attemptDismiss() {
         when {
+            isQrStrict -> {
+                showQrScanner = true
+            }
             needsChallenge -> {
                 pendingAction = "dismiss"
                 inputVal = ""
@@ -224,8 +235,8 @@ fun AlarmRingContent(
     }
 
     fun attemptSnooze() {
-        if (!snoozeEnabled) {
-            errorMessage = "Snooze disabled for this alarm."
+        if (isQrStrict || !snoozeEnabled) {
+            errorMessage = if (isQrStrict) "Physical QR Seal alarm has NO snooze or skip!" else "Snooze disabled for this alarm."
             return
         }
         when {
@@ -243,7 +254,7 @@ fun AlarmRingContent(
         modifier = Modifier
             .fillMaxSize()
             .background(DarkBackground)
-            .pointerInput(Unit) {
+            .pointerInput(isQrStrict) {
                 detectDragGestures(
                     onDragEnd = {
                         if (dragY < -dragThreshold) {
@@ -284,7 +295,7 @@ fun AlarmRingContent(
             Spacer(Modifier.height(20.dp))
 
             Text(
-                text = "SYSTEM WAKE UP",
+                text = if (isQrStrict) "STRICT PHYSICAL QR LOCK" else "SYSTEM WAKE UP",
                 style = MaterialTheme.typography.labelLarge,
                 color = DangerPenaltyRed,
                 letterSpacing = 3.sp
@@ -299,134 +310,192 @@ fun AlarmRingContent(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(32.dp))
 
-            if (showChallenge) {
+            if (isQrStrict) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(DarkCard)
-                        .border(1.dp, DarkBorder, RoundedCornerShape(16.dp))
-                        .padding(20.dp)
+                        .border(1.5.dp, DangerPenaltyRed, RoundedCornerShape(16.dp))
+                        .padding(18.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
-                            text = if (pendingAction == "snooze") "SNOOZE REQUEST" else "DISMISS REQUEST",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted
+                            text = "SCAN REGISTERED QR / BARCODE TO STOP",
+                            color = AccentCyan,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            textAlign = TextAlign.Center
                         )
-                        if (dismissMethod.contains("MATH", ignoreCase = true)) {
-                            Text(
-                                text = "SOLVE: $num1 + $num2 = ?",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = PrimaryManaBlue
-                            )
-                        } else {
-                            Text(
-                                text = "ENTER PIN",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = PrimaryManaBlue
-                            )
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = inputVal,
-                            onValueChange = { inputVal = it },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = if (dismissMethod.contains("MATH"))
-                                    KeyboardType.Number else KeyboardType.NumberPassword
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = PrimaryManaBlue,
-                                unfocusedBorderColor = DarkBorder,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = "No skip or bypass available. Walk to your physical seal and scan it now.",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(14.dp))
                         Button(
-                            onClick = {
-                                if (verifyChallenge()) {
-                                    executePendingAction(pendingAction)
-                                } else {
-                                    errorMessage = if (dismissMethod.contains("MATH", ignoreCase = true))
-                                        "Incorrect. Try again ($failCount/5)"
-                                    else "Incorrect PIN. Try again ($failCount/5)"
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { showQrScanner = true },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = SuccessGreen,
+                                containerColor = AccentCyan,
                                 contentColor = DarkBackground
-                            )
+                            ),
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text(if (pendingAction == "snooze") "CONFIRM & SNOOZE" else "CONFIRM & DISMISS")
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Button(
-                            onClick = { onForgotCredential() },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = DarkCard,
-                                contentColor = TextMuted
-                            )
-                        ) {
-                            Text("FORGOT · USE DEVICE LOCK", fontSize = 11.sp)
+                            Text("OPEN CAMERA SCANNER", fontWeight = FontWeight.Black, fontSize = 12.sp)
                         }
                     }
                 }
+            } else {
+                if (showChallenge) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(DarkCard)
+                            .border(1.dp, DarkBorder, RoundedCornerShape(16.dp))
+                            .padding(20.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = if (pendingAction == "snooze") "SNOOZE REQUEST" else "DISMISS REQUEST",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                            if (dismissMethod.contains("MATH", ignoreCase = true)) {
+                                Text(
+                                    text = "SOLVE: $num1 + $num2 = ?",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PrimaryManaBlue
+                                )
+                            } else {
+                                Text(
+                                    text = "ENTER PIN",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PrimaryManaBlue
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = inputVal,
+                                onValueChange = { inputVal = it },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = if (dismissMethod.contains("MATH"))
+                                        KeyboardType.Number else KeyboardType.NumberPassword
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = PrimaryManaBlue,
+                                    unfocusedBorderColor = DarkBorder,
+                                    focusedTextColor = TextPrimary,
+                                    unfocusedTextColor = TextPrimary
+                                )
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    if (verifyChallenge()) {
+                                        executePendingAction(pendingAction)
+                                    } else {
+                                        errorMessage = if (dismissMethod.contains("MATH", ignoreCase = true))
+                                            "Incorrect. Try again ($failCount/5)"
+                                        else "Incorrect PIN. Try again ($failCount/5)"
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = SuccessGreen,
+                                    contentColor = TextOnBlue
+                                )
+                            ) {
+                                Text(if (pendingAction == "snooze") "CONFIRM & SNOOZE" else "CONFIRM & DISMISS")
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Button(
+                                onClick = { onForgotCredential() },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = DarkCard,
+                                    contentColor = TextSecondary
+                                )
+                            ) {
+                                Text("FORGOT · USE DEVICE LOCK", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
+
+                if (showChallenge && failCount >= 5) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { executePendingAction(pendingAction) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = DarkCard,
+                            contentColor = DangerPenaltyRed
+                        )
+                    ) {
+                        Text("EMERGENCY UNLOCK", fontSize = 11.sp)
+                    }
+                }
+
+                RowHints(snoozeEnabled = snoozeEnabled, snoozeMinutes = snoozeMinutes)
+
                 Spacer(Modifier.height(24.dp))
-            }
 
-            // Emergency escape after 5 fails
-            if (showChallenge && failCount >= 5) {
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = { executePendingAction(pendingAction) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DarkCard,
-                        contentColor = DangerPenaltyRed
+                if (errorMessage.isNotBlank()) {
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DangerPenaltyRed,
+                        textAlign = TextAlign.Center
                     )
-                ) {
-                    Text("EMERGENCY UNLOCK", fontSize = 11.sp)
+                    Spacer(Modifier.height(12.dp))
                 }
-            }
 
-            // Swipe hints
-            RowHints(snoozeEnabled = snoozeEnabled, snoozeMinutes = snoozeMinutes)
-
-            Spacer(Modifier.height(24.dp))
-
-            if (errorMessage.isNotBlank()) {
-                Text(
-                    text = errorMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DangerPenaltyRed,
-                    textAlign = TextAlign.Center
+                RowButtons(
+                    snoozeEnabled = snoozeEnabled,
+                    snoozeMinutes = snoozeMinutes,
+                    onSnooze = { attemptSnooze() },
+                    onDismiss = {
+                        if (needsChallenge) {
+                            pendingAction = "dismiss"
+                            showChallenge = true
+                        } else {
+                            attemptDismiss()
+                        }
+                    }
                 )
-                Spacer(Modifier.height(12.dp))
             }
-
-            // Buttons as fallback
-            RowButtons(
-                snoozeEnabled = snoozeEnabled,
-                snoozeMinutes = snoozeMinutes,
-                onSnooze = { attemptSnooze() },
-                onDismiss = {
-                    if (needsChallenge) showChallenge = true else attemptDismiss()
-                }
-            )
         }
+    }
+
+    if (isQrStrict && showQrScanner) {
+        QrScannerDialog(
+            title = "WAKE-UP SEAL VERIFICATION",
+            subtitle = "Scan your registered QR/Barcode to silence this alarm",
+            expectedCode = requiredPin,
+            onDismiss = { showQrScanner = false },
+            onScanned = {
+                showQrScanner = false
+                onDismissConfirmed()
+            }
+        )
     }
 }
 
 @Composable
 private fun RowHints(snoozeEnabled: Boolean, snoozeMinutes: Int) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
@@ -463,7 +532,7 @@ private fun RowButtons(
     onSnooze: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -485,7 +554,7 @@ private fun RowButtons(
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.buttonColors(
                 containerColor = DangerPenaltyRed,
-                contentColor = TextPrimary
+                contentColor = TextOnBlue
             ),
             shape = RoundedCornerShape(10.dp)
         ) {

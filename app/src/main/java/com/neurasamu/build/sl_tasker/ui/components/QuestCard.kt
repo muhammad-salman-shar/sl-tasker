@@ -78,6 +78,7 @@ import java.util.Locale
 fun QuestCard(
     task: TaskEntity,
     occurrence: OccurrenceEntity,
+    todaySteps: Int = 0,
     onComplete: () -> Unit,
     onStart: () -> Unit = {},
     onEdit: () -> Unit = {},
@@ -279,7 +280,11 @@ fun QuestCard(
                         AdvanceMetaPill("QR SEAL", AccentCyan)
                     }
                     if (task.stepGoal > 0) {
-                        AdvanceMetaPill("GOAL: ${task.stepGoal} STEPS", AccentGold)
+                        val met = todaySteps >= task.stepGoal
+                        AdvanceMetaPill(
+                            "STEPS: $todaySteps / ${task.stepGoal}",
+                            if (met) SuccessGreen else AccentGold
+                        )
                     }
                 }
             }

@@ -147,8 +147,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onPause() {
+        try { com.neurasamu.build.sl_tasker.util.StepTrackerManager.stopListening() } catch (_: Throwable) {}
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
+        try { com.neurasamu.build.sl_tasker.util.StepTrackerManager.startListening(this) } catch (_: Throwable) {}
 
         // Continue permissions flow if we returned from a settings screen
         try {
@@ -216,6 +222,15 @@ class MainActivity : ComponentActivity() {
             ) == PackageManager.PERMISSION_GRANTED
             if (!granted) {
                 requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val stepPerm = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!stepPerm) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
                 return
             }
         }
