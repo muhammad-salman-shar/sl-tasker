@@ -111,7 +111,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         try {
             val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-            com.neurasamu.build.sl_tasker.ui.theme.ThemeState.mode = prefs.getInt("theme_mode", 0)
+            val savedThemeId = com.neurasamu.build.sl_tasker.ui.theme.AppThemeId.fromStored(
+                prefs.getString("active_theme_id", null)
+            )
+            com.neurasamu.build.sl_tasker.ui.theme.ThemeState.selectTheme(savedThemeId)
             com.neurasamu.build.sl_tasker.ui.theme.ThemeState.isLiteMode = prefs.getBoolean("lite_mode", false)
         } catch (_: Throwable) {}
         checkAndRequestPermissions()

@@ -2,79 +2,79 @@ package com.neurasamu.build.sl_tasker.ui.theme
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * Liquid Glass material modifier (iOS 26 / VisionOS style).
- * - Translucent vertical gradient fill
- * - Directional specular rim (bright top-left -> transparent bottom-right)
- * - Soft ambient elevation shadow
- *
- * Perf-safe: no RenderEffect/blur, fake-glass approach for low-end devices.
- */
 fun Modifier.liquidGlass(
-    shape: Shape = RoundedCornerShape(24.dp),
-    tint: Color = Color.White,
-    fillTop: Float = 0.10f,
-    fillBottom: Float = 0.03f,
-    rimAlpha: Float = 0.55f,
-    shadowElevation: Dp = 16.dp
-): Modifier = this
-    .shadow(
-        elevation = shadowElevation,
-        shape = shape,
-        clip = false
-    )
-    .clip(shape)
-    .background(
-        Brush.verticalGradient(
-            colors = listOf(
-                tint.copy(alpha = fillTop),
-                tint.copy(alpha = fillBottom)
-            )
+    shape: Shape = RoundedCornerShape(18.dp),
+    tint: Color = GlassTintBlue,
+    tintAlpha: Float = 0.07f,
+    topAlpha: Float = 0.11f,
+    bottomAlpha: Float = 0.04f,
+    borderWidth: Dp = 1.dp,
+    rimAlpha: Float = 0.28f
+): Modifier {
+    val isLight = ThemeState.isLight
+    val cardBase = ThemeState.tokens.cardBg
+    val borderCol = ThemeState.tokens.border
+    return this
+        .clip(shape)
+        .background(
+            if (isLight) {
+                Brush.verticalGradient(
+                    listOf(
+                        cardBase.copy(alpha = 0.96f),
+                        cardBase.copy(alpha = 0.90f)
+                    )
+                )
+            } else {
+                Brush.verticalGradient(
+                    listOf(
+                        GlassFill.copy(alpha = topAlpha),
+                        GlassFill.copy(alpha = (topAlpha + bottomAlpha) * 0.5f),
+                        GlassFill.copy(alpha = bottomAlpha)
+                    )
+                )
+            }
         )
-    )
-    .border(
-        width = 1.dp,
-        color = Color.White.copy(alpha = rimAlpha * 0.55f),
-        shape = shape
-    )
-
-@Composable
-fun GlassCard(
-    modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(24.dp),
-    padding: PaddingValues = PaddingValues(16.dp),
-    shadowElevation: Dp = 16.dp,
-    fillTop: Float = 0.10f,
-    fillBottom: Float = 0.03f,
-    tint: Color = Color.White,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = modifier
-            .liquidGlass(
-                shape = shape,
-                tint = tint,
-                fillTop = fillTop,
-                fillBottom = fillBottom,
-                shadowElevation = shadowElevation
+        .background(tint.copy(alpha = if (isLight) tintAlpha * 0.7f else tintAlpha))
+        .border(
+            width = borderWidth,
+            color = if (isLight) borderCol else GlassRim.copy(alpha = rimAlpha),
+            shape = shape
+        )
+        .drawWithContent {
+            drawContent()
+            val h = 1.dp.toPx()
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    listOf(
+                        Color.Transparent,
+                        (if (isLight) tint else GlassRim).copy(alpha = rimAlpha * 1.1f),
+                        Color.Transparent
+                    )
+                ),
+                size = size.copy(height = h)
             )
-            .padding(padding),
-        content = content
-    )
+        }
 }
+
+fun Modifier.liquidGlassPill(
+    tint: Color = GlassTintBlue,
+    selected: Boolean = false
+): Modifier = this.liquidGlass(
+    shape = RoundedCornerShape(50),
+    tint = tint,
+    tintAlpha = if (selected) 0.22f else 0.06f,
+    topAlpha = if (selected) 0.18f else 0.09f,
+    bottomAlpha = if (selected) 0.08f else 0.03f,
+    borderWidth = if (selected) 1.2.dp else 0.8.dp,
+    rimAlpha = if (selected) 0.50f else 0.22f
+)

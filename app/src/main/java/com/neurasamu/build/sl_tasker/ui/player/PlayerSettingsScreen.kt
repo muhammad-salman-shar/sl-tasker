@@ -167,6 +167,65 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
+                val activeTheme = ThemeState.activeTheme
+                SettingsCard {
+                    Text("APPEARANCE & THEMES", color = PrimaryManaBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "High-contrast themes calibrated for clear readability",
+                        color = TextSecondary,
+                        fontSize = 10.sp
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        com.neurasamu.build.sl_tasker.ui.theme.AppThemeId.entries.forEach { tId ->
+                            val isSel = activeTheme == tId
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) PrimaryManaBlue.copy(alpha = 0.16f) else DarkSurface)
+                                    .border(
+                                        width = if (isSel) 1.5.dp else 1.dp,
+                                        color = if (isSel) PrimaryManaBlue else DarkBorder,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable {
+                                        ThemeState.selectTheme(tId)
+                                        try {
+                                            context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                                                .edit().putString("active_theme_id", tId.name).apply()
+                                        } catch (_: Throwable) {}
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = tId.displayName,
+                                        color = if (isSel) PrimaryManaBlue else TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = tId.subtitle,
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                Text(
+                                    text = if (isSel) "ACTIVE" else "SELECT",
+                                    color = if (isSel) PrimaryManaBlue else TextMuted,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
                 SettingsCard {
                     Text("PERMISSIONS", color = PrimaryManaBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))

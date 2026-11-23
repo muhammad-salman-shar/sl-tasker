@@ -1,17 +1,10 @@
 package com.neurasamu.build.sl_tasker.ui.home
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.runtime.collectAsState
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,55 +16,67 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
-import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
-import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
-import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
-import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
-import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
-import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
-import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
-import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
-import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
-import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import androidx.compose.runtime.LaunchedEffect
-import kotlin.math.sin
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.width
-import com.neurasamu.build.sl_tasker.ui.viewmodel.DailyQuestViewModel
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
+import com.neurasamu.build.sl_tasker.data.task.HabitPresets
+import com.neurasamu.build.sl_tasker.data.task.RespectfulHabitPreset
+import com.neurasamu.build.sl_tasker.security.LicenseManager
+import com.neurasamu.build.sl_tasker.security.PaywallTrigger
 import com.neurasamu.build.sl_tasker.ui.components.DailyQuestSection
+import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
+import com.neurasamu.build.sl_tasker.ui.theme.BadgeBg
+import com.neurasamu.build.sl_tasker.ui.theme.BadgeText
+import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
+import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
+import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
+import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
+import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
+import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
+import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
+import com.neurasamu.build.sl_tasker.ui.theme.TextOnBlue
+import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
+import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
+import com.neurasamu.build.sl_tasker.ui.viewmodel.DailyQuestViewModel
+import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
+import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
+import com.neurasamu.build.sl_tasker.util.SoundFx
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -80,267 +85,420 @@ fun HomeScreen(
     dailyQuestViewModel: DailyQuestViewModel,
     modifier: Modifier = Modifier
 ) {
+    val ctx = LocalContext.current
     val activeQuests by taskViewModel.activeQuests.collectAsStateWithLifecycle()
-    val playerStats by statsViewModel.playerStats.collectAsStateWithLifecycle()
-    val dailyQuests by dailyQuestViewModel.quests.collectAsStateWithLifecycle()
-    val upcoming = activeQuests.take(5)
+    val completedQuests by taskViewModel.completedQuests.collectAsStateWithLifecycle()
+    val stats by statsViewModel.playerStats.collectAsStateWithLifecycle()
+    val dailyQuests by dailyQuestViewModel.todayQuests.collectAsStateWithLifecycle()
+    val dailyCompleted by dailyQuestViewModel.completedTodayCount.collectAsStateWithLifecycle()
 
-    Column(
+    var showDailyCongrats by remember { mutableStateOf(false) }
+
+    // Daily Completion Celebration when all scheduled tasks for today are completed
+    LaunchedEffect(activeQuests.size, completedQuests.size) {
+        if (activeQuests.isEmpty() && completedQuests.isNotEmpty()) {
+            val cal = Calendar.getInstance()
+            val dayKey = "${cal.get(Calendar.YEAR)}_${cal.get(Calendar.DAY_OF_YEAR)}"
+            val prefs = ctx.getSharedPreferences("sl_daily_congrats", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean(dayKey, false)) {
+                prefs.edit().putBoolean(dayKey, true).apply()
+                showDailyCongrats = true
+                try { SoundFx.levelUp() } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color.Transparent)
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Spacer(Modifier.height(20.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            StatCircle(
-                icon = Icons.Rounded.Favorite,
-                value = "${playerStats.health}",
-                label = "HP",
-                progress = playerStats.health / 100f,
-                primaryColor = DangerPenaltyRed
-            )
-            StatCircle(
-                icon = Icons.Rounded.Bolt,
-                value = "${playerStats.ep}",
-                label = "/ ${GamificationEngine.EP_PER_LEVEL} EP",
-                progress = playerStats.ep.toFloat() / GamificationEngine.EP_PER_LEVEL,
-                primaryColor = PrimaryManaBlue
-            )
+        // 1. Compact Status Card
+        item {
+            StatusCard(stats = stats)
         }
 
-        val isProUser by com.neurasamu.build.sl_tasker.security.LicenseManager.isProFlow.collectAsState()
-        val incompleteQuests = dailyQuests.filter { !it.completed }
-        if (isProUser && incompleteQuests.isNotEmpty()) {
-            Spacer(Modifier.height(20.dp))
+        // 2. Daily Quests
+        item {
             DailyQuestSection(
-                quests = incompleteQuests,
-                onComplete = { id -> dailyQuestViewModel.complete(id) }
+                quests = dailyQuests,
+                completedCount = dailyCompleted,
+                onComplete = { dailyQuestViewModel.completeQuest(it) }
             )
         }
 
-        Spacer(Modifier.height(20.dp))
+        // 3. Respectful Quick Routine Presets
+        item {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "DAILY ROUTINE PRESETS",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = PrimaryManaBlue,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    Text(
+                        text = "1-tap add",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                        fontSize = 10.sp
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(items = HabitPresets.all, key = { it.id }) { preset ->
+                        PresetChipCard(
+                            preset = preset,
+                            onAdd = {
+                                if (!LicenseManager.isPro() && activeQuests.size >= 2) {
+                                    PaywallTrigger.show("Free tier allows up to 2 active tasks. Upgrade to Pro for unlimited tasks.")
+                                } else {
+                                    taskViewModel.createQuest(
+                                        title = preset.title,
+                                        description = preset.subtitle,
+                                        difficulty = preset.difficulty,
+                                        reminderMinutesOfDay = preset.reminderMinutesOfDay,
+                                        customRepeatDays = "",
+                                        durationMinutes = preset.durationMinutes,
+                                        isRepeat = false,
+                                        allowEarlyComplete = true,
+                                        userType = preset.categoryLabel,
+                                        scheduleMode = preset.scheduleMode,
+                                        validityDays = 1,
+                                        isAdvanced = preset.isAdvanced,
+                                        hpDropEnabled = true,
+                                        requireQrProof = false,
+                                        stepGoal = preset.stepGoal
+                                    )
+                                    Toast.makeText(
+                                        ctx,
+                                        "Added \"${preset.title}\" to today's tasks!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
 
-        Text(
-            text = "UPCOMING QUESTS",
-            style = MaterialTheme.typography.labelLarge,
-            color = PrimaryManaBlue,
-            fontSize = 12.sp
-        )
-
-        Spacer(Modifier.height(10.dp))
-
-        if (upcoming.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+        // 4. Today's Tasks Header
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "THE SYSTEM AWAITS",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF0B1220) else TextPrimary
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "Add your first quest to begin ascension.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (ThemeState.isLight) androidx.compose.ui.graphics.Color(0xFF64748B) else TextMuted
-                    )
+                Text(
+                    text = "TODAY'S TASKS",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = PrimaryManaBlue,
+                    fontSize = 13.sp,
+                    letterSpacing = 1.5.sp
+                )
+                Text(
+                    text = "${activeQuests.size} pending",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        if (activeQuests.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DarkCard)
+                        .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = if (completedQuests.isNotEmpty()) "All Today's Quests Completed!" else "All clear",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = if (completedQuests.isNotEmpty())
+                                "Amazing discipline! You cleared every objective for today."
+                            else
+                                "Tap a preset above or + on Tasks to schedule your day.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(items = upcoming, key = { it.occurrence.id }) { item ->
-                    UpcomingRow(
-                        title = item.task.title,
-                        timeMillis = item.occurrence.scheduledAt,
-                        difficulty = item.task.difficulty
-                    )
-                }
+            items(
+                items = activeQuests.take(6),
+                key = { it.occurrence.id }
+            ) { item ->
+                CompactTaskRow(
+                    title = item.task.title,
+                    difficulty = item.task.difficulty,
+                    timeMillis = item.occurrence.scheduledAt,
+                    allowEarly = item.task.allowEarlyComplete,
+                    onComplete = { taskViewModel.completeQuest(item.occurrence.id) }
+                )
             }
         }
+    }
+
+    if (showDailyCongrats) {
+        AlertDialog(
+            onDismissRequest = { showDailyCongrats = false },
+            containerColor = DarkCard,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.AutoAwesome,
+                        contentDescription = null,
+                        tint = AccentGold,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "DAILY GOALS COMPLETE!",
+                        color = PrimaryManaBlue,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Congratulations! You have completed all scheduled tasks for today (${completedQuests.size} cleared).",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Keep your streak alive — your task board will refresh cleanly at 12:00 AM midnight.",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showDailyCongrats = false },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryManaBlue,
+                        contentColor = TextOnBlue
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("CELEBRATE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        )
     }
 }
 
 @Composable
-private fun StatCircle(
-    icon: ImageVector,
-    value: String,
-    label: String,
-    progress: Float,
-    primaryColor: Color
+private fun PresetChipCard(
+    preset: RespectfulHabitPreset,
+    onAdd: () -> Unit
 ) {
-    val isLite = com.neurasamu.build.sl_tasker.ui.theme.ThemeState.isLiteMode
-    val isPro by com.neurasamu.build.sl_tasker.security.LicenseManager.isProFlow.collectAsState()
-    val proAnim = isPro && !isLite
-
-    var pulse by remember { mutableFloatStateOf(1f) }
-    var rotation by remember { mutableFloatStateOf(0f) }
-    var glow by remember { mutableFloatStateOf(0.6f) }
-
-    LaunchedEffect(proAnim, isLite) {
-        if (isLite) {
-            pulse = 1f
-            rotation = 0f
-            glow = 0.6f
-            return@LaunchedEffect
-        }
-        val startNanos = System.nanoTime()
-        while (true) {
-            withFrameNanos {
-                val elapsedSec = (System.nanoTime() - startNanos) / 1_000_000_000.0
-                rotation = if (proAnim) (((elapsedSec / 2.6) * 360.0) % 360.0).toFloat() else 0f
-                val pulseWave = (sin(elapsedSec * Math.PI / 1.4).toFloat() + 1f) * 0.5f
-                pulse = 0.94f + 0.12f * pulseWave
-                val glowWave = (sin(elapsedSec * Math.PI / 1.2).toFloat() + 1f) * 0.5f
-                glow = 0.35f + 0.55f * glowWave
-            }
-        }
-    }
-
-    Box(
-        modifier = Modifier.size(144.dp),
-        contentAlignment = Alignment.Center
+    Column(
+        modifier = Modifier
+            .width(148.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(DarkCard)
+            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
+            .clickable { onAdd() }
+            .padding(10.dp)
     ) {
-        // Outer breathing halo (unclipped so glow breathes smoothly)
-        Canvas(modifier = Modifier.size(144.dp)) {
-            drawCircle(
-                color = primaryColor.copy(alpha = 0.14f * (glow + 0.35f)),
-                radius = (128.dp.toPx() / 2f) * pulse
-            )
-        }
-
-        // Inner circular meter face
         Box(
             modifier = Modifier
-                .size(128.dp)
-                .clip(CircleShape)
-                .background(DarkCard)
-                .border(1.dp, primaryColor.copy(alpha = 0.25f), CircleShape),
-            contentAlignment = Alignment.Center
+                .clip(RoundedCornerShape(6.dp))
+                .background(BadgeBg)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
-            Canvas(modifier = Modifier.size(128.dp)) {
-                val stroke = 6.dp.toPx()
-                val inset = stroke / 2f
-                val arcSize = Size(size.width - stroke, size.height - stroke)
-                // Track
-                drawArc(
-                    color = primaryColor.copy(alpha = 0.15f),
-                    startAngle = -90f,
-                    sweepAngle = 360f,
-                    useCenter = false,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
-                    topLeft = Offset(inset, inset),
-                    size = arcSize
+            Text(
+                text = preset.categoryLabel,
+                color = BadgeText,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = preset.title,
+            color = TextPrimary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = preset.subtitle,
+            color = TextSecondary,
+            fontSize = 10.sp,
+            maxLines = 2,
+            lineHeight = 13.sp
+        )
+    }
+}
+
+@Composable
+private fun StatusCard(stats: PlayerStatsEntity) {
+    val rank = when {
+        stats.level >= 20 -> "S"
+        stats.level >= 15 -> "A"
+        stats.level >= 10 -> "B"
+        stats.level >= 5 -> "C"
+        stats.level >= 3 -> "D"
+        else -> "E"
+    }
+    val hpFraction = (stats.health.coerceIn(0, 100)) / 100f
+    val hpColor = when {
+        stats.health >= 60 -> SuccessGreen
+        stats.health >= 30 -> AccentGold
+        else -> DangerPenaltyRed
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(DarkCard, DarkSurface)
                 )
-                // Progress
-                drawArc(
-                    color = primaryColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f * progress.coerceIn(0f, 1f),
-                    useCenter = false,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
-                    topLeft = Offset(inset, inset),
-                    size = arcSize
-                )
-                // Glowing dot on progress tip
-                val angleRad = Math.toRadians((-90f + 360f * progress.coerceIn(0f, 1f)).toDouble())
-                val cx = size.width / 2f + (size.width / 2f - stroke / 2f) * Math.cos(angleRad).toFloat()
-                val cy = size.height / 2f + (size.height / 2f - stroke / 2f) * Math.sin(angleRad).toFloat()
-                drawCircle(
-                    color = primaryColor.copy(alpha = glow),
-                    radius = stroke * 0.9f,
-                    center = Offset(cx, cy)
-                )
+            )
+            .border(1.dp, DarkBorder, RoundedCornerShape(14.dp))
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(PrimaryManaBlue.copy(alpha = 0.15f))
+                        .border(1.dp, PrimaryManaBlue, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = rank,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = PrimaryManaBlue,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 22.sp
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "LEVEL ${stats.level}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "${stats.ep} EP",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                }
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = primaryColor,
-                    modifier = Modifier.size(22.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MiniStat(
+                    icon = Icons.Rounded.LocalFireDepartment,
+                    value = "${stats.streak}d",
+                    tint = AccentGold
                 )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = value,
-                    color = TextPrimary,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = label,
-                    color = TextMuted,
-                    fontSize = 10.sp
+                MiniStat(
+                    icon = Icons.Rounded.TaskAlt,
+                    value = "${stats.totalCompleted}",
+                    tint = SuccessGreen
                 )
             }
         }
 
-        // PRO-only rotating orbiting light beam cleanly outside the ring
-        if (proAnim) {
-            Canvas(modifier = Modifier.size(140.dp)) {
-                val stroke = 3.dp.toPx()
-                val inset = stroke / 2f + 2.dp.toPx()
-                val arcSize = Size(size.width - inset * 2f, size.height - inset * 2f)
-                val lightBrush = Brush.sweepGradient(
-                    0.0f to Color.Transparent,
-                    0.50f to Color.Transparent,
-                    0.80f to primaryColor.copy(alpha = 0.60f),
-                    0.95f to primaryColor,
-                    1.0f to Color.White
-                )
-                rotate(degrees = rotation) {
-                    drawArc(
-                        brush = lightBrush,
-                        startAngle = 0f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        style = Stroke(width = stroke, cap = StrokeCap.Round),
-                        topLeft = Offset(inset, inset),
-                        size = arcSize
-                    )
-                    val radius = arcSize.width / 2f
-                    val tipX = size.width / 2f + radius
-                    val tipY = size.height / 2f
-                    drawCircle(
-                        color = primaryColor.copy(alpha = 0.50f),
-                        radius = stroke * 2.2f,
-                        center = Offset(tipX, tipY)
-                    )
-                    drawCircle(
-                        color = Color.White,
-                        radius = stroke * 0.95f,
-                        center = Offset(tipX, tipY)
-                    )
-                }
-            }
+        Spacer(Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("HEALTH", style = MaterialTheme.typography.labelSmall, color = TextSecondary, fontSize = 10.sp)
+            Text("${stats.health} / 100", style = MaterialTheme.typography.labelSmall, color = hpColor, fontSize = 10.sp)
+        }
+        Spacer(Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(DarkSurface)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(hpFraction)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(hpColor)
+            )
         }
     }
 }
 
 @Composable
-private fun UpcomingRow(
+private fun MiniStat(icon: ImageVector, value: String, tint: Color) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(DarkSurface)
+            .border(1.dp, DarkBorder, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(value, color = TextPrimary, fontSize = 11.sp, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun CompactTaskRow(
     title: String,
+    difficulty: com.neurasamu.build.sl_tasker.data.model.Difficulty,
     timeMillis: Long,
-    difficulty: com.neurasamu.build.sl_tasker.data.model.Difficulty
+    allowEarly: Boolean,
+    onComplete: () -> Unit
 ) {
     val timeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
     val timeStr = timeFormat.format(Date(timeMillis))
 
-    // Live countdown (updates every minute; we re-tick every 30s)
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(timeMillis) {
         while (true) {
@@ -399,24 +557,31 @@ private fun UpcomingRow(
                     )
                 }
                 Spacer(Modifier.width(6.dp))
+                Icon(Icons.Rounded.Schedule, contentDescription = null, tint = TextMuted, modifier = Modifier.size(12.dp))
+                Spacer(Modifier.width(4.dp))
                 Text(
-                    text = timeStr,
-                    color = TextMuted,
-                    fontSize = 10.sp
+                    text = "$timeStr · $countdownStr",
+                    color = if (diffMs <= 0L) PrimaryManaBlue else TextSecondary,
+                    fontSize = 11.sp
                 )
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = countdownStr,
-                style = MaterialTheme.typography.labelLarge,
-                color = PrimaryManaBlue
-            )
-            Text(
-                text = "remaining",
-                color = TextMuted,
-                fontSize = 9.sp
-            )
+        val canComplete = allowEarly || System.currentTimeMillis() >= timeMillis
+        if (canComplete) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(PrimaryManaBlue)
+                    .clickable { onComplete() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Done",
+                    color = TextOnBlue,
+                    fontSize = 11.sp,
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
         }
     }
 }
