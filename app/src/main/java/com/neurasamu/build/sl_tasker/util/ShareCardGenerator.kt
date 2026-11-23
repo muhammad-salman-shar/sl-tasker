@@ -16,11 +16,56 @@ import com.neurasamu.build.sl_tasker.data.player.PlayerProfile
 import java.io.File
 import java.io.FileOutputStream
 
+data class FriendFlexStats(
+    val name: String,
+    val level: Int,
+    val rank: String,
+    val weeklyQuests: Int,
+    val weeklySteps: Int,
+    val streak: Int,
+    val shameBadge: String
+)
+
 object ShareCardGenerator {
 
-    fun share(ctx: Context, stats: PlayerStatsEntity, profile: PlayerProfile?) {
+    fun encodeFlexPayload(
+        stats: PlayerStatsEntity,
+        profile: PlayerProfile?,
+        weeklyQuests: Int,
+        weeklySteps: Int
+    ): String {
+        val safeName = (profile?.name ?: "HUNTER")
+            .replace("|", " ")
+            .trim()
+            .ifBlank { "HUNTER" }
+            .take(20)
+        val shame = if (stats.isShamed()) stats.shamingReason.replace("|", " ").take(36) else ""
+        return "SLFLEX|v1|$safeName|${stats.level}|${rank(stats.level)}|$weeklyQuests|$weeklySteps|${stats.streak}|$shame"
+    }
+
+    fun parseFlexPayload(raw: String): FriendFlexStats? {
+        val parts = raw.trim().split("|")
+        if (parts.size < 8 || parts[0] != "SLFLEX") return null
+        return FriendFlexStats(
+            name = parts[2].ifBlank { "FRIEND" },
+            level = parts[3].toIntOrNull() ?: 1,
+            rank = parts[4].ifBlank { "E" },
+            weeklyQuests = parts[5].toIntOrNull() ?: 0,
+            weeklySteps = parts[6].toIntOrNull() ?: 0,
+            streak = parts[7].toIntOrNull() ?: 0,
+            shameBadge = parts.getOrNull(8)?.trim() ?: ""
+        )
+    }
+
+    fun share(
+        ctx: Context,
+        stats: PlayerStatsEntity,
+        profile: PlayerProfile?,
+        weeklyQuests: Int = stats.totalCompleted,
+        weeklySteps: Int = StepTrackerManager.weeklySteps.value
+    ) {
         try {
-            val bitmap = generate(ctx, stats, profile)
+            val bitmap = generate(stats, profile, weeklyQuests, weeklySteps)
             val dir = File(ctx.cacheDir, "share")
             dir.mkdirs()
             val file = File(dir, "sl_tasker_profile.png")
@@ -35,21 +80,27 @@ object ShareCardGenerator {
             val share = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
                 putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_TEXT, buildCaption(stats, profile))
+                putExtra(Intent.EXTRA_TEXT, buildCaption(stats, profile, weeklyQuests, weeklySteps))
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            ctx.startActivity(Intent.createChooser(share, "Share Player Card").apply {
+            ctx.startActivity(Intent.createChooser(share, "Share Flex Card").apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         } catch (_: Throwable) {}
     }
 
-    private fun buildCaption(stats: PlayerStatsEntity, profile: PlayerProfile?): String {
-        val name = profile?.name?.uppercase() ?: "PLAYER"
-        return "⚔️ $name — Level ${stats.level} · Rank ${rank(stats.level)} · ${stats.totalCompleted} quests cleared · Streak ${stats.streak}🔥 · HP ${stats.health}/100"
+    private fun buildCaption(
+        stats: PlayerStatsEntity,
+        profile: PlayerProfile?,
+        weeklyQuests: Int,
+        weeklySteps: Int
+    ): String {
+        val name = profile?.name?.uppercase() ?: "HUNTER"
+        val shameTag = if (stats.isShamed()) " [⚠ ${stats.shamingReason}]" else ""
+        return "$name$shameTag — Level ${stats.level} (Rank ${rank(stats.level)}) · $weeklyQuests weekly quests · $weeklySteps weekly steps · Streak ${stats.streak}d"
     }
 
-    private fun rank(level: Int): String = when {
+    fun rank(level: Int): String = when {
         level >= 20 -> "S"
         level >= 15 -> "A"
         level >= 10 -> "B"
@@ -59,16 +110,16 @@ object ShareCardGenerator {
     }
 
     private fun generate(
-        ctx: Context,
         stats: PlayerStatsEntity,
-        profile: PlayerProfile?
+        profile: PlayerProfile?,
+        weeklyQuests: Int,
+        weeklySteps: Int
     ): Bitmap {
         val w = 1080
-        val h = 1350
+        val h = 1440
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
 
-        // Background gradient
         val bg = Paint().apply {
             shader = LinearGradient(
                 0f, 0f, 0f, h.toFloat(),
@@ -78,27 +129,25 @@ object ShareCardGenerator {
         }
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), bg)
 
-        // Radial glow
         val glow = Paint().apply {
             shader = android.graphics.RadialGradient(
-                w / 2f, 320f, 560f,
+                w / 2f, 300f, 540f,
                 intArrayOf(Color.parseColor("#4A90FF80"), Color.TRANSPARENT),
                 null, Shader.TileMode.CLAMP
             )
         }
-        c.drawCircle(w / 2f, 320f, 560f, glow)
+        c.drawCircle(w / 2f, 300f, 540f, glow)
 
-        // Notched card
         val cardPaint = Paint().apply {
             color = Color.parseColor("#0F1830")
             isAntiAlias = true
         }
         val notch = 60f
         val cardPath = android.graphics.Path().apply {
-            val left = 80f
-            val top = 260f
-            val right = (w - 80).toFloat()
-            val bottom = (h - 120).toFloat()
+            val left = 72f
+            val top = 230f
+            val right = (w - 72).toFloat()
+            val bottom = (h - 90).toFloat()
             moveTo(left, top)
             lineTo(right - notch, top)
             lineTo(right, top + notch)
@@ -110,7 +159,6 @@ object ShareCardGenerator {
         }
         c.drawPath(cardPath, cardPaint)
 
-        // Card border
         val border = Paint().apply {
             color = Color.parseColor("#3B82F6")
             style = Paint.Style.STROKE
@@ -119,35 +167,31 @@ object ShareCardGenerator {
         }
         c.drawPath(cardPath, border)
 
-        // Top gold hairline
         val gold = Paint().apply {
             color = Color.parseColor("#FBBF24")
             strokeWidth = 6f
             strokeCap = Paint.Cap.ROUND
         }
-        c.drawLine(140f, 261f, 340f, 261f, gold)
+        c.drawLine(132f, 231f, 332f, 231f, gold)
 
-        // Text helpers
         val bold = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         val black = Typeface.create("sans-serif-black", Typeface.BOLD)
 
-        // Brand
         val brandPaint = Paint().apply {
-            color = Color.parseColor("#4A90FF")
+            color = Color.parseColor("#60A5FA")
             textSize = 36f
             typeface = bold
             letterSpacing = 0.2f
         }
-        c.drawText("SL TASKER", 140f, 200f, brandPaint)
+        c.drawText("SL TASKER", 132f, 175f, brandPaint)
 
         val sysPaint = Paint().apply {
-            color = Color.parseColor("#5A6785")
-            textSize = 24f
+            color = Color.parseColor("#8B9AB8")
+            textSize = 23f
             typeface = bold
         }
-        c.drawText("PLAYER STATUS", 140f, 235f, sysPaint)
+        c.drawText("PROGRESS FLEX CARD", 132f, 208f, sysPaint)
 
-        // Rank circle
         val rankVal = rank(stats.level)
         val rankColor = when (rankVal) {
             "S" -> "#FBBF24"
@@ -163,26 +207,25 @@ object ShareCardGenerator {
             strokeWidth = 6f
             isAntiAlias = true
         }
-        c.drawCircle(w / 2f, 450f, 130f, rankCircle)
+        c.drawCircle(w / 2f, 405f, 118f, rankCircle)
 
         val rankFill = Paint().apply {
             color = Color.parseColor(rankColor + "40")
         }
-        c.drawCircle(w / 2f, 450f, 126f, rankFill)
+        c.drawCircle(w / 2f, 405f, 114f, rankFill)
 
         val rankText = Paint().apply {
             color = Color.parseColor(rankColor)
-            textSize = 140f
+            textSize = 128f
             typeface = black
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
         }
-        c.drawText(rankVal, w / 2f, 510f, rankText)
+        c.drawText(rankVal, w / 2f, 458f, rankText)
 
-        // Name
-        val name = profile?.name?.uppercase() ?: "PLAYER"
+        val name = profile?.name?.uppercase() ?: "HUNTER"
         val namePaint = Paint().apply {
-            textSize = 64f
+            textSize = 58f
             typeface = black
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
@@ -196,66 +239,93 @@ object ShareCardGenerator {
                 color = Color.WHITE
             }
         }
-        c.drawText(name, w / 2f, 680f, namePaint)
+        c.drawText(name, w / 2f, 605f, namePaint)
 
-        // Player ID
-        val idPaint = Paint().apply {
-            color = Color.parseColor("#8B9AB8")
-            textSize = 28f
-            typeface = bold
-            textAlign = Paint.Align.CENTER
-        }
-        if (!profile?.playerId.isNullOrBlank()) {
-            c.drawText(profile.playerId, w / 2f, 725f, idPaint)
-        }
-
-        // Level + stats row
         val levelPaint = Paint().apply {
             color = Color.parseColor("#FBBF24")
-            textSize = 42f
+            textSize = 38f
             typeface = black
             textAlign = Paint.Align.CENTER
         }
-        c.drawText("LEVEL ${stats.level}", w / 2f, 800f, levelPaint)
+        c.drawText("LEVEL ${stats.level}", w / 2f, 660f, levelPaint)
 
-        // Stats rows
-        val rowStartY = 900f
-        val rowHeight = 90f
+        if (stats.isShamed()) {
+            val shameBg = Paint().apply {
+                color = Color.parseColor("#3B0A0A")
+                isAntiAlias = true
+            }
+            val shameBorder = Paint().apply {
+                color = Color.parseColor("#EF4444")
+                style = Paint.Style.STROKE
+                strokeWidth = 3f
+                isAntiAlias = true
+            }
+            val rect = RectF(140f, 682f, (w - 140).toFloat(), 732f)
+            c.drawRoundRect(rect, 14f, 14f, shameBg)
+            c.drawRoundRect(rect, 14f, 14f, shameBorder)
+            val shameTxt = Paint().apply {
+                color = Color.parseColor("#FF6B6B")
+                textSize = 23f
+                typeface = bold
+                textAlign = Paint.Align.CENTER
+                isAntiAlias = true
+            }
+            c.drawText("⚠ ${stats.shamingReason.uppercase()}", w / 2f, 715f, shameTxt)
+        }
+
+        val rowStartY = 805f
+        val rowHeight = 76f
         val labelPaint = Paint().apply {
-            color = Color.parseColor("#5A6785")
-            textSize = 30f
+            color = Color.parseColor("#8B9AB8")
+            textSize = 26f
             typeface = bold
         }
         val valuePaint = Paint().apply {
             color = Color.WHITE
-            textSize = 40f
+            textSize = 34f
             typeface = black
             textAlign = Paint.Align.RIGHT
         }
 
-        val stats_list = listOf(
-            "HP" to "${stats.health}/100",
-            "EP" to "${stats.ep}",
-            "Streak" to "${stats.streak} 🔥",
-            "Completed" to "${stats.totalCompleted}",
-            "Missed" to "${stats.totalMissed}"
+        val statsList = listOf(
+            "WEEKLY QUESTS" to "$weeklyQuests",
+            "WEEKLY STEPS" to "$weeklySteps",
+            "STREAK" to "${stats.streak}d",
+            "TOTAL CLEARED" to "${stats.totalCompleted}",
+            "HEALTH" to "${stats.health}/100"
         )
 
-        stats_list.forEachIndexed { i, (label, value) ->
+        statsList.forEachIndexed { i, (label, value) ->
             val y = rowStartY + i * rowHeight
-            c.drawText(label.uppercase(), 140f, y, labelPaint)
-            c.drawText(value, (w - 140).toFloat(), y, valuePaint)
+            c.drawText(label, 124f, y, labelPaint)
+            c.drawText(value, 670f, y, valuePaint)
         }
 
-        // Footer
+        val flexPayload = encodeFlexPayload(stats, profile, weeklyQuests, weeklySteps)
+        val qrBmp = runCatching { QrBarcodeHelper.generateQrBitmap(flexPayload, 240) }.getOrNull()
+        if (qrBmp != null) {
+            val qrBox = RectF(715f, 830f, 975f, 1090f)
+            val whiteBg = Paint().apply { color = Color.WHITE; isAntiAlias = true }
+            c.drawRoundRect(qrBox, 16f, 16f, whiteBg)
+            c.drawBitmap(qrBmp, 725f, 840f, null)
+
+            val scanHintPaint = Paint().apply {
+                color = Color.parseColor("#93C5FD")
+                textSize = 20f
+                typeface = bold
+                textAlign = Paint.Align.CENTER
+            }
+            c.drawText("SCAN TO COMPARE", 845f, 1122f, scanHintPaint)
+        }
+
         val footerPaint = Paint().apply {
-            color = Color.parseColor("#4A90FF")
-            textSize = 26f
+            color = Color.parseColor("#60A5FA")
+            textSize = 25f
             typeface = bold
             textAlign = Paint.Align.CENTER
             letterSpacing = 0.15f
         }
-        c.drawText("NEURASAMU.COM", w / 2f, (h - 40).toFloat(), footerPaint)
+        c.drawText("SL TASKER · NEURASAMU.COM", w / 2f, (h - 32).toFloat(), footerPaint)
 
         return bmp
     }

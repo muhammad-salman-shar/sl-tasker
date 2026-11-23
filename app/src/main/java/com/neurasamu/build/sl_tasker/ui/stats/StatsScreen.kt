@@ -1,15 +1,12 @@
 package com.neurasamu.build.sl_tasker.ui.stats
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,29 +26,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Share
-import kotlinx.coroutines.launch
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.collectAsState
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.QrCodeScanner
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,37 +54,42 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.neurasamu.build.sl_tasker.data.model.EventEntity
 import com.neurasamu.build.sl_tasker.data.model.EventType
 import com.neurasamu.build.sl_tasker.data.player.PlayerProfile
 import com.neurasamu.build.sl_tasker.data.player.PlayerProfileStore
 import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
+import com.neurasamu.build.sl_tasker.security.LicenseManager
+import com.neurasamu.build.sl_tasker.ui.components.QrScannerDialog
+import com.neurasamu.build.sl_tasker.ui.theme.AccentCyan
+import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
-import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
+import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.DarkCard
+import com.neurasamu.build.sl_tasker.ui.theme.DarkSurface
 import com.neurasamu.build.sl_tasker.ui.theme.GoldWarning
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
-import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
+import com.neurasamu.build.sl_tasker.ui.theme.TextOnBlue
 import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
+import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
+import com.neurasamu.build.sl_tasker.ui.theme.ThemeState
 import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
+import com.neurasamu.build.sl_tasker.util.FriendFlexStats
 import com.neurasamu.build.sl_tasker.util.ShareCardGenerator
+import com.neurasamu.build.sl_tasker.util.StepTrackerManager
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.min
-
-// Cyan accent from HTML design
-private val CyberCyan = Color(0xFF00F3FF)
-private val CyberBg = Color(0xFF050810)
 
 @Composable
 fun StatsScreen(
@@ -98,34 +98,52 @@ fun StatsScreen(
 ) {
     val stats by statsViewModel.playerStats.collectAsStateWithLifecycle()
     val events by statsViewModel.recentEvents.collectAsStateWithLifecycle()
+    val weeklyEvents by statsViewModel.weeklyEvents.collectAsStateWithLifecycle()
+    val weeklySteps by StepTrackerManager.weeklySteps.collectAsStateWithLifecycle()
 
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<PlayerProfile?>(null) }
     var showEditProfile by remember { mutableStateOf(false) }
     var showRankHall by remember { mutableStateOf(false) }
+    var showScanFriendFlex by remember { mutableStateOf(false) }
+    var friendFlex by remember { mutableStateOf<FriendFlexStats?>(null) }
+
+    val weeklyCompleted = remember(weeklyEvents) {
+        weeklyEvents.count { it.type == EventType.OCCURRENCE_COMPLETED }
+    }
+    val weeklyMissed = remember(weeklyEvents) {
+        weeklyEvents.count { it.type == EventType.OCCURRENCE_MISSED }
+    }
+    val weeklyConsistencyPct = remember(weeklyCompleted, weeklyMissed) {
+        val total = weeklyCompleted + weeklyMissed
+        if (total == 0) 100 else ((weeklyCompleted * 100) / total).coerceIn(0, 100)
+    }
+    val rankProgressPct = remember(stats.ep) {
+        ((stats.ep * 100) / GamificationEngine.EP_PER_LEVEL).coerceIn(0, 100)
+    }
+
     LaunchedEffect(Unit) {
         try {
             PlayerProfileStore(ctx).profile.collect { p -> profile = p }
         } catch (_: Throwable) { }
     }
 
-    Box(modifier = modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Transparent)) {
-        // Background grid + radial glow (HTML replica)
+    val headerAccent = if (ThemeState.isLight) PrimaryManaBlue else AccentCyan
+
+    Box(modifier = modifier.fillMaxSize().background(Color.Transparent)) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // Radial glow at top
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(CyberCyan.copy(alpha = 0.08f), Color.Transparent),
+                    colors = listOf(headerAccent.copy(alpha = 0.08f), Color.Transparent),
                     center = Offset(size.width / 2, 0f),
                     radius = size.width * 0.8f
                 ),
                 radius = size.width * 0.8f,
                 center = Offset(size.width / 2, 0f)
             )
-            // Grid lines
             val step = 60f
-            val gridColor = CyberCyan.copy(alpha = 0.03f)
+            val gridColor = headerAccent.copy(alpha = 0.03f)
             var x = 0f
             while (x <= size.width) {
                 drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), 1f)
@@ -145,27 +163,34 @@ fun StatsScreen(
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Identity card
             profile?.let { p ->
                 if (p.introCompleted) {
                     item {
                         IdentityCard(
                             profile = p,
                             onEdit = { showEditProfile = true },
+                            onCompareFriend = { showScanFriendFlex = true },
                             onShare = {
-                                try { ShareCardGenerator.share(ctx, stats, p) } catch (_: Throwable) {}
+                                try {
+                                    ShareCardGenerator.share(
+                                        ctx = ctx,
+                                        stats = stats,
+                                        profile = p,
+                                        weeklyQuests = weeklyCompleted,
+                                        weeklySteps = weeklySteps
+                                    )
+                                } catch (_: Throwable) {}
                             }
                         )
                     }
                 }
             }
 
-            // HUNTER PROFILE title
             item {
                 Column {
                     Text(
                         "HUNTER PROFILE",
-                        color = CyberCyan,
+                        color = headerAccent,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.SansSerif,
@@ -173,13 +198,49 @@ fun StatsScreen(
                     )
                     Text(
                         "Permanent progression record",
-                        color = TextMuted,
+                        color = TextSecondary,
                         fontSize = 13.sp
                     )
                 }
             }
 
-            // Rank card
+            if (stats.isShamed()) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(DangerPenaltyRed.copy(alpha = 0.16f))
+                            .border(1.5.dp, DangerPenaltyRed, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Warning,
+                            contentDescription = "Shaming Badge",
+                            tint = DangerPenaltyRed,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "SHAMING BADGE ACTIVE (24H)",
+                                color = DangerPenaltyRed,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = stats.shamingReason,
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
             item {
                 RankCard(
                     level = stats.level,
@@ -188,7 +249,6 @@ fun StatsScreen(
                 )
             }
 
-            // HP + EP combined card
             item {
                 BarsCard(
                     hp = stats.health,
@@ -196,7 +256,6 @@ fun StatsScreen(
                 )
             }
 
-            // Stat grid
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -223,15 +282,101 @@ fun StatsScreen(
                 }
             }
 
-            // RECENT ACTIVITY title
+            // WEEKLY PROGRESS REPORT
             item {
-                Text(
-                    "RECENT ACTIVITY",
-                    color = CyberCyan,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(DarkCard.copy(alpha = 0.90f))
+                        .border(1.dp, PrimaryManaBlue.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "WEEKLY PROGRESS REPORT",
+                            color = PrimaryManaBlue,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(PrimaryManaBlue)
+                                .clickable { showScanFriendFlex = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "COMPARE FRIEND QR",
+                                color = TextOnBlue,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SmallStatBox(
+                            value = "$weeklyCompleted",
+                            label = "WEEK QUESTS",
+                            color = SuccessGreen,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SmallStatBox(
+                            value = "$weeklySteps",
+                            label = "WEEK STEPS",
+                            color = headerAccent,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SmallStatBox(
+                            value = "$weeklyConsistencyPct%",
+                            label = "CONSISTENCY",
+                            color = GoldWarning,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SmallStatBox(
+                            value = "$rankProgressPct%",
+                            label = "RANK PROGRESS",
+                            color = PrimaryManaBlue,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "RECENT ACTIVITY (TODAY)",
+                        color = headerAccent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        "Resets 12:00 AM",
+                        color = TextMuted,
+                        fontSize = 10.sp
+                    )
+                }
             }
 
             if (events.isEmpty()) {
@@ -241,10 +386,11 @@ fun StatsScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(DarkCard)
+                            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No activity yet.", color = TextMuted, fontSize = 12.sp)
+                        Text("No activity yet in today's cycle.", color = TextSecondary, fontSize = 12.sp)
                     }
                 }
             } else {
@@ -253,10 +399,84 @@ fun StatsScreen(
                 }
             }
         }
+
         if (showRankHall) {
             RankShowcaseDialog(
                 currentLevel = stats.level,
                 onDismiss = { showRankHall = false }
+            )
+        }
+
+        if (showScanFriendFlex) {
+            QrScannerDialog(
+                title = "SCAN FRIEND'S FLEX CARD",
+                subtitle = "Scan the QR code on your friend's SL Tasker Progress Flex Card to compare stats side-by-side",
+                expectedCode = null,
+                onDismiss = { showScanFriendFlex = false },
+                onScanned = { scanned ->
+                    showScanFriendFlex = false
+                    val parsed = ShareCardGenerator.parseFlexPayload(scanned)
+                    if (parsed != null) {
+                        friendFlex = parsed
+                    } else {
+                        Toast.makeText(
+                            ctx,
+                            "Not a valid SL Tasker Flex Card QR.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            )
+        }
+
+        friendFlex?.let { friend ->
+            val myName = profile?.name?.uppercase()?.ifBlank { "YOU" } ?: "YOU"
+            val myRank = ShareCardGenerator.rank(stats.level)
+            AlertDialog(
+                onDismissRequest = { friendFlex = null },
+                containerColor = DarkCard,
+                shape = RoundedCornerShape(18.dp),
+                title = {
+                    Text(
+                        text = "2-FRIEND FLEX COMPARISON",
+                        color = PrimaryManaBlue,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(myName, color = PrimaryManaBlue, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                            Text("VS", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(friend.name.uppercase(), color = GoldWarning, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                        }
+                        FlexCompareRow("LEVEL", "Lv.${stats.level} ($myRank)", "Lv.${friend.level} (${friend.rank})")
+                        FlexCompareRow("WEEK QUESTS", "$weeklyCompleted", "${friend.weeklyQuests}")
+                        FlexCompareRow("WEEK STEPS", "$weeklySteps", "${friend.weeklySteps}")
+                        FlexCompareRow("STREAK", "${stats.streak}d", "${friend.streak}d")
+                        if (stats.isShamed()) {
+                            Text("Your Badge: ⚠ ${stats.shamingReason}", color = DangerPenaltyRed, fontSize = 10.sp)
+                        }
+                        if (friend.shameBadge.isNotBlank()) {
+                            Text("Friend Badge: ⚠ ${friend.shameBadge}", color = DangerPenaltyRed, fontSize = 10.sp)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { friendFlex = null },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PrimaryManaBlue,
+                            contentColor = TextOnBlue
+                        )
+                    ) {
+                        Text("DONE", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                }
             )
         }
 
@@ -279,6 +499,23 @@ fun StatsScreen(
 }
 
 @Composable
+private fun FlexCompareRow(metric: String, myVal: String, friendVal: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(DarkSurface)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(myVal, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(metric, color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+        Text(friendVal, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
 private fun EditProfileDialog(
     profile: PlayerProfile,
     onDismiss: () -> Unit,
@@ -290,21 +527,21 @@ private fun EditProfileDialog(
     var ageText by remember { mutableStateOf(profile.age.toString()) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = Color(0xFFFFD700),
-        unfocusedBorderColor = CyberCyan.copy(alpha = 0.35f),
-        focusedTextColor = Color.White,
-        unfocusedTextColor = Color.White,
-        focusedLabelColor = Color(0xFFFFD700),
-        unfocusedLabelColor = TextMuted
+        focusedBorderColor = PrimaryManaBlue,
+        unfocusedBorderColor = DarkBorder,
+        focusedTextColor = TextPrimary,
+        unfocusedTextColor = TextPrimary,
+        focusedLabelColor = PrimaryManaBlue,
+        unfocusedLabelColor = TextSecondary
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF0A1226),
+        containerColor = DarkCard,
         title = {
             Text(
                 "EDIT HUNTER PROFILE",
-                color = Color(0xFFFFD700),
+                color = PrimaryManaBlue,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 1.5.sp
@@ -346,10 +583,10 @@ private fun EditProfileDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (sel) CyberCyan.copy(alpha = 0.22f) else DarkCard)
+                                .background(if (sel) PrimaryManaBlue.copy(alpha = 0.22f) else DarkSurface)
                                 .border(
                                     1.dp,
-                                    if (sel) CyberCyan else Color(0xFF1E2A45),
+                                    if (sel) PrimaryManaBlue else DarkBorder,
                                     RoundedCornerShape(8.dp)
                                 )
                                 .clickable { gender = g }
@@ -358,7 +595,7 @@ private fun EditProfileDialog(
                         ) {
                             Text(
                                 g.uppercase(),
-                                color = if (sel) CyberCyan else TextMuted,
+                                color = if (sel) PrimaryManaBlue else TextSecondary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -376,8 +613,8 @@ private fun EditProfileDialog(
                     onSave(safeName, gender, safeAge, safeId)
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFD700),
-                    contentColor = Color(0xFF0A0D14)
+                    containerColor = PrimaryManaBlue,
+                    contentColor = TextOnBlue
                 )
             ) {
                 Text("SAVE", fontWeight = FontWeight.Black)
@@ -385,15 +622,21 @@ private fun EditProfileDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL", color = TextMuted)
+                Text("CANCEL", color = TextSecondary)
             }
         }
     )
 }
 
 @Composable
-private fun IdentityCard(profile: PlayerProfile, onEdit: () -> Unit, onShare: () -> Unit) {
-    val isPro by com.neurasamu.build.sl_tasker.security.LicenseManager.isProFlow.collectAsState()
+private fun IdentityCard(
+    profile: PlayerProfile,
+    onEdit: () -> Unit,
+    onCompareFriend: () -> Unit = {},
+    onShare: () -> Unit
+) {
+    val isPro by LicenseManager.isProFlow.collectAsState()
+    val headerAccent = if (ThemeState.isLight) PrimaryManaBlue else AccentCyan
     val genderStr = when (profile.gender.lowercase()) {
         "male" -> "MALE"
         "female" -> "FEMALE"
@@ -406,11 +649,11 @@ private fun IdentityCard(profile: PlayerProfile, onEdit: () -> Unit, onShare: ()
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(DarkCard.copy(alpha = 0.78f))
+            .background(DarkCard.copy(alpha = 0.90f))
             .border(
                 width = if (isPro) 1.3.dp else 1.dp,
                 brush = if (isPro) goldBorder else Brush.linearGradient(
-                    listOf(CyberCyan.copy(alpha = 0.25f), CyberCyan.copy(alpha = 0.12f))
+                    listOf(headerAccent.copy(alpha = 0.35f), DarkBorder)
                 ),
                 shape = RoundedCornerShape(16.dp)
             )
@@ -419,17 +662,26 @@ private fun IdentityCard(profile: PlayerProfile, onEdit: () -> Unit, onShare: ()
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "PLAYER IDENTITY",
-                color = if (isPro) Color(0xFFFFD700) else CyberCyan,
+                color = if (isPro) AccentGold else headerAccent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 2.sp,
                 modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = onCompareFriend, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Rounded.QrCodeScanner,
+                    contentDescription = "Scan Friend Flex QR",
+                    tint = headerAccent,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(Modifier.width(4.dp))
             IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) {
                 Icon(
                     Icons.Rounded.Edit,
                     contentDescription = "Edit Profile",
-                    tint = if (isPro) Color(0xFFFFD700) else CyberCyan,
+                    tint = if (isPro) AccentGold else headerAccent,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -437,8 +689,8 @@ private fun IdentityCard(profile: PlayerProfile, onEdit: () -> Unit, onShare: ()
             IconButton(onClick = onShare, modifier = Modifier.size(30.dp)) {
                 Icon(
                     Icons.Rounded.Share,
-                    contentDescription = "Share",
-                    tint = CyberCyan,
+                    contentDescription = "Share Flex Card",
+                    tint = headerAccent,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -457,7 +709,7 @@ private fun IdentityCard(profile: PlayerProfile, onEdit: () -> Unit, onShare: ()
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
-                IdentityField("PLAYER ID", profile.playerId, cyan = true)
+                IdentityField("PLAYER ID", profile.playerId, accent = true)
             }
             Column(modifier = Modifier.weight(1f)) {
                 IdentityField("GENDER", genderStr)
@@ -484,7 +736,7 @@ private fun LuxuryNameplate(name: String, isPro: Boolean) {
     Column {
         Text(
             "NAME",
-            color = Color(0xFFD4AF37),
+            color = AccentGold,
             fontSize = 10.sp,
             letterSpacing = 1.6.sp,
             fontWeight = FontWeight.Bold
@@ -541,16 +793,12 @@ private fun LuxuryNameplate(name: String, isPro: Boolean) {
 }
 
 @Composable
-private fun IdentityField(label: String, value: String, cyan: Boolean = false, gold: Boolean = false) {
+private fun IdentityField(label: String, value: String, accent: Boolean = false) {
     Column {
-        Text(label, color = TextMuted, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = TextSecondary, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
         Text(
             value.ifBlank { "—" },
-            color = when {
-                gold -> Color(0xFFFFD700)
-                cyan -> CyberCyan
-                else -> TextPrimary
-            },
+            color = if (accent) PrimaryManaBlue else TextPrimary,
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.SansSerif
@@ -561,22 +809,33 @@ private fun IdentityField(label: String, value: String, cyan: Boolean = false, g
 @Composable
 private fun RankCard(level: Int, streak: Int, onClick: () -> Unit) {
     val tier = HunterRankSystem.forLevel(level)
+    val isLight = ThemeState.isLight
     val cardBorder = Brush.linearGradient(
         listOf(tier.accent, tier.primary, tier.secondary)
     )
+    val badgeTextCol = if (isLight) tier.primary else tier.accent
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(
-                Brush.horizontalGradient(
-                    listOf(
-                        tier.primary.copy(alpha = if (tier.isPremiumFrame) 0.22f else 0.10f),
-                        tier.frameBg.copy(alpha = 0.9f),
-                        DarkCard.copy(alpha = 0.75f)
+                if (isLight) {
+                    Brush.horizontalGradient(
+                        listOf(
+                            DarkCard,
+                            tier.primary.copy(alpha = 0.08f)
+                        )
                     )
-                )
+                } else {
+                    Brush.horizontalGradient(
+                        listOf(
+                            tier.primary.copy(alpha = if (tier.isPremiumFrame) 0.22f else 0.10f),
+                            tier.frameBg.copy(alpha = 0.9f),
+                            DarkCard.copy(alpha = 0.75f)
+                        )
+                    )
+                }
             )
             .border(
                 width = if (tier.isPremiumFrame) 1.5.dp else 1.dp,
@@ -595,7 +854,7 @@ private fun RankCard(level: Int, streak: Int, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "LEVEL $level",
-                    color = Color.White,
+                    color = TextPrimary,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Black,
                     fontFamily = FontFamily.SansSerif
@@ -604,13 +863,13 @@ private fun RankCard(level: Int, streak: Int, onClick: () -> Unit) {
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(5.dp))
-                        .background(tier.primary.copy(alpha = 0.25f))
-                        .border(0.8.dp, tier.accent, RoundedCornerShape(5.dp))
+                        .background(tier.primary.copy(alpha = 0.18f))
+                        .border(0.8.dp, badgeTextCol, RoundedCornerShape(5.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         tier.code,
-                        color = tier.accent,
+                        color = badgeTextCol,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black
                     )
@@ -619,7 +878,7 @@ private fun RankCard(level: Int, streak: Int, onClick: () -> Unit) {
             Spacer(Modifier.height(2.dp))
             Text(
                 tier.title,
-                color = tier.accent,
+                color = badgeTextCol,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.sp
@@ -627,13 +886,13 @@ private fun RankCard(level: Int, streak: Int, onClick: () -> Unit) {
             Spacer(Modifier.height(3.dp))
             Text(
                 "Tap to view all 10 Hunter Ranks ›",
-                color = TextMuted,
+                color = TextSecondary,
                 fontSize = 10.sp
             )
         }
 
         Column(horizontalAlignment = Alignment.End) {
-            Text("STREAK", color = TextMuted, fontSize = 10.sp, letterSpacing = 1.sp)
+            Text("STREAK", color = TextSecondary, fontSize = 10.sp, letterSpacing = 1.sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "$streak",
@@ -655,8 +914,8 @@ private fun BarsCard(hp: Int, ep: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(DarkCard.copy(alpha = 0.7f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+            .background(DarkCard.copy(alpha = 0.90f))
+            .border(1.dp, DarkBorder, RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         BarRow(
@@ -671,8 +930,8 @@ private fun BarsCard(hp: Int, ep: Int) {
             label = "ENERGY",
             value = "$ep / ${GamificationEngine.EP_PER_LEVEL} EP",
             progress = ep.toFloat() / GamificationEngine.EP_PER_LEVEL,
-            colorStart = Color(0xFF0066CC),
-            colorEnd = Color(0xFF00B3FF)
+            colorStart = PrimaryManaBlue,
+            colorEnd = PrimaryManaBlue
         )
     }
 }
@@ -714,8 +973,8 @@ private fun BarRow(
                 .fillMaxWidth()
                 .height(10.dp)
                 .clip(RoundedCornerShape(5.dp))
-                .background(Color.White.copy(alpha = 0.05f))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(5.dp))
+                .background(DarkSurface)
+                .border(1.dp, DarkBorder, RoundedCornerShape(5.dp))
         ) {
             Box(
                 modifier = Modifier
@@ -735,8 +994,8 @@ private fun SmallStatBox(value: String, label: String, color: Color, modifier: M
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(DarkCard.copy(alpha = 0.7f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+            .background(DarkCard.copy(alpha = 0.90f))
+            .border(1.dp, DarkBorder, RoundedCornerShape(12.dp))
             .padding(vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -750,7 +1009,7 @@ private fun SmallStatBox(value: String, label: String, color: Color, modifier: M
         Spacer(Modifier.height(4.dp))
         Text(
             label,
-            color = TextMuted,
+            color = TextSecondary,
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp
@@ -759,13 +1018,14 @@ private fun SmallStatBox(value: String, label: String, color: Color, modifier: M
 }
 
 @Composable
-private fun ActivityRow(event: com.neurasamu.build.sl_tasker.data.model.EventEntity) {
+private fun ActivityRow(event: EventEntity) {
+    val headerAccent = if (ThemeState.isLight) PrimaryManaBlue else AccentCyan
     val (icon, color, title) = when (event.type) {
         EventType.OCCURRENCE_COMPLETED -> Triple(Icons.Rounded.CheckCircle, SuccessGreen, "Quest Completed")
         EventType.OCCURRENCE_MISSED -> Triple(Icons.Rounded.Warning, DangerPenaltyRed, "Quest Missed")
         EventType.PENALTY_APPLIED -> Triple(Icons.Rounded.Warning, DangerPenaltyRed, "Penalty Applied")
         EventType.RECOVERY_COMPLETED -> Triple(Icons.Rounded.ArrowUpward, GoldWarning, "Recovery Completed")
-        EventType.LEVEL_UP -> Triple(Icons.Rounded.ArrowUpward, CyberCyan, "Level Up!")
+        EventType.LEVEL_UP -> Triple(Icons.Rounded.ArrowUpward, headerAccent, "Level Up!")
     }
 
     val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
@@ -774,8 +1034,8 @@ private fun ActivityRow(event: com.neurasamu.build.sl_tasker.data.model.EventEnt
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(DarkCard.copy(alpha = 0.7f))
-            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(14.dp))
+            .background(DarkCard.copy(alpha = 0.90f))
+            .border(1.dp, DarkBorder, RoundedCornerShape(14.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -783,8 +1043,8 @@ private fun ActivityRow(event: com.neurasamu.build.sl_tasker.data.model.EventEnt
             modifier = Modifier
                 .size(38.dp)
                 .clip(CircleShape)
-                .background(color.copy(alpha = 0.12f))
-                .border(1.dp, color.copy(alpha = 0.4f), CircleShape),
+                .background(color.copy(alpha = 0.14f))
+                .border(1.dp, color.copy(alpha = 0.45f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
@@ -800,7 +1060,7 @@ private fun ActivityRow(event: com.neurasamu.build.sl_tasker.data.model.EventEnt
             if (event.note.isNotBlank()) {
                 Text(
                     event.note,
-                    color = TextMuted,
+                    color = TextSecondary,
                     fontSize = 11.sp,
                     maxLines = 1
                 )

@@ -33,13 +33,14 @@ class StatsRepository(private val database: AppDatabase) {
         }
     }
 
-    /**
-     * Recent Activity displays events from the current 24-hour / 12:00 AM midnight cycle,
-     * clearing cleanly every midnight while preserving lifetime counters in PlayerStatsEntity.
-     */
     fun getRecentEvents(limit: Int = 30): Flow<List<EventEntity>> {
         val midnightStart = startOfTodayMidnightMillis()
         return eventDao.getEventsSince(midnightStart, limit)
+    }
+
+    fun getWeeklyEvents(limit: Int = 200): Flow<List<EventEntity>> {
+        val weekStart = startOfCurrentWeekMillis()
+        return eventDao.getEventsSince(weekStart, limit)
     }
 
     fun getActiveRecoveryQuests(): Flow<List<RecoveryQuestEntity>> =
@@ -86,6 +87,21 @@ class StatsRepository(private val database: AppDatabase) {
                 set(Calendar.MINUTE, 0)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
+            }
+            return cal.timeInMillis
+        }
+
+        fun startOfCurrentWeekMillis(nowMillis: Long = System.currentTimeMillis()): Long {
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = nowMillis
+                set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            if (cal.timeInMillis > nowMillis) {
+                cal.add(Calendar.WEEK_OF_YEAR, -1)
             }
             return cal.timeInMillis
         }

@@ -44,6 +44,13 @@ class StatsViewModel(
             initialValue = emptyList()
         )
 
+    val weeklyEvents: StateFlow<List<EventEntity>> = statsRepository.getWeeklyEvents()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     val recoveryQuests: StateFlow<List<RecoveryQuestEntity>> = statsRepository.getActiveRecoveryQuests()
         .stateIn(
             scope = viewModelScope,
