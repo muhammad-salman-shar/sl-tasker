@@ -181,9 +181,11 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                         fontSize = 10.sp
                     )
                     Spacer(Modifier.height(10.dp))
+                    val isProUser by com.neurasamu.build.sl_tasker.security.LicenseManager.isProFlow.collectAsState()
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         com.neurasamu.build.sl_tasker.ui.theme.AppThemeId.entries.forEach { tId ->
                             val isSel = activeTheme == tId
+                            val lockedPro = tId.isProOnly && !isProUser
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -195,22 +197,39 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                                         shape = RoundedCornerShape(8.dp)
                                     )
                                     .clickable {
-                                        ThemeState.selectTheme(tId)
-                                        try {
-                                            context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-                                                .edit().putString("active_theme_id", tId.name).apply()
-                                        } catch (_: Throwable) {}
+                                        if (lockedPro) {
+                                            com.neurasamu.build.sl_tasker.security.PaywallTrigger.show(
+                                                "${tId.displayName} is a PRO theme. Upgrade to unlock all 8 Hunter Themes!"
+                                            )
+                                        } else {
+                                            ThemeState.selectTheme(tId)
+                                            try {
+                                                context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                                                    .edit().putString("active_theme_id", tId.name).apply()
+                                            } catch (_: Throwable) {}
+                                        }
                                     }
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = tId.displayName,
-                                        color = if (isSel) PrimaryManaBlue else TextPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = tId.displayName,
+                                            color = if (isSel) PrimaryManaBlue else TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (tId.isProOnly) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                text = "PRO",
+                                                color = com.neurasamu.build.sl_tasker.ui.theme.AccentGold,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                        }
+                                    }
                                     Text(
                                         text = tId.subtitle,
                                         color = TextSecondary,
@@ -218,8 +237,16 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                                     )
                                 }
                                 Text(
-                                    text = if (isSel) "ACTIVE" else "SELECT",
-                                    color = if (isSel) PrimaryManaBlue else TextMuted,
+                                    text = when {
+                                        isSel -> "ACTIVE"
+                                        lockedPro -> "LOCKED"
+                                        else -> "SELECT"
+                                    },
+                                    color = when {
+                                        isSel -> PrimaryManaBlue
+                                        lockedPro -> com.neurasamu.build.sl_tasker.ui.theme.AccentGold
+                                        else -> TextMuted
+                                    },
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )

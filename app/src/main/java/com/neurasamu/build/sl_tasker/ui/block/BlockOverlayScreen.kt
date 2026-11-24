@@ -24,7 +24,6 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,14 +48,8 @@ import com.neurasamu.build.sl_tasker.ui.components.QrScannerDialog
 import com.neurasamu.build.sl_tasker.ui.theme.AccentCyan
 import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 import com.neurasamu.build.sl_tasker.ui.theme.DangerPenaltyRed
-import com.neurasamu.build.sl_tasker.ui.theme.DarkBackground
-import com.neurasamu.build.sl_tasker.ui.theme.DarkBorder
 import com.neurasamu.build.sl_tasker.ui.theme.PrimaryManaBlue
 import com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
-import com.neurasamu.build.sl_tasker.ui.theme.TextMuted
-import com.neurasamu.build.sl_tasker.ui.theme.TextOnBlue
-import com.neurasamu.build.sl_tasker.ui.theme.TextPrimary
-import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 
 @Composable
 fun BlockOverlayScreen(
@@ -70,19 +63,19 @@ fun BlockOverlayScreen(
 
     val transition = rememberInfiniteTransition(label = "blockPulse")
     val pulse by transition.animateFloat(
-        initialValue = 0.95f,
+        initialValue = 0.96f,
         targetValue = 1.05f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
+            animation = tween(950, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
     )
     val glowAlpha by transition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.8f,
+        initialValue = 0.35f,
+        targetValue = 0.85f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
+            animation = tween(1400, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "glow"
@@ -96,9 +89,9 @@ fun BlockOverlayScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        DarkBackground,
-                        Color(0xFF1A0505),
-                        DarkBackground
+                        Color(0xFF04060D),
+                        Color(0xFF1D0408),
+                        Color(0xFF04060D)
                     )
                 )
             )
@@ -106,19 +99,19 @@ fun BlockOverlayScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(28.dp),
+                .padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(124.dp)
                     .scale(pulse)
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
                             colors = listOf(
-                                DangerPenaltyRed.copy(alpha = 0.25f * glowAlpha),
+                                DangerPenaltyRed.copy(alpha = 0.30f * glowAlpha),
                                 Color.Transparent
                             )
                         )
@@ -127,17 +120,17 @@ fun BlockOverlayScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(88.dp)
+                        .size(92.dp)
                         .clip(CircleShape)
-                        .background(DarkBackground)
-                        .border(2.dp, DangerPenaltyRed, CircleShape),
+                        .background(Color(0xFF0A0D18))
+                        .border(2.5.dp, DangerPenaltyRed, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Lock,
                         contentDescription = "Locked",
                         tint = DangerPenaltyRed,
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(46.dp)
                     )
                 }
             }
@@ -146,47 +139,52 @@ fun BlockOverlayScreen(
 
             Text(
                 text = "ACCESS DENIED",
-                style = MaterialTheme.typography.headlineMedium,
                 color = DangerPenaltyRed,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = 4.sp
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            Text(
-                text = "The System requires physical effort or focus.",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary,
+                letterSpacing = 3.sp,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = "SYSTEM LOCK ACTIVE",
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.5.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(Modifier.height(8.dp))
 
             Text(
                 text = if (blockState.hasRegisteredSeal)
-                    "Scan your registered Physical Seal (${blockState.sealLabel}), use Walk-to-Earn scroll quota, or open SL Tasker."
+                    "SCAN YOUR PHYSICAL SEAL (${blockState.sealLabel.uppercase()}), USE WALK QUOTA, OR FINISH YOUR QUESTS."
                 else
-                    "Walk 500 real steps to earn scroll quota, or complete your pending tasks in SL Tasker.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-                textAlign = TextAlign.Center,
-                fontSize = 12.sp
+                    "COMPLETE YOUR PENDING QUESTS OR WALK 500 REAL STEPS TO UNLOCK.",
+                color = Color(0xFFE2E8F0),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Center
             )
 
             if (!blockedPackage.isNullOrBlank()) {
                 Spacer(Modifier.height(16.dp))
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.55f))
-                        .border(1.dp, DarkBorder, RoundedCornerShape(6.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.70f))
+                        .border(1.5.dp, DangerPenaltyRed.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = "BLOCKED: $blockedPackage",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextMuted,
+                        color = Color(0xFFFCA5A5),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -200,19 +198,20 @@ fun BlockOverlayScreen(
                     border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
                         brush = SolidColor(AccentCyan)
                     ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .height(54.dp)
                 ) {
                     Text(
-                        text = "SCAN PHYSICAL SEAL (UNLOCK 10m)",
+                        text = "SCAN PHYSICAL SEAL (10m UNLOCK)",
                         color = AccentCyan,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.8.sp
                     )
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
             }
 
             if (availableScrollMins >= 10) {
@@ -221,54 +220,57 @@ fun BlockOverlayScreen(
                     border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
                         brush = SolidColor(SuccessGreen)
                     ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .height(54.dp)
                 ) {
                     Text(
                         text = "USE 10m SCROLL QUOTA (${availableScrollMins}m EARNED)",
                         color = SuccessGreen,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black
                     )
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
             } else {
                 Text(
-                    text = "Walk-to-Earn Quota: ${availableScrollMins}m / 10m needed (500 steps = 10m)",
+                    text = "WALK QUOTA: ${availableScrollMins}m / 10m (500 STEPS = 10m)",
                     color = AccentGold,
-                    fontSize = 11.sp,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
             }
 
             Button(
                 onClick = onOpenTasker,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PrimaryManaBlue,
-                    contentColor = TextOnBlue
+                    contentColor = Color.White
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .height(56.dp)
             ) {
                 Text(
                     text = "OPEN SL TASKER",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.5.sp
                 )
             }
 
             Spacer(Modifier.height(18.dp))
 
             Text(
-                text = "Scroll time cannot be farmed from trivial tasks.",
-                style = MaterialTheme.typography.labelSmall,
-                color = DangerPenaltyRed.copy(alpha = 0.8f),
+                text = "DISCIPLINE OVER DISTRACTION",
+                color = DangerPenaltyRed,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp,
                 textAlign = TextAlign.Center
             )
         }

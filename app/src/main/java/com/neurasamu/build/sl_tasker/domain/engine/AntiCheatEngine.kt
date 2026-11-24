@@ -14,17 +14,15 @@ data class AntiCheatEvaluation(
 )
 
 /**
- * Closes the "1-minute Critical task in background" exploit and detects rapid task farming.
- * - Full HARD reward (40 HP, 30 EP) requires >= 20 min realistic duration.
- * - Full CRITICAL reward (50 HP, 50 EP) requires >= 30 min realistic duration.
- * - Short 1-19 min Hard/Critical tasks receive capped minimal rewards (+5 HP, +3 EP) and log a strike.
- * - Rapid burst farming (>= 4 completions within 10 minutes or >= 2 short-duration cheese attempts)
- *   applies a visible 24-hour temporary shaming badge ("Shortcut Hunter / Cheese Detected").
+ * Prevents rapid burst task farming and ultra-short (< 5 min) Hard/Critical cheese exploits.
+ * - Any Hard/Critical task >= 5 min earns its full rightful HP (+40 HP for HARD, +50 HP for CRITICAL).
+ * - Only sub-5-minute (1-4 min) Hard/Critical tasks or rapid burst farming (>= 5 tasks in 10 min)
+ *   are capped to +5 HP / +3 EP and trigger the 24h Shaming Badge.
  */
 object AntiCheatEngine {
 
-    const val MIN_HARD_MINUTES = 20
-    const val MIN_CRITICAL_MINUTES = 30
+    const val MIN_HARD_MINUTES = 5
+    const val MIN_CRITICAL_MINUTES = 5
     const val SHAMING_DURATION_MS = 24L * 60L * 60L * 1000L
     const val SHAME_BADGE_TITLE = "Shortcut Hunter / Cheese Detected"
 
@@ -44,7 +42,7 @@ object AntiCheatEngine {
         nowMillis: Long = System.currentTimeMillis()
     ): AntiCheatEvaluation {
         val minRequired = minimumMinutesFor(task.difficulty)
-        val shortDurationCheese = minRequired > 0 && task.durationMinutes < minRequired
+        val shortDurationCheese = minRequired > 0 && task.durationMinutes in 1 until minRequired
 
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val windowStart = nowMillis - 10L * 60L * 1000L
@@ -56,7 +54,7 @@ object AntiCheatEngine {
         existingTs.add(nowMillis)
         prefs.edit().putString(KEY_RECENT_TIMESTAMPS, existingTs.joinToString(",")).apply()
 
-        val rapidFarming = existingTs.size >= 4
+        val rapidFarming = existingTs.size >= 5
         val newStrikes = if (shortDurationCheese || rapidFarming) {
             currentStats.cheatStrikeCount + 1
         } else {
@@ -76,7 +74,7 @@ object AntiCheatEngine {
 
         val warning = when {
             triggerShame -> "Anti-Cheat: $SHAME_BADGE_TITLE badge applied (24h). Rewards capped."
-            shortDurationCheese -> "Anti-Cheat: ${task.difficulty.name} full reward needs >= ${minRequired}m. Reward capped (+5 HP)."
+            shortDurationCheese -> "Anti-Cheat: ${task.difficulty.name} full reward needs >= ${minRequired}m. Capped (+5 HP)."
             else -> null
         }
 
