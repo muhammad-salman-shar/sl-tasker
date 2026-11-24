@@ -89,7 +89,8 @@ fun DashboardScreen(
                 elapsedBeforePauseSeconds = 0,
                 isPaused = false,
                 accentColorArgb = accent,
-                durationMinutes = item.task.durationMinutes.coerceAtLeast(1)
+                durationMinutes = item.task.durationMinutes.coerceAtLeast(1),
+                stepGoal = item.task.stepGoal
             )
             val svc = Intent(ctx, com.neurasamu.build.sl_tasker.service.TimerService::class.java)
             svc.action = com.neurasamu.build.sl_tasker.service.TimerService.ACTION_START
@@ -97,6 +98,7 @@ fun DashboardScreen(
             svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_TITLE, timer.taskTitle)
             svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_MINUTES, timer.durationMinutes)
             svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_ACCENT, timer.accentColorArgb)
+            svc.putExtra(com.neurasamu.build.sl_tasker.service.TimerService.EXTRA_STEP_GOAL, timer.stepGoal)
             androidx.core.content.ContextCompat.startForegroundService(ctx, svc)
             ctx.startActivity(
                 Intent(ctx, com.neurasamu.build.sl_tasker.ui.timer.TimerActivity::class.java)
@@ -305,6 +307,40 @@ fun DashboardScreen(
                         )
                     }
                 }
+            } else if (selectedTypeFilter != null) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(vertical = 12.dp, horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(
+                        items = currentList,
+                        key = { it.occurrence.id }
+                    ) { item ->
+                        CategoryGlowSwipeCard(
+                            item = item,
+                            onStart = {
+                                if (item.task.isAdvanced && item.task.requireQrProof) {
+                                    pendingQrTaskItem = item
+                                } else {
+                                    launchTaskTimer(item)
+                                }
+                            },
+                            onComplete = {
+                                if (item.task.isAdvanced && item.task.requireQrProof) {
+                                    pendingQrTaskItem = item
+                                } else {
+                                    taskViewModel.completeQuest(item.occurrence.id)
+                                }
+                            },
+                            onEdit = { editingTask = item.task },
+                            onDelete = { taskViewModel.deleteTask(item.task.id) }
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -336,14 +372,7 @@ fun DashboardScreen(
                                 }
                             },
                             onStart = {
-                                if (item.task.isAdvanced && item.task.stepGoal > 0 && todaySteps < item.task.stepGoal) {
-                                    val rem = item.task.stepGoal - todaySteps
-                                    android.widget.Toast.makeText(
-                                        ctx,
-                                        "Walk $rem more steps first ($todaySteps / ${item.task.stepGoal})!",
-                                        android.widget.Toast.LENGTH_SHORT
-                                    ).show()
-                                } else if (item.task.isAdvanced && item.task.requireQrProof) {
+                                if (item.task.isAdvanced && item.task.requireQrProof) {
                                     pendingQrTaskItem = item
                                 } else {
                                     launchTaskTimer(item)
@@ -498,6 +527,162 @@ private fun TypeChipSmall(label: String, count: Int, selected: Boolean, onClick:
                 fontSize = 10.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
             )
+        }
+    }
+}
+
+
+@Composable
+private fun CategoryGlowSwipeCard(
+    item: com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem,
+    onStart: () -> Unit,
+    onComplete: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val diffColor = when (item.task.difficulty) {
+        com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> DangerPenaltyRed
+        com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> com.neurasamu.build.sl_tasker.ui.theme.AccentGold
+        com.neurasamu.build.sl_tasker.data.model.Difficulty.MEDIUM -> PrimaryManaBlue
+    }
+    val diffMs = item.occurrence.scheduledAt - System.currentTimeMillis()
+    val timeLeftLabel = when {
+        diffMs <= 0L -> "DUE NOW"
+        diffMs < 60_000L -> "<1m LEFT"
+        diffMs < 60L * 60_000L -> "${diffMs / 60_000L}m LEFT"
+        diffMs < 24L * 60L * 60_000L -> "${diffMs / (60L * 60_000L)}h LEFT"
+        else -> "${diffMs / (24L * 60L * 60_000L)}d LEFT"
+    }
+    val needsTimer = item.task.difficulty != com.neurasamu.build.sl_tasker.data.model.Difficulty.MEDIUM ||
+        item.task.stepGoal > 0
+    val durationInfo = when {
+        item.task.stepGoal > 0 -> "Target: ${item.task.stepGoal} Steps"
+        item.task.durationMinutes > 0 -> "Duration: ${item.task.durationMinutes} min"
+        else -> "Instant Quest"
+    }
+
+    Column(
+        modifier = Modifier
+            .width(264.dp)
+            .height(294.dp)
+            .androidx.compose.ui.draw.shadow(
+                elevation = 18.dp,
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = diffColor.copy(alpha = 0.50f),
+                spotColor = diffColor.copy(alpha = 0.50f)
+            )
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(DarkCard, DarkSurface)
+                )
+            )
+            .border(1.5.dp, diffColor.copy(alpha = 0.70f), RoundedCornerShape(22.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Top-Left: Time Left + Top-Right: Difficulty
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(diffColor.copy(alpha = 0.16f))
+                    .border(1.dp, diffColor.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = timeLeftLabel,
+                    color = diffColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.8.sp
+                )
+            }
+            Text(
+                text = item.task.difficulty.name,
+                color = TextSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // Middle: Bold Task Title
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = item.task.title,
+                color = TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Black,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 3
+            )
+            if (item.task.userType.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = item.task.userType.uppercase(),
+                    color = PrimaryManaBlue,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+        }
+
+        // Bottom: Duration/Steps above Start/Complete button
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = durationInfo,
+                color = TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = if (needsTimer) onStart else onComplete,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (needsTimer) diffColor else com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+            ) {
+                Text(
+                    text = if (needsTimer) "START QUEST" else "COMPLETE",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Text(
+                    text = "Edit",
+                    color = TextMuted,
+                    fontSize = 10.sp,
+                    modifier = Modifier.clickable { onEdit() }
+                )
+                Text(
+                    text = "Delete",
+                    color = DangerPenaltyRed.copy(alpha = 0.85f),
+                    fontSize = 10.sp,
+                    modifier = Modifier.clickable { onDelete() }
+                )
+            }
         }
     }
 }

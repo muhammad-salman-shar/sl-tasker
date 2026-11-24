@@ -267,6 +267,47 @@ fun AiSheet(
             }
         }
 
+        // Quick Insertion Bar (1-tap prompts & instant actions)
+        androidx.compose.foundation.lazy.LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            val quickChips = listOf(
+                Triple("+ Task 7PM", "Create a hard task Study at 19:00 for 30 min", false),
+                Triple("+ Walk 1k Steps", "Create a hard walk task Morning Walk at 07:00 with 1000 steps", false),
+                Triple("+ Alarm 6:30AM", "Set an alarm at 06:30 labeled Wake Up", false),
+                Triple("Weekly Stats", "Show my weekly stats", true),
+                Triple("My Stats", "Show my stats", true),
+                Triple("Pending", "What tasks are pending?", true),
+                Triple("Block Socials", "Block social apps", true)
+            )
+            items(quickChips) { (chipLabel, promptText, autoSend) ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(DarkSurface)
+                        .border(1.dp, PrimaryManaBlue.copy(alpha = 0.45f), RoundedCornerShape(50))
+                        .clickable {
+                            if (autoSend) {
+                                vm.send(promptText)
+                            } else {
+                                input = promptText
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = chipLabel,
+                        color = PrimaryManaBlue,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
         // Input
         Row(
             modifier = Modifier

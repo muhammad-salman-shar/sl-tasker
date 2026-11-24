@@ -235,6 +235,7 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                 val days = json.optString("days").trim()
                 val typeStr = json.optString("type", "MEDIUM").uppercase()
                 val durationMin = json.optInt("duration_minutes", 0)
+                val stepGoal = json.optInt("step_goal", 0).coerceAtLeast(0)
 
                 val time = parseHm(timeStr)
                 if (title.isBlank() || time == null) {
@@ -265,12 +266,18 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     repeatRule = repeat,
                     customRepeatDays = days,
                     durationMinutes = dur,
-                    reminderMinutesOfDay = reminderMin
+                    reminderMinutesOfDay = reminderMin,
+                    isAdvanced = stepGoal > 0,
+                    stepGoal = stepGoal
                 )
                 val (_, occId) = taskRepo.createTaskWithOccurrence(task, next, deadline)
                 scheduler.scheduleReminder(occId, next, title)
 
-                val durText = if (dur > 0) ", ${dur} min" else ""
+                val durText = when {
+                    stepGoal > 0 -> ", $stepGoal steps"
+                    dur > 0 -> ", ${dur} min"
+                    else -> ""
+                }
                 _messages.value = _messages.value + AiMessage("info", "Task created: \"$title\" at $timeStr ($difficulty$durText).")
             }
             "create_alarm" -> {
@@ -426,6 +433,31 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 } catch (e: Throwable) {
                     _messages.value = _messages.value + AiMessage("assistant", "List failed: ${e.message}")
+                }
+            }
+            "weekly_stats" -> {
+                try {
+                    val s = db.playerStatsDao().getPlayerStats()
+                    val weekAgo = System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L
+                    val weeklyEvents = db.eventDao().getEventsSince(weekAgo).first()
+                    val weeklyCompleted = weeklyEvents.count { it.type == com.neurasamu.build.sl_tasker.data.model.EventType.COMPLETED }
+                    val weeklyMissed = weeklyEvents.count { it.type == com.neurasamu.build.sl_tasker.data.model.EventType.MISSED }
+                    val weeklySteps = com.neurasamu.build.sl_tasker.util.StepTrackerManager.weeklySteps.value
+                    val todaySteps = com.neurasamu.build.sl_tasker.util.StepTrackerManager.todaySteps.value
+                    val totalAttempts = (weeklyCompleted + weeklyMissed).coerceAtLeast(1)
+                    val consistency = ((weeklyCompleted * 100f) / totalAttempts).toInt()
+                    val report = buildString {
+                        append("📊 WEEKLY HUNTER REPORT (7 Days)\n")
+                        append("• Quests Cleared: $weeklyCompleted  |  Missed: $weeklyMissed\n")
+                        append("• Consistency: $consistency%\n")
+                        append("• Weekly Steps: $weeklySteps (Today: $todaySteps)\n")
+                        if (s != null) {
+                            append("• Current Status: Lv.${s.level} · HP ${s.health}/100 · EP ${s.ep} · Streak ${s.streak}d")
+                        }
+                    }
+                    _messages.value = _messages.value + AiMessage("assistant", report)
+                } catch (e: Throwable) {
+                    _messages.value = _messages.value + AiMessage("assistant", "Weekly stats failed: ${e.message}")
                 }
             }
             "show_stats" -> {

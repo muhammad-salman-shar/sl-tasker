@@ -58,7 +58,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.neurasamu.build.sl_tasker.data.model.Difficulty
 import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
-import com.neurasamu.build.sl_tasker.data.repository.TaskWithOccurrence
+import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem
 import com.neurasamu.build.sl_tasker.data.timer.ActiveTimer
 import com.neurasamu.build.sl_tasker.data.timer.TimerRuntime
 import com.neurasamu.build.sl_tasker.service.TimerService
@@ -134,7 +134,7 @@ fun HomeScreen(
     val incompleteDailyQuests = remember(dailyQuests) { dailyQuests.filter { !it.completed } }
 
     var showDailyCongrats by remember { mutableStateOf(false) }
-    var viewingItem by remember { mutableStateOf<TaskWithOccurrence?>(null) }
+    var viewingItem by remember { mutableStateOf<TaskOccurrenceItem?>(null) }
 
     val cal = remember { Calendar.getInstance() }
     val dayEpochKey = remember { "${cal.get(Calendar.YEAR)}_${cal.get(Calendar.DAY_OF_YEAR)}" }
@@ -158,7 +158,7 @@ fun HomeScreen(
         }
     }
 
-    fun startTimerFor(item: TaskWithOccurrence) {
+    fun startTimerFor(item: TaskOccurrenceItem) {
         val mins = item.task.durationMinutes.coerceAtLeast(1)
         val accent = when (item.task.difficulty) {
             Difficulty.CRITICAL -> 0xFFFF3B5C.toInt()
@@ -178,7 +178,10 @@ fun HomeScreen(
         )
         TimerRuntime.set(activeTimer)
         try {
-            ContextCompat.startForegroundService(ctx, TimerService.startIntent(ctx, activeTimer))
+            val svc = TimerService.startIntent(ctx, activeTimer).apply {
+                putExtra(TimerService.EXTRA_STEP_GOAL, activeTimer.stepGoal)
+            }
+            ContextCompat.startForegroundService(ctx, svc)
         } catch (_: Throwable) {}
         try {
             ctx.startActivity(
@@ -730,7 +733,7 @@ private fun MiniStat(icon: ImageVector, value: String, tint: Color) {
 
 @Composable
 private fun CompactTaskRow(
-    item: TaskWithOccurrence,
+    item: TaskOccurrenceItem,
     onView: () -> Unit
 ) {
     val timeMillis = item.occurrence.scheduledAt

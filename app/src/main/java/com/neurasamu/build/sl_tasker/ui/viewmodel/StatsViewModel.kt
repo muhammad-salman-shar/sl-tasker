@@ -11,12 +11,14 @@ import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
 import com.neurasamu.build.sl_tasker.data.model.RecoveryQuestEntity
 import com.neurasamu.build.sl_tasker.data.model.TaskDebtEntity
 import com.neurasamu.build.sl_tasker.data.repository.StatsRepository
+import com.neurasamu.build.sl_tasker.domain.engine.GamificationEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.min
 
 class StatsViewModel(
     application: Application,
@@ -68,6 +70,27 @@ class StatsViewModel(
     fun completeRecovery(questId: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             statsRepository.completeRecoveryQuest(questId)
+        }
+    }
+
+    fun awardBonus(hp: Int, ep: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val db = AppDatabase.getInstance(getApplication())
+                val dao = db.playerStatsDao()
+                val cur = dao.getPlayerStats() ?: PlayerStatsEntity()
+                val newHp = min(GamificationEngine.MAX_HEALTH, cur.health + hp.coerceAtLeast(0))
+                val totalEp = cur.ep + ep.coerceAtLeast(0)
+                val newLevel = (totalEp / GamificationEngine.EP_PER_LEVEL) + 1
+                dao.insertOrUpdate(
+                    cur.copy(
+                        health = newHp,
+                        ep = totalEp,
+                        level = maxOf(cur.level, newLevel),
+                        recoveryModeActive = if (newHp >= 50) false else cur.recoveryModeActive
+                    )
+                )
+            } catch (_: Throwable) {}
         }
     }
 
