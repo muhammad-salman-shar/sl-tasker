@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -603,7 +604,7 @@ fun StatsScreen(
                             ) {
                                 if (thumb != null) {
                                     androidx.compose.foundation.Image(
-                                        bitmap = androidx.compose.ui.graphics.asImageBitmap(thumb),
+                                        bitmap = thumb.asImageBitmap(),
                                         contentDescription = tpl.title,
                                         modifier = Modifier
                                             .size(width = 76.dp, height = 102.dp)
@@ -725,7 +726,7 @@ fun StatsScreen(
                     }
 
                     androidx.compose.foundation.Image(
-                        bitmap = androidx.compose.ui.graphics.asImageBitmap(generatedBmp),
+                        bitmap = generatedBmp.asImageBitmap(),
                         contentDescription = "Generated Flex Card",
                         modifier = Modifier
                             .height(320.dp)
