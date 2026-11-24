@@ -440,8 +440,8 @@ class AiViewModel(app: Application) : AndroidViewModel(app) {
                     val s = db.playerStatsDao().getPlayerStats()
                     val weekAgo = System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L
                     val weeklyEvents = db.eventDao().getEventsSince(weekAgo).first()
-                    val weeklyCompleted = weeklyEvents.count { it.type == com.neurasamu.build.sl_tasker.data.model.EventType.COMPLETED }
-                    val weeklyMissed = weeklyEvents.count { it.type == com.neurasamu.build.sl_tasker.data.model.EventType.MISSED }
+                    val weeklyCompleted = weeklyEvents.count { it.type == com.neurasamu.build.sl_tasker.data.model.EventType.OCCURRENCE_COMPLETED }
+                    val weeklyMissed = weeklyEvents.count { it.type == com.neurasamu.build.sl_tasker.data.model.EventType.OCCURRENCE_MISSED }
                     val weeklySteps = com.neurasamu.build.sl_tasker.util.StepTrackerManager.weeklySteps.value
                     val todaySteps = com.neurasamu.build.sl_tasker.util.StepTrackerManager.todaySteps.value
                     val totalAttempts = (weeklyCompleted + weeklyMissed).coerceAtLeast(1)
