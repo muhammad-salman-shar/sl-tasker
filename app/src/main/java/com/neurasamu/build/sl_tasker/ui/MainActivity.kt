@@ -154,7 +154,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        try { com.neurasamu.build.sl_tasker.util.StepTrackerManager.startListening(this) } catch (_: Throwable) {}
+        try { com.neurasamu.build.sl_tasker.util.if (com.neurasamu.build.sl_tasker.worker.StepSyncWorker.isEnabled(this)) { StepTrackerManager.syncOnceInBackground(this) }
+        StepTrackerManager.startListening(this) } catch (_: Throwable) {}
 
         // Continue permissions flow if we returned from a settings screen
         try {

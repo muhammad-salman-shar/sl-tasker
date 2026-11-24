@@ -331,47 +331,129 @@ fun PlayerSettingsScreen(onClose: () -> Unit) {
                 val stepsToNext = com.neurasamu.build.sl_tasker.util.StepTrackerManager.STEPS_PER_REWARD -
                     (todaySteps % com.neurasamu.build.sl_tasker.util.StepTrackerManager.STEPS_PER_REWARD)
                 val earnedMins = s.earnedScrollSeconds / 60
+                var countStepsInBg by remember {
+                    mutableStateOf(com.neurasamu.build.sl_tasker.worker.StepSyncWorker.isEnabled(context))
+                }
+                val stepPermLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    if (granted) {
+                        countStepsInBg = true
+                        com.neurasamu.build.sl_tasker.worker.StepSyncWorker.setEnabled(context, true)
+                        com.neurasamu.build.sl_tasker.util.StepTrackerManager.syncOnceInBackground(context)
+                        com.neurasamu.build.sl_tasker.util.StepTrackerManager.startListening(context)
+                        android.widget.Toast.makeText(
+                            context,
+                            "Background Step Counting Enabled!",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        countStepsInBg = false
+                        android.widget.Toast.makeText(
+                            context,
+                            "Physical Activity permission required to count steps.",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
                 SettingsCard {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("WALK-TO-EARN (STEP COUNTER)", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = if (sensorAvailable)
-                                    "Today: $todaySteps steps · $stepsToNext steps to next +25 HP & +10m scroll"
-                                else
-                                    "Hardware step sensor unavailable on this device.",
-                                color = TextPrimary,
-                                fontSize = 11.sp
-                            )
-                            Text(
-                                text = "Earned Scroll Quota Bank: $earnedMins mins",
-                                color = com.neurasamu.build.sl_tasker.ui.theme.AccentGold,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        if (earnedMins >= 10) {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        val ok = prefs.activateScrollUnlock(10, consumeEarnedQuota = true)
-                                        if (ok) {
-                                            android.widget.Toast.makeText(context, "10m scroll pass activated!", android.widget.Toast.LENGTH_SHORT).show()
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("WALK-TO-EARN (STEP COUNTER)", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = if (sensorAvailable)
+                                        "Today: $todaySteps steps · $stepsToNext steps to next +25 HP & +10m scroll"
+                                    else
+                                        "Hardware step sensor unavailable on this device.",
+                                    color = TextPrimary,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = "Earned Scroll Quota Bank: $earnedMins mins",
+                                    color = com.neurasamu.build.sl_tasker.ui.theme.AccentGold,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            if (earnedMins >= 10) {
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            val ok = prefs.activateScrollUnlock(10, consumeEarnedQuota = true)
+                                            if (ok) {
+                                                android.widget.Toast.makeText(context, "10m scroll pass activated!", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
                                         }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = SuccessGreen,
+                                        contentColor = DarkBackground
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("USE 10m", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(DarkSurface)
+                                .border(
+                                    1.dp,
+                                    if (countStepsInBg) SuccessGreen.copy(alpha = 0.6f) else DarkBorder,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Count Steps in Background",
+                                    color = if (countStepsInBg) SuccessGreen else TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Keep counting your daily steps even when app is closed",
+                                    color = TextSecondary,
+                                    fontSize = 9.sp
+                                )
+                            }
+                            Switch(
+                                checked = countStepsInBg,
+                                onCheckedChange = { enabled ->
+                                    if (enabled) {
+                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q &&
+                                            androidx.core.content.ContextCompat.checkSelfPermission(
+                                                context,
+                                                android.Manifest.permission.ACTIVITY_RECOGNITION
+                                            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                                        ) {
+                                            stepPermLauncher.launch(android.Manifest.permission.ACTIVITY_RECOGNITION)
+                                        } else {
+                                            countStepsInBg = true
+                                            com.neurasamu.build.sl_tasker.worker.StepSyncWorker.setEnabled(context, true)
+                                            com.neurasamu.build.sl_tasker.util.StepTrackerManager.syncOnceInBackground(context)
+                                            com.neurasamu.build.sl_tasker.util.StepTrackerManager.startListening(context)
+                                        }
+                                    } else {
+                                        countStepsInBg = false
+                                        com.neurasamu.build.sl_tasker.worker.StepSyncWorker.setEnabled(context, false)
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = SuccessGreen,
-                                    contentColor = DarkBackground
-                                ),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("USE 10m", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = DarkCard,
+                                    checkedTrackColor = SuccessGreen
+                                )
+                            )
                         }
                     }
                 }

@@ -91,6 +91,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(
     statsViewModel: StatsViewModel,
@@ -108,6 +109,9 @@ fun StatsScreen(
     var showRankHall by remember { mutableStateOf(false) }
     var showScanFriendFlex by remember { mutableStateOf(false) }
     var friendFlex by remember { mutableStateOf<FriendFlexStats?>(null) }
+    var showCardSelectSheet by remember { mutableStateOf(false) }
+    var showGeneratedCardPreview by remember { mutableStateOf(false) }
+    var selectedTemplate by remember { mutableStateOf(com.neurasamu.build.sl_tasker.util.FlexCardTemplate.STANDARD_FREE) }
 
     val weeklyCompleted = remember(weeklyEvents) {
         weeklyEvents.count { it.type == EventType.OCCURRENCE_COMPLETED }
@@ -171,15 +175,12 @@ fun StatsScreen(
                             onEdit = { showEditProfile = true },
                             onCompareFriend = { showScanFriendFlex = true },
                             onShare = {
-                                try {
-                                    ShareCardGenerator.share(
-                                        ctx = ctx,
-                                        stats = stats,
-                                        profile = p,
-                                        weeklyQuests = weeklyCompleted,
-                                        weeklySteps = weeklySteps
-                                    )
-                                } catch (_: Throwable) {}
+                                selectedTemplate = if (LicenseManager.isPro()) {
+                                    com.neurasamu.build.sl_tasker.util.FlexCardTemplate.SOLO_LEVELING
+                                } else {
+                                    com.neurasamu.build.sl_tasker.util.FlexCardTemplate.STANDARD_FREE
+                                }
+                                showCardSelectSheet = true
                             }
                         )
                     }
@@ -224,7 +225,7 @@ fun StatsScreen(
                         Spacer(Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "SHAMING BADGE ACTIVE (24H)",
+                                text = "CHEATER DETECTED (12H PENALTY)",
                                 color = DangerPenaltyRed,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
@@ -432,52 +433,375 @@ fun StatsScreen(
         friendFlex?.let { friend ->
             val myName = profile?.name?.uppercase()?.ifBlank { "YOU" } ?: "YOU"
             val myRank = ShareCardGenerator.rank(stats.level)
+            val myScore = stats.level * 1000 + weeklyCompleted * 50 + (weeklySteps / 100) + stats.streak * 30 - (if (stats.isShamed()) 5000 else 0)
+            val friendScore = friend.level * 1000 + friend.weeklyQuests * 50 + (friend.weeklySteps / 100) + friend.streak * 30 - (if (friend.shameBadge.isNotBlank()) 5000 else 0)
+            val iAmWinner = myScore >= friendScore
+
             AlertDialog(
                 onDismissRequest = { friendFlex = null },
                 containerColor = DarkCard,
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(20.dp),
                 title = {
                     Text(
-                        text = "2-FRIEND FLEX COMPARISON",
-                        color = PrimaryManaBlue,
-                        fontSize = 14.sp,
+                        text = "⚔ HUNTER DUEL COMPARISON",
+                        color = AccentGold,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Black
                     )
                 },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(myName, color = PrimaryManaBlue, fontSize = 12.sp, fontWeight = FontWeight.Black)
-                            Text("VS", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text(friend.name.uppercase(), color = GoldWarning, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(DarkSurface)
+                                    .border(
+                                        width = if (iAmWinner) 2.dp else 1.dp,
+                                        color = if (iAmWinner) AccentGold else DarkBorder,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (iAmWinner) {
+                                    Text("👑 BADSHAH", color = AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                }
+                                Text(
+                                    text = if (iAmWinner) "👑 $myName" else myName,
+                                    color = if (iAmWinner) AccentGold else PrimaryManaBlue,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                                Text("Rank $myRank · Lv.${stats.level}", color = TextPrimary, fontSize = 11.sp)
+                                Text("$weeklyCompleted Quests", color = TextSecondary, fontSize = 10.sp)
+                                Text("$weeklySteps Steps", color = TextSecondary, fontSize = 10.sp)
+                                Text("${stats.streak}d Streak", color = SuccessGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                if (stats.isShamed()) {
+                                    Text("⚠ CHEATER", color = DangerPenaltyRed, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(DarkSurface)
+                                    .border(
+                                        width = if (!iAmWinner) 2.dp else 1.dp,
+                                        color = if (!iAmWinner) AccentGold else DarkBorder,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (!iAmWinner) {
+                                    Text("👑 BADSHAH", color = AccentGold, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                }
+                                Text(
+                                    text = if (!iAmWinner) "👑 ${friend.name.uppercase()}" else friend.name.uppercase(),
+                                    color = if (!iAmWinner) AccentGold else AccentCyan,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                                Text("Rank ${friend.rank} · Lv.${friend.level}", color = TextPrimary, fontSize = 11.sp)
+                                Text("${friend.weeklyQuests} Quests", color = TextSecondary, fontSize = 10.sp)
+                                Text("${friend.weeklySteps} Steps", color = TextSecondary, fontSize = 10.sp)
+                                Text("${friend.streak}d Streak", color = SuccessGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                if (friend.shameBadge.isNotBlank()) {
+                                    Text("⚠ CHEATER", color = DangerPenaltyRed, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
                         }
-                        FlexCompareRow("LEVEL", "Lv.${stats.level} ($myRank)", "Lv.${friend.level} (${friend.rank})")
-                        FlexCompareRow("WEEK QUESTS", "$weeklyCompleted", "${friend.weeklyQuests}")
-                        FlexCompareRow("WEEK STEPS", "$weeklySteps", "${friend.weeklySteps}")
-                        FlexCompareRow("STREAK", "${stats.streak}d", "${friend.streak}d")
-                        if (stats.isShamed()) {
-                            Text("Your Badge: ⚠ ${stats.shamingReason}", color = DangerPenaltyRed, fontSize = 10.sp)
-                        }
-                        if (friend.shameBadge.isNotBlank()) {
-                            Text("Friend Badge: ⚠ ${friend.shameBadge}", color = DangerPenaltyRed, fontSize = 10.sp)
-                        }
+
+                        Text(
+                            text = if (iAmWinner)
+                                "👑 $myName wears the Crown of Discipline!"
+                            else
+                                "👑 ${friend.name.uppercase()} takes the Crown! Complete more quests to reclaim it.",
+                            color = AccentGold,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = { friendFlex = null },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryManaBlue,
-                            contentColor = TextOnBlue
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryManaBlue, contentColor = TextOnBlue)
                     ) {
                         Text("DONE", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
                 }
             )
+        }
+
+        // STEP 1: Bottom Sheet -> "SELECT YOUR CARD" -> "GENERATE CARD"
+        if (showCardSelectSheet) {
+            val isProUser by LicenseManager.isProFlow.collectAsState()
+            val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            androidx.compose.material3.ModalBottomSheet(
+                onDismissRequest = { showCardSelectSheet = false },
+                sheetState = sheetState,
+                containerColor = DarkCard,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "SELECT YOUR CARD",
+                        color = AccentGold,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.2.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Choose a Hunter Card design, then tap Generate Card",
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    Spacer(Modifier.height(14.dp))
+
+                    androidx.compose.foundation.lazy.LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(com.neurasamu.build.sl_tasker.util.FlexCardTemplate.entries) { tpl ->
+                            val isSel = selectedTemplate == tpl
+                            val locked = tpl.isProOnly && !isProUser
+                            val thumb = remember(tpl) { ShareCardGenerator.loadPreviewThumbnail(ctx, tpl) }
+                            Column(
+                                modifier = Modifier
+                                    .width(92.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSel) AccentGold.copy(alpha = 0.18f) else DarkSurface)
+                                    .border(
+                                        width = if (isSel) 2.dp else 1.dp,
+                                        color = if (isSel) AccentGold else DarkBorder,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable {
+                                        if (locked) {
+                                            com.neurasamu.build.sl_tasker.security.PaywallTrigger.show(
+                                                "${tpl.title} is a PRO Flex Card! Upgrade to unlock all 11 Luxury Hunter Cards."
+                                            )
+                                        } else {
+                                            selectedTemplate = tpl
+                                        }
+                                    }
+                                    .padding(6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (thumb != null) {
+                                    androidx.compose.foundation.Image(
+                                        bitmap = androidx.compose.ui.graphics.asImageBitmap(thumb),
+                                        contentDescription = tpl.title,
+                                        modifier = Modifier
+                                            .size(width = 76.dp, height = 102.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(width = 76.dp, height = 102.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(DarkCard),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("FREE", color = PrimaryManaBlue, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                    }
+                                }
+                                Spacer(Modifier.height(5.dp))
+                                Text(
+                                    text = tpl.title,
+                                    color = if (isSel) AccentGold else TextPrimary,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = if (locked) "PRO 🔒" else if (tpl.isProOnly) "PRO" else "FREE",
+                                    color = if (tpl.isProOnly) AccentGold else SuccessGreen,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(18.dp))
+
+                    Button(
+                        onClick = {
+                            showCardSelectSheet = false
+                            showGeneratedCardPreview = true
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AccentGold,
+                            contentColor = Color.Black
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        Text(
+                            text = "GENERATE CARD",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                    Spacer(Modifier.height(18.dp))
+                }
+            }
+        }
+
+        // STEP 2: Generated Card Preview with Top-Right Share + Bottom WhatsApp, TikTok, YouTube, Facebook, Other
+        if (showGeneratedCardPreview) {
+            val generatedBmp = remember(selectedTemplate, stats, profile, weeklyCompleted, weeklySteps) {
+                ShareCardGenerator.generatePreviewBitmap(
+                    ctx = ctx,
+                    template = selectedTemplate,
+                    stats = stats,
+                    profile = profile,
+                    weeklyQuests = weeklyCompleted,
+                    weeklySteps = weeklySteps
+                )
+            }
+            androidx.compose.ui.window.Dialog(onDismissRequest = { showGeneratedCardPreview = false }) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(DarkCard)
+                        .border(1.5.dp, AccentGold.copy(alpha = 0.75f), RoundedCornerShape(22.dp))
+                        .padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { showGeneratedCardPreview = false }) {
+                            Text("CLOSE", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            text = "YOUR FLEX CARD",
+                            color = AccentGold,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        IconButton(
+                            onClick = {
+                                ShareCardGenerator.share(
+                                    ctx = ctx,
+                                    stats = stats,
+                                    profile = profile,
+                                    weeklyQuests = weeklyCompleted,
+                                    weeklySteps = weeklySteps,
+                                    template = selectedTemplate
+                                )
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Share,
+                                contentDescription = "Share Card",
+                                tint = AccentGold,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    androidx.compose.foundation.Image(
+                        bitmap = androidx.compose.ui.graphics.asImageBitmap(generatedBmp),
+                        contentDescription = "Generated Flex Card",
+                        modifier = Modifier
+                            .height(320.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, DarkBorder, RoundedCornerShape(14.dp))
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "SHARE TO",
+                        color = TextSecondary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    val socialTargets = listOf(
+                        Triple("WhatsApp", Color(0xFF25D366), listOf("com.whatsapp", "com.whatsapp.w4b")),
+                        Triple("TikTok", Color(0xFF00F2EA), listOf("com.zhiliaoapp.musically", "com.ss.android.ugc.trill")),
+                        Triple("YouTube", Color(0xFFFF0000), listOf("com.google.android.youtube")),
+                        Triple("Facebook", Color(0xFF1877F2), listOf("com.facebook.katana", "com.facebook.lite")),
+                        Triple("Other", PrimaryManaBlue, emptyList())
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        socialTargets.forEach { (appName, badgeColor, pkgs) ->
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(DarkSurface)
+                                    .border(1.dp, badgeColor.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        ShareCardGenerator.share(
+                                            ctx = ctx,
+                                            stats = stats,
+                                            profile = profile,
+                                            weeklyQuests = weeklyCompleted,
+                                            weeklySteps = weeklySteps,
+                                            template = selectedTemplate,
+                                            targetPackages = pkgs
+                                        )
+                                    }
+                                    .padding(vertical = 8.dp, horizontal = 2.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(badgeColor.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = appName.take(2).uppercase(),
+                                        color = badgeColor,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = appName,
+                                    color = TextPrimary,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         val currentProfile = profile
