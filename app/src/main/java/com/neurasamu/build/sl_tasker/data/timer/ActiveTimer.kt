@@ -11,13 +11,20 @@ data class ActiveTimer(
     val isPaused: Boolean,
     val accentColorArgb: Int,
     val durationMinutes: Int,
-    val elapsedRealtimeAtStart: Long = android.os.SystemClock.elapsedRealtime()
+    val elapsedRealtimeAtStart: Long = android.os.SystemClock.elapsedRealtime(),
+    val stepGoal: Int = 0,
+    val initialStepsAtStart: Int = 0
 ) {
+    val isStepMode: Boolean
+        get() = stepGoal > 0
+
+    fun sessionSteps(currentTodaySteps: Int): Int =
+        (currentTodaySteps - initialStepsAtStart).coerceAtLeast(0)
+
     fun remainingSeconds(): Int {
         return if (isPaused) {
             (totalSeconds - elapsedBeforePauseSeconds).coerceAtLeast(0)
         } else {
-            // Use monotonic clock (elapsedRealtime) instead of wall clock to prevent cheating
             val elapsedRealNow = android.os.SystemClock.elapsedRealtime()
             val elapsedRealSinceStart = (elapsedRealNow - elapsedRealtimeAtStart) / 1000
             val elapsed = elapsedBeforePauseSeconds + elapsedRealSinceStart.toInt()
@@ -37,6 +44,8 @@ data class ActiveTimer(
         put("accentColorArgb", accentColorArgb)
         put("durationMinutes", durationMinutes)
         put("elapsedRealtimeAtStart", elapsedRealtimeAtStart)
+        put("stepGoal", stepGoal)
+        put("initialStepsAtStart", initialStepsAtStart)
     }.toString()
 
     companion object {
@@ -51,7 +60,9 @@ data class ActiveTimer(
                 isPaused = o.optBoolean("isPaused", false),
                 accentColorArgb = o.optInt("accentColorArgb", 0xFF00E5FF.toInt()),
                 durationMinutes = o.optInt("durationMinutes", 1),
-                elapsedRealtimeAtStart = o.optLong("elapsedRealtimeAtStart", android.os.SystemClock.elapsedRealtime())
+                elapsedRealtimeAtStart = o.optLong("elapsedRealtimeAtStart", android.os.SystemClock.elapsedRealtime()),
+                stepGoal = o.optInt("stepGoal", 0),
+                initialStepsAtStart = o.optInt("initialStepsAtStart", 0)
             )
         } catch (_: Throwable) { null }
     }

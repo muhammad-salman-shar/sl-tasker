@@ -21,12 +21,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
- * Hardware Step Counter manager (Walk-to-Earn).
- * - Uses Sensor.TYPE_STEP_COUNTER (and TYPE_STEP_DETECTOR fallback).
- * - Zero background battery drain: only listens while registered in foreground/active session.
- * - Every 500 real steps = +25 HP + 10 minutes (600s) of earnable scroll-time quota.
+ * Multi-sensor Step Counter Manager:
+ * 1) Primary: Hardware TYPE_STEP_COUNTER (and TYPE_STEP_DETECTOR).
+ * 2) Automatic Fallback: Hardware TYPE_ACCELEROMETER peak-stride detector so step tracking
+ *    works reliably even on budget/custom ROM devices without a dedicated step co-processor.
+ * - Every 500 real steps = +25 HP + 10m (600s) scroll quota.
  */
 object StepTrackerManager : SensorEventListener {
 
@@ -44,14 +46,15 @@ object StepTrackerManager : SensorEventListener {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    @Volatile
-    private var appContext: Context? = null
+    @Volatile private var appContext: Context? = null
+    @Volatile private var sensorManager: SensorManager? = null
+    @Volatile private var isListening = false
+    @Volatile private var activeSensorType: Int = -1
 
-    @Volatile
-    private var sensorManager: SensorManager? = null
-
-    @Volatile
-    private var isListening = false
+    // Accelerometer fallback stride state
+    @Volatile private var lastAccelStepMs = 0L
+    @Volatile private var filteredMag = 9.81f
+    @Volatile private var wasAboveThreshold = false
 
     private val _todaySteps = MutableStateFlow(0)
     val todaySteps: StateFlow<Int> = _todaySteps
@@ -71,9 +74,10 @@ object StepTrackerManager : SensorEventListener {
         _weeklySteps.value = p.getInt(KEY_WEEKLY_STEPS, 0)
         val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         sensorManager = sm
-        val hasCounter = sm?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) != null ||
-            sm?.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) != null
-        _sensorAvailable.value = hasCounter
+        val hasAny = sm?.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) != null ||
+            sm?.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) != null ||
+            sm?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null
+        _sensorAvailable.value = hasAny
     }
 
     fun startListening(context: Context) {
@@ -81,24 +85,34 @@ object StepTrackerManager : SensorEventListener {
         if (appContext == null) init(ctx)
         if (isListening) return
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val granted = ContextCompat.checkSelfPermission(
+        val sm = sensorManager ?: (ctx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager) ?: return
+        val hasActivityPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(
                 ctx,
                 Manifest.permission.ACTIVITY_RECOGNITION
             ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) return
+        } else {
+            true
         }
 
-        val sm = sensorManager ?: (ctx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager) ?: return
-        val counter = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-        val detector = sm.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
-        val sensor = counter ?: detector ?: run {
+        val counter = if (hasActivityPerm) sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) else null
+        val detector = if (hasActivityPerm) sm.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR) else null
+        val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        val chosen = counter ?: detector ?: accel ?: run {
             _sensorAvailable.value = false
             return
         }
         try {
-            sm.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+            val rate = if (chosen.type == Sensor.TYPE_ACCELEROMETER) {
+                SensorManager.SENSOR_DELAY_GAME
+            } else {
+                SensorManager.SENSOR_DELAY_UI
+            }
+            sm.registerListener(this, chosen, rate)
+            activeSensorType = chosen.type
             isListening = true
+            _sensorAvailable.value = true
         } catch (_: Throwable) {}
     }
 
@@ -108,6 +122,7 @@ object StepTrackerManager : SensorEventListener {
             sensorManager?.unregisterListener(this)
         } catch (_: Throwable) {}
         isListening = false
+        activeSensorType = -1
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -129,29 +144,47 @@ object StepTrackerManager : SensorEventListener {
                 val prevToday = p.getInt(KEY_TODAY_STEPS, 0)
                 val delta = (newToday - prevToday).coerceAtLeast(0)
                 if (delta > 0) {
-                    val newWeekly = p.getInt(KEY_WEEKLY_STEPS, 0) + delta
-                    p.edit()
-                        .putInt(KEY_TODAY_STEPS, newToday)
-                        .putInt(KEY_WEEKLY_STEPS, newWeekly)
-                        .apply()
-                    _todaySteps.value = newToday
-                    _weeklySteps.value = newWeekly
-                    checkAndAwardStepMilestones(ctx, newToday)
+                    applyDeltaSteps(ctx, p, delta, explicitToday = newToday)
                 }
             }
             Sensor.TYPE_STEP_DETECTOR -> {
                 val inc = ev.values.size.coerceAtLeast(1)
-                val newToday = p.getInt(KEY_TODAY_STEPS, 0) + inc
-                val newWeekly = p.getInt(KEY_WEEKLY_STEPS, 0) + inc
-                p.edit()
-                    .putInt(KEY_TODAY_STEPS, newToday)
-                    .putInt(KEY_WEEKLY_STEPS, newWeekly)
-                    .apply()
-                _todaySteps.value = newToday
-                _weeklySteps.value = newWeekly
-                checkAndAwardStepMilestones(ctx, newToday)
+                applyDeltaSteps(ctx, p, inc, explicitToday = null)
+            }
+            Sensor.TYPE_ACCELEROMETER -> {
+                val x = ev.values.getOrNull(0) ?: return
+                val y = ev.values.getOrNull(1) ?: return
+                val z = ev.values.getOrNull(2) ?: return
+                val mag = sqrt(x * x + y * y + z * z)
+                filteredMag = 0.82f * filteredMag + 0.18f * mag
+                val deltaFromGravity = filteredMag - 9.81f
+                val now = System.currentTimeMillis()
+                if (deltaFromGravity > 1.65f && !wasAboveThreshold && (now - lastAccelStepMs) >= 340L) {
+                    wasAboveThreshold = true
+                    lastAccelStepMs = now
+                    applyDeltaSteps(ctx, p, 1, explicitToday = null)
+                } else if (deltaFromGravity < 0.75f) {
+                    wasAboveThreshold = false
+                }
             }
         }
+    }
+
+    private fun applyDeltaSteps(
+        ctx: Context,
+        p: android.content.SharedPreferences,
+        delta: Int,
+        explicitToday: Int?
+    ) {
+        val newToday = explicitToday ?: (p.getInt(KEY_TODAY_STEPS, 0) + delta)
+        val newWeekly = p.getInt(KEY_WEEKLY_STEPS, 0) + delta
+        p.edit()
+            .putInt(KEY_TODAY_STEPS, newToday)
+            .putInt(KEY_WEEKLY_STEPS, newWeekly)
+            .apply()
+        _todaySteps.value = newToday
+        _weeklySteps.value = newWeekly
+        checkAndAwardStepMilestones(ctx, newToday)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}

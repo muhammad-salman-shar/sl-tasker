@@ -54,6 +54,7 @@ class TimerService : Service() {
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_MINUTES = "extra_minutes"
         const val EXTRA_ACCENT = "extra_accent"
+        const val EXTRA_STEP_GOAL = "extra_step_goal"
 
         fun startIntent(ctx: Context, timer: ActiveTimer): Intent =
             Intent(ctx, TimerService::class.java).apply {
@@ -62,6 +63,7 @@ class TimerService : Service() {
                 putExtra(EXTRA_TITLE, timer.taskTitle)
                 putExtra(EXTRA_MINUTES, timer.durationMinutes)
                 putExtra(EXTRA_ACCENT, timer.accentColorArgb)
+                putExtra(EXTRA_STEP_GOAL, timer.stepGoal)
             }
     }
 
@@ -129,6 +131,11 @@ class TimerService : Service() {
             return
         }
 
+        val stepGoal = intent.getIntExtra(EXTRA_STEP_GOAL, 0).coerceAtLeast(0)
+        if (stepGoal > 0) {
+            try { com.neurasamu.build.sl_tasker.util.StepTrackerManager.startListening(applicationContext) } catch (_: Throwable) {}
+        }
+        val initialSteps = com.neurasamu.build.sl_tasker.util.StepTrackerManager.todaySteps.value
         val timer = ActiveTimer(
             occurrenceId = occId,
             taskTitle = title,
@@ -138,7 +145,9 @@ class TimerService : Service() {
             elapsedRealtimeAtStart = android.os.SystemClock.elapsedRealtime(),
             isPaused = false,
             accentColorArgb = accent,
-            durationMinutes = minutes
+            durationMinutes = minutes,
+            stepGoal = stepGoal,
+            initialStepsAtStart = initialSteps
         )
         TimerRuntime.set(timer)
         scope.launch { store?.save(timer) }
@@ -201,7 +210,10 @@ class TimerService : Service() {
             while (true) {
                 delay(500L)
                 val t = TimerRuntime.active.value ?: break
-                if (t.remainingSeconds() <= 0) {
+                val doneBySteps = t.isStepMode &&
+                    t.sessionSteps(com.neurasamu.build.sl_tasker.util.StepTrackerManager.todaySteps.value) >= t.stepGoal
+                val doneByTime = !t.isStepMode && t.remainingSeconds() <= 0
+                if (doneBySteps || doneByTime) {
                     onTimerComplete(t)
                     break
                 }

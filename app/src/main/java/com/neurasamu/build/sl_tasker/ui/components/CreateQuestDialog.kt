@@ -583,23 +583,75 @@ fun CreateQuestDialog(
                 }
 
                 if (requiresTimer) {
-                    SectionLabel("TIMER (MINUTES)")
-                    OutlinedTextField(
-                        value = durationText,
-                        onValueChange = { durationText = it.filter { c -> c.isDigit() }.take(4) },
-                        label = { Text("e.g. 30 or 60") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    val useStepTarget = (stepGoalText.toIntOrNull() ?: 0) > 0
+                    SectionLabel("TRACKING TARGET (TIMER OR STEPS)")
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = difficultyColor,
-                            unfocusedBorderColor = DarkBorder,
-                            focusedTextColor = primaryTextColor,
-                            unfocusedTextColor = primaryTextColor,
-                            focusedLabelColor = difficultyColor,
-                            unfocusedLabelColor = mutedTextColor
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(false to "Duration (Min)", true to "Step Counter").forEach { (isStepChoice, lbl) ->
+                            val sel = useStepTarget == isStepChoice
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (sel) difficultyColor.copy(alpha = 0.22f) else inactiveSurfaceColor)
+                                    .border(1.dp, if (sel) difficultyColor else DarkBorder, RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        if (isStepChoice) {
+                                            if ((stepGoalText.toIntOrNull() ?: 0) <= 0) stepGoalText = "1000"
+                                        } else {
+                                            stepGoalText = ""
+                                        }
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = lbl,
+                                    color = if (sel) difficultyColor else mutedTextColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    if (useStepTarget) {
+                        OutlinedTextField(
+                            value = stepGoalText,
+                            onValueChange = { stepGoalText = it.filter { c -> c.isDigit() }.take(6) },
+                            label = { Text("Step target (e.g. 1000 or 3000)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = difficultyColor,
+                                unfocusedBorderColor = DarkBorder,
+                                focusedTextColor = primaryTextColor,
+                                unfocusedTextColor = primaryTextColor,
+                                focusedLabelColor = difficultyColor,
+                                unfocusedLabelColor = mutedTextColor
+                            )
                         )
-                    )
+                    } else {
+                        OutlinedTextField(
+                            value = durationText,
+                            onValueChange = { durationText = it.filter { c -> c.isDigit() }.take(4) },
+                            label = { Text("Duration in minutes (e.g. 30 or 60)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = difficultyColor,
+                                unfocusedBorderColor = DarkBorder,
+                                focusedTextColor = primaryTextColor,
+                                unfocusedTextColor = primaryTextColor,
+                                focusedLabelColor = difficultyColor,
+                                unfocusedLabelColor = mutedTextColor
+                            )
+                        )
+                    }
                 }
 
                 // 7. Allow Complete
