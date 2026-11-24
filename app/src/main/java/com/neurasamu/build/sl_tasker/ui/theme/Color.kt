@@ -247,6 +247,31 @@ object ThemeState {
     var activeTheme by mutableStateOf(AppThemeId.HUNTER_DARK)
     var mode by mutableStateOf(1)
     var isLiteMode by mutableStateOf(false)
+    var autoSwitchEvery3Hours by mutableStateOf(false)
+
+    private const val THREE_HOURS_MS = 3L * 60L * 60L * 1000L
+
+    fun applyAutoThemeRotationIfEnabled(prefs: android.content.SharedPreferences, isPro: Boolean) {
+        val enabled = prefs.getBoolean("auto_switch_theme_3h", false) && isPro
+        autoSwitchEvery3Hours = enabled
+        if (!enabled) return
+        val now = System.currentTimeMillis()
+        val lastSwitch = prefs.getLong("last_theme_switch_at", 0L)
+        if (lastSwitch == 0L) {
+            prefs.edit().putLong("last_theme_switch_at", now).apply()
+            return
+        }
+        if (now - lastSwitch >= THREE_HOURS_MS) {
+            val all = AppThemeId.entries
+            val nextIdx = (all.indexOf(activeTheme) + 1) % all.size
+            val nextTheme = all[nextIdx]
+            selectTheme(nextTheme)
+            prefs.edit()
+                .putString("active_theme_id", nextTheme.name)
+                .putLong("last_theme_switch_at", now)
+                .apply()
+        }
+    }
 
     val isLight: Boolean
         get() = activeTheme.isLight

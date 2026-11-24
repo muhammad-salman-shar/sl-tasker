@@ -813,6 +813,12 @@ private fun AddAlarmDialog(
                             }
                             OutlinedButton(
                                 onClick = {
+                                    if (!com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()) {
+                                        com.neurasamu.build.sl_tasker.security.PaywallTrigger.show(
+                                            "Custom Physical QR Code Generator is a PRO feature. Upgrade to generate & print QR seals!"
+                                        )
+                                        return@OutlinedButton
+                                    }
                                     val payload = if (qrSealCode.startsWith("SLTASKER-SEAL-")) qrSealCode
                                     else if (blockState.sealCode.startsWith("SLTASKER-SEAL-")) blockState.sealCode
                                     else QrBarcodeHelper.generateSealPayload()

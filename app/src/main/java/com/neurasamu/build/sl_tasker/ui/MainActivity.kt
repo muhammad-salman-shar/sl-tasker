@@ -116,6 +116,10 @@ class MainActivity : ComponentActivity() {
             )
             com.neurasamu.build.sl_tasker.ui.theme.ThemeState.selectTheme(savedThemeId)
             com.neurasamu.build.sl_tasker.ui.theme.ThemeState.isLiteMode = prefs.getBoolean("lite_mode", false)
+            com.neurasamu.build.sl_tasker.ui.theme.ThemeState.applyAutoThemeRotationIfEnabled(
+                prefs,
+                com.neurasamu.build.sl_tasker.security.LicenseManager.isPro(this)
+            )
         } catch (_: Throwable) {}
         checkAndRequestPermissions()
 
@@ -154,8 +158,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        try { com.neurasamu.build.sl_tasker.util.if (com.neurasamu.build.sl_tasker.worker.StepSyncWorker.isEnabled(this)) { StepTrackerManager.syncOnceInBackground(this) }
-        StepTrackerManager.startListening(this) } catch (_: Throwable) {}
+        try {
+            val isProNow = com.neurasamu.build.sl_tasker.security.LicenseManager.isPro(this)
+            val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+            com.neurasamu.build.sl_tasker.ui.theme.ThemeState.applyAutoThemeRotationIfEnabled(prefs, isProNow)
+            if (isProNow && com.neurasamu.build.sl_tasker.worker.StepSyncWorker.isEnabled(this)) {
+                com.neurasamu.build.sl_tasker.util.StepTrackerManager.syncOnceInBackground(this)
+            }
+            if (isProNow) {
+                com.neurasamu.build.sl_tasker.util.StepTrackerManager.startListening(this)
+            }
+        } catch (_: Throwable) {}
 
         // Continue permissions flow if we returned from a settings screen
         try {

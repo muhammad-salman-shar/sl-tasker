@@ -222,7 +222,15 @@ fun CreateQuestDialog(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(9.dp))
                                 .background(pillBg)
-                                .clickable { isAdvanceTab = advFlag }
+                                .clickable {
+                                    if (advFlag && !isEdit && !com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()) {
+                                        com.neurasamu.build.sl_tasker.security.PaywallTrigger.show(
+                                            "Advanced Tasks (Custom Categories, QR Proof & Step Goals) are a PRO feature. Upgrade to unlock!"
+                                        )
+                                    } else {
+                                        isAdvanceTab = advFlag
+                                    }
+                                }
                                 .padding(vertical = 7.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -599,6 +607,12 @@ fun CreateQuestDialog(
                                     .border(1.dp, if (sel) difficultyColor else DarkBorder, RoundedCornerShape(8.dp))
                                     .clickable {
                                         if (isStepChoice) {
+                                            if (!com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()) {
+                                                com.neurasamu.build.sl_tasker.security.PaywallTrigger.show(
+                                                    "Step-Counter Quests are a PRO feature. Upgrade to unlock step goals & live pedometer tracking!"
+                                                )
+                                                return@clickable
+                                            }
                                             if ((stepGoalText.toIntOrNull() ?: 0) <= 0) stepGoalText = "1000"
                                         } else {
                                             stepGoalText = ""
@@ -620,7 +634,15 @@ fun CreateQuestDialog(
                     if (useStepTarget) {
                         OutlinedTextField(
                             value = stepGoalText,
-                            onValueChange = { stepGoalText = it.filter { c -> c.isDigit() }.take(6) },
+                            onValueChange = {
+                                if (!com.neurasamu.build.sl_tasker.security.LicenseManager.isPro()) {
+                                    com.neurasamu.build.sl_tasker.security.PaywallTrigger.show(
+                                        "Step-Counter Quests are a PRO feature. Upgrade to unlock step goals!"
+                                    )
+                                } else {
+                                    stepGoalText = it.filter { c -> c.isDigit() }.take(6)
+                                }
+                            },
                             label = { Text("Step target (e.g. 1000 or 3000)") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
