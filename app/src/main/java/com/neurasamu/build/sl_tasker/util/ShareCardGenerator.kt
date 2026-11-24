@@ -250,7 +250,8 @@ object ShareCardGenerator {
         profile: PlayerProfile?,
         weeklyQuests: Int = stats.totalCompleted,
         weeklySteps: Int = StepTrackerManager.weeklySteps.value,
-        template: FlexCardTemplate = FlexCardTemplate.STANDARD_FREE
+        template: FlexCardTemplate = FlexCardTemplate.STANDARD_FREE,
+        targetPackages: List<String> = emptyList()
     ) {
         try {
             val bitmap = generatePreviewBitmap(ctx, template, stats, profile, weeklyQuests, weeklySteps)
@@ -265,13 +266,41 @@ object ShareCardGenerator {
                 "${ctx.packageName}.fileprovider",
                 file
             )
-            val share = Intent(Intent.ACTION_SEND).apply {
+            val caption = buildCaption(stats, profile, weeklyQuests, weeklySteps)
+            val baseIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
                 putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_TEXT, buildCaption(stats, profile, weeklyQuests, weeklySteps))
+                putExtra(Intent.EXTRA_TEXT, caption)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            ctx.startActivity(Intent.createChooser(share, "Share Flex Card").apply {
+
+            if (targetPackages.isNotEmpty()) {
+                val pm = ctx.packageManager
+                val matchedPkg = targetPackages.firstOrNull { pkg ->
+                    try {
+                        pm.getPackageInfo(pkg, 0)
+                        true
+                    } catch (_: Throwable) {
+                        false
+                    }
+                }
+                if (matchedPkg != null) {
+                    val targeted = Intent(baseIntent).apply {
+                        setPackage(matchedPkg)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    ctx.startActivity(targeted)
+                    return
+                } else {
+                    android.widget.Toast.makeText(
+                        ctx,
+                        "App not installed — opening system share menu",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+            ctx.startActivity(Intent.createChooser(baseIntent, "Share Flex Card").apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         } catch (_: Throwable) {}

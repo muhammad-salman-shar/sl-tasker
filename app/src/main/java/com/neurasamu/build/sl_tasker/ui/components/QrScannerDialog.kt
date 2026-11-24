@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -15,6 +16,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,10 +27,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.FlashOff
+import androidx.compose.material.icons.rounded.FlashOn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -93,6 +100,8 @@ fun QrScannerDialog(
     }
     var statusText by remember { mutableStateOf("Align QR code or barcode inside frame") }
     var isMismatch by remember { mutableStateOf(false) }
+    var torchOn by remember { mutableStateOf(false) }
+    var boundCamera by remember { mutableStateOf<Camera?>(null) }
     val completedOnce = remember { AtomicBoolean(false) }
 
     val launcher = rememberLauncherForActivityResult(
@@ -174,6 +183,7 @@ fun QrScannerDialog(
 
                     DisposableEffect(Unit) {
                         onDispose {
+                            try { boundCamera?.cameraControl?.enableTorch(false) } catch (_: Throwable) {}
                             try { boundProvider?.unbindAll() } catch (_: Throwable) {}
                             try { scanner.close() } catch (_: Throwable) {}
                             try { cameraExecutor.shutdown() } catch (_: Throwable) {}
@@ -183,7 +193,7 @@ fun QrScannerDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(240.dp)
+                            .height(248.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(Color.Black)
                             .border(
@@ -233,6 +243,7 @@ fun QrScannerDialog(
                                                             if (completedOnce.compareAndSet(false, true)) {
                                                                 isMismatch = false
                                                                 statusText = "Verified: ${value.take(24)}"
+                                                                try { boundCamera?.cameraControl?.enableTorch(false) } catch (_: Throwable) {}
                                                                 onScanned(value)
                                                             }
                                                         } else {
@@ -247,12 +258,13 @@ fun QrScannerDialog(
                                         }
 
                                         provider.unbindAll()
-                                        provider.bindToLifecycle(
+                                        val cam = provider.bindToLifecycle(
                                             lifecycleOwner,
                                             CameraSelector.DEFAULT_BACK_CAMERA,
                                             preview,
                                             analysis
                                         )
+                                        boundCamera = cam
                                     } catch (_: Throwable) {
                                         statusText = "Unable to start camera preview."
                                     }
@@ -260,6 +272,46 @@ fun QrScannerDialog(
                                 previewView
                             }
                         )
+
+                        // Top-Right Flashlight (Torch) On/Off Button
+                        val hasFlash = boundCamera?.cameraInfo?.hasFlashUnit() != false
+                        if (hasFlash) {
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(10.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (torchOn) AccentGold else Color(0xCC0A1224))
+                                    .border(
+                                        1.dp,
+                                        if (torchOn) AccentGold else AccentCyan.copy(alpha = 0.7f),
+                                        RoundedCornerShape(50)
+                                    )
+                                    .clickable {
+                                        val next = !torchOn
+                                        torchOn = next
+                                        try {
+                                            boundCamera?.cameraControl?.enableTorch(next)
+                                        } catch (_: Throwable) {}
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (torchOn) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff,
+                                    contentDescription = "Toggle Flashlight",
+                                    tint = if (torchOn) Color.Black else AccentCyan,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = if (torchOn) "FLASH ON" else "FLASH",
+                                    color = if (torchOn) Color.Black else Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
                     }
                 }
 

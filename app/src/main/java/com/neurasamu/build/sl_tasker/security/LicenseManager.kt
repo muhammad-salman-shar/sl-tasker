@@ -93,9 +93,24 @@ object LicenseManager {
     }
 
     fun setPro(context: Context, value: Boolean) {
+        val wasPro = cachedPro == true || _isProFlow.value
         cachedPro = value
         _isProFlow.value = value
         encryptValue(context, KEY_PRO, if (value) "1" else "0")
+        if (value && !wasPro) {
+            try {
+                com.neurasamu.build.sl_tasker.ui.theme.ThemeState.selectTheme(
+                    com.neurasamu.build.sl_tasker.ui.theme.AppThemeId.ROSE_CREAM
+                )
+                context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(
+                        "active_theme_id",
+                        com.neurasamu.build.sl_tasker.ui.theme.AppThemeId.ROSE_CREAM.name
+                    )
+                    .apply()
+            } catch (_: Throwable) {}
+        }
     }
 
     // ----- Hard trial -----
