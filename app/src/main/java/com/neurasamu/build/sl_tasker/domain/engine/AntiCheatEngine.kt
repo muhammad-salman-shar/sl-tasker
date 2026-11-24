@@ -23,8 +23,8 @@ object AntiCheatEngine {
 
     const val MIN_HARD_MINUTES = 5
     const val MIN_CRITICAL_MINUTES = 5
-    const val SHAMING_DURATION_MS = 24L * 60L * 60L * 1000L
-    const val SHAME_BADGE_TITLE = "Shortcut Hunter / Cheese Detected"
+    const val SHAMING_DURATION_MS = 12L * 60L * 60L * 1000L
+    const val SHAME_BADGE_TITLE = "CHEATER DETECTED"
 
     private const val PREFS_NAME = "sl_anticheat_prefs"
     private const val KEY_RECENT_TIMESTAMPS = "recent_completion_ts"
@@ -73,7 +73,7 @@ object AntiCheatEngine {
         }
 
         val warning = when {
-            triggerShame -> "Anti-Cheat: $SHAME_BADGE_TITLE badge applied (24h). Rewards capped."
+            triggerShame -> "Anti-Cheat: $SHAME_BADGE_TITLE badge applied (12h). Rewards capped."
             shortDurationCheese -> "Anti-Cheat: ${task.difficulty.name} full reward needs >= ${minRequired}m. Capped (+5 HP)."
             else -> null
         }

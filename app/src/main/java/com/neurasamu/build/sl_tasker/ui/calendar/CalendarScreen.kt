@@ -155,24 +155,38 @@ fun CalendarScreen(
                         val dayNum = cellIndex - firstDayOfWeek + 1
                         val valid = dayNum in 1..daysInMonth
                         val itemsOnDay = if (valid) byDay[dayNum] ?: emptyList() else emptyList()
+                        val todayCal = java.util.Calendar.getInstance()
+                        val isToday = valid &&
+                            year == todayCal.get(java.util.Calendar.YEAR) &&
+                            month == todayCal.get(java.util.Calendar.MONTH) &&
+                            dayNum == todayCal.get(java.util.Calendar.DAY_OF_MONTH)
                         val isSelected = valid && dayNum == selectedDay
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(1f)
                                 .padding(2.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(if (isToday) CircleShape else RoundedCornerShape(8.dp))
                                 .background(
                                     when {
+                                        isToday -> com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen.copy(alpha = 0.24f)
                                         isSelected -> PrimaryBlue.copy(alpha = 0.2f)
                                         valid -> DarkSurface.copy(alpha = 0.4f)
                                         else -> Color.Transparent
                                     }
                                 )
                                 .border(
-                                    width = if (isSelected) 1.dp else 0.dp,
-                                    color = if (isSelected) PrimaryBlue else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp)
+                                    width = when {
+                                        isToday -> 2.dp
+                                        isSelected -> 1.dp
+                                        else -> 0.dp
+                                    },
+                                    color = when {
+                                        isToday -> com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
+                                        isSelected -> PrimaryBlue
+                                        else -> Color.Transparent
+                                    },
+                                    shape = if (isToday) CircleShape else RoundedCornerShape(8.dp)
                                 )
                                 .clickable(enabled = valid) {
                                     selectedDay = if (selectedDay == dayNum) -1 else dayNum

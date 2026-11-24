@@ -428,7 +428,7 @@ private fun AddAlarmDialog(
             label.trim(),
             selectedMethod,
             storedSecret,
-            isRepeat || selectedDays.isNotEmpty(),
+            isRepeat,
             csv,
             if (selectedMethod == DismissMethod.QR) false else snoozeEnabled,
             (snoozeText.toIntOrNull() ?: 10).coerceAtLeast(1),
@@ -469,7 +469,7 @@ private fun AddAlarmDialog(
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(if (sel) PrimaryManaBlue.copy(alpha = 0.2f) else DarkSurface)
                                 .border(1.dp, if (sel) PrimaryManaBlue else DarkBorder, RoundedCornerShape(6.dp))
-                                .clickable { isRepeat = flag }
+                                .clickable { isRepeat = flag; if (!flag) selectedDays = emptySet() }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {

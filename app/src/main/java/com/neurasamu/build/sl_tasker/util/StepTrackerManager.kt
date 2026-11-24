@@ -80,6 +80,32 @@ object StepTrackerManager : SensorEventListener {
         _sensorAvailable.value = hasAny
     }
 
+
+    fun syncOnceInBackground(context: Context) {
+        val ctx = context.applicationContext
+        if (appContext == null) init(ctx)
+        if (isListening) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val granted = ContextCompat.checkSelfPermission(
+                ctx,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) return
+        }
+        val sm = sensorManager ?: (ctx.getSystemService(Context.SENSOR_SERVICE) as? SensorManager) ?: return
+        val counter = sm.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) ?: return
+        val oneShot = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                try { sm.unregisterListener(this) } catch (_: Throwable) {}
+                this@StepTrackerManager.onSensorChanged(event)
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+        try {
+            sm.registerListener(oneShot, counter, SensorManager.SENSOR_DELAY_NORMAL)
+        } catch (_: Throwable) {}
+    }
+
     fun startListening(context: Context) {
         val ctx = context.applicationContext
         if (appContext == null) init(ctx)
