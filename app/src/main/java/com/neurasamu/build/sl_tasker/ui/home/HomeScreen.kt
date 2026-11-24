@@ -25,9 +25,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -58,11 +60,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.neurasamu.build.sl_tasker.data.model.Difficulty
 import com.neurasamu.build.sl_tasker.data.model.PlayerStatsEntity
-import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem
 import com.neurasamu.build.sl_tasker.data.timer.ActiveTimer
 import com.neurasamu.build.sl_tasker.data.timer.TimerRuntime
 import com.neurasamu.build.sl_tasker.service.TimerService
-import com.neurasamu.build.sl_tasker.ui.components.DailyQuestSection
 import com.neurasamu.build.sl_tasker.ui.theme.AccentCyan
 import com.neurasamu.build.sl_tasker.ui.theme.AccentGold
 import com.neurasamu.build.sl_tasker.ui.theme.BadgeBg
@@ -80,6 +80,7 @@ import com.neurasamu.build.sl_tasker.ui.theme.TextSecondary
 import com.neurasamu.build.sl_tasker.ui.timer.TimerActivity
 import com.neurasamu.build.sl_tasker.ui.viewmodel.DailyQuestViewModel
 import com.neurasamu.build.sl_tasker.ui.viewmodel.StatsViewModel
+import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem
 import com.neurasamu.build.sl_tasker.ui.viewmodel.TaskViewModel
 import com.neurasamu.build.sl_tasker.util.SoundFx
 import java.text.SimpleDateFormat
@@ -130,11 +131,10 @@ fun HomeScreen(
     val activeQuests by taskViewModel.activeQuests.collectAsStateWithLifecycle()
     val completedQuests by taskViewModel.completedQuests.collectAsStateWithLifecycle()
     val stats by statsViewModel.playerStats.collectAsStateWithLifecycle()
-    val dailyQuests by dailyQuestViewModel.quests.collectAsStateWithLifecycle()
-    val incompleteDailyQuests = remember(dailyQuests) { dailyQuests.filter { !it.completed } }
 
     var showDailyCongrats by remember { mutableStateOf(false) }
     var viewingItem by remember { mutableStateOf<TaskOccurrenceItem?>(null) }
+    var warningConfirmItem by remember { mutableStateOf<TaskOccurrenceItem?>(null) }
 
     val cal = remember { Calendar.getInstance() }
     val dayEpochKey = remember { "${cal.get(Calendar.YEAR)}_${cal.get(Calendar.DAY_OF_YEAR)}" }
@@ -174,7 +174,7 @@ fun HomeScreen(
             isPaused = false,
             accentColorArgb = accent,
             durationMinutes = mins,
-            stepGoal = if (item.task.isAdvanced) item.task.stepGoal else 0
+            stepGoal = item.task.stepGoal
         )
         TimerRuntime.set(activeTimer)
         try {
@@ -199,22 +199,54 @@ fun HomeScreen(
         contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 0. Anti-Cheat 12-Hour Cheater Alert Banner on Home Screen
+        if (stats.isShamed()) {
+            item {
+                val remMs = (stats.shamingUntilMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+                val remHrs = remMs / (60L * 60L * 1000L)
+                val remMins = (remMs % (60L * 60L * 1000L)) / (60L * 1000L)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF2B090E))
+                        .border(1.5.dp, DangerPenaltyRed, RoundedCornerShape(14.dp))
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Warning,
+                        contentDescription = null,
+                        tint = DangerPenaltyRed,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "⚠ CHEATER DETECTED (12H PENALTY)",
+                            color = DangerPenaltyRed,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.8.sp
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Anti-cheat violation active on your Hunter Profile & Flex Card for ${remHrs}h ${remMins}m.",
+                            color = Color(0xFFFCA5A5),
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+        }
+
         // 1. Compact Status Card
         item {
             StatusCard(stats = stats)
         }
 
-        // 2. Daily Quests
-        if (incompleteDailyQuests.isNotEmpty()) {
-            item {
-                DailyQuestSection(
-                    quests = incompleteDailyQuests,
-                    onComplete = { id -> dailyQuestViewModel.complete(id) }
-                )
-            }
-        }
-
-        // 3. 3 Essential Daily Life Habits (Swipeable cards with bottom Complete button)
+        // 2. Daily Essentials Only (Daily Quests removed as requested)
         item {
             Column {
                 Row(
@@ -268,7 +300,7 @@ fun HomeScreen(
             }
         }
 
-        // 4. Today's Tasks Header
+        // 3. Today's Tasks Header
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -341,9 +373,10 @@ fun HomeScreen(
             Difficulty.HARD -> AccentGold
             Difficulty.MEDIUM -> PrimaryManaBlue
         }
-        val needsTimer = item.task.difficulty != Difficulty.MEDIUM ||
-            (item.task.isAdvanced && item.task.stepGoal > 0)
-        val canAct = item.task.allowEarlyComplete || System.currentTimeMillis() >= item.occurrence.scheduledAt
+        val needsTimer = item.task.difficulty != Difficulty.MEDIUM || item.task.stepGoal > 0
+        val now = System.currentTimeMillis()
+        val isLocked = !item.task.allowEarlyComplete && now < item.occurrence.scheduledAt
+        val remLockHrs = ((item.occurrence.scheduledAt - now) / (60L * 60_000L)).coerceAtLeast(1L)
         val timeFmt = remember { SimpleDateFormat("hh:mm a · dd MMM", Locale.getDefault()) }
 
         Dialog(onDismissRequest = { viewingItem = null }) {
@@ -407,7 +440,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(10.dp))
 
                 val metaLabel = buildString {
-                    if (item.task.isAdvanced && item.task.stepGoal > 0) {
+                    if (item.task.stepGoal > 0) {
                         append("Step Target: ${item.task.stepGoal} steps")
                     } else if (item.task.durationMinutes > 0) {
                         append("Focus Duration: ${item.task.durationMinutes} min")
@@ -431,15 +464,17 @@ fun HomeScreen(
                         val target = item
                         viewingItem = null
                         if (needsTimer) {
-                            startTimerFor(target)
+                            warningConfirmItem = target
                         } else {
                             taskViewModel.completeQuest(target.occurrence.id)
                         }
                     },
-                    enabled = canAct,
+                    enabled = !isLocked,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (needsTimer) diffColor else SuccessGreen,
-                        contentColor = Color.White
+                        containerColor = if (isLocked) DarkSurface else if (needsTimer) diffColor else SuccessGreen,
+                        contentColor = if (isLocked) TextMuted else Color.White,
+                        disabledContainerColor = DarkSurface,
+                        disabledContentColor = TextMuted
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
@@ -447,13 +482,21 @@ fun HomeScreen(
                         .height(50.dp)
                 ) {
                     Icon(
-                        imageVector = if (needsTimer) Icons.Rounded.PlayArrow else Icons.Rounded.CheckCircle,
+                        imageVector = when {
+                            isLocked -> Icons.Rounded.Lock
+                            needsTimer -> Icons.Rounded.PlayArrow
+                            else -> Icons.Rounded.CheckCircle
+                        },
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = if (!canAct) "LOCKED UNTIL SCHEDULED TIME" else if (needsTimer) "START TASK" else "COMPLETE TASK",
+                        text = when {
+                            isLocked -> "LOCKED (${remLockHrs}h)"
+                            needsTimer -> "START TASK"
+                            else -> "COMPLETE TASK"
+                        },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.sp
@@ -466,6 +509,61 @@ fun HomeScreen(
                 }
             }
         }
+    }
+
+    // Strict -40 HP Penalty Warning Dialog before starting Hard / Critical / Step quests
+    warningConfirmItem?.let { warnItem ->
+        AlertDialog(
+            onDismissRequest = { warningConfirmItem = null },
+            containerColor = DarkCard,
+            shape = RoundedCornerShape(18.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.Warning,
+                        contentDescription = null,
+                        tint = DangerPenaltyRed,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "STRICT QUEST WARNING",
+                        color = DangerPenaltyRed,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = "Once you start \"${warnItem.task.title}\", giving up or quitting early will immediately deduct -40 HP!\n\nAre you ready to lock in and finish?",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val target = warnItem
+                        warningConfirmItem = null
+                        startTimerFor(target)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DangerPenaltyRed,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("CONTINUE & START", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { warningConfirmItem = null }) {
+                    Text("CANCEL", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 
     if (showDailyCongrats) {
@@ -747,6 +845,7 @@ private fun CompactTaskRow(
             kotlinx.coroutines.delay(30_000L)
         }
     }
+    val isLocked = !item.task.allowEarlyComplete && nowMs < timeMillis
     val diffMs = timeMillis - nowMs
     val countdownStr = when {
         diffMs <= 0L -> "NOW"
@@ -796,11 +895,16 @@ private fun CompactTaskRow(
                     )
                 }
                 Spacer(Modifier.width(6.dp))
-                Icon(Icons.Rounded.Schedule, contentDescription = null, tint = TextMuted, modifier = Modifier.size(12.dp))
+                Icon(
+                    imageVector = if (isLocked) Icons.Rounded.Lock else Icons.Rounded.Schedule,
+                    contentDescription = null,
+                    tint = if (isLocked) DangerPenaltyRed else TextMuted,
+                    modifier = Modifier.size(12.dp)
+                )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = "$timeStr · $countdownStr",
-                    color = if (diffMs <= 0L) PrimaryManaBlue else TextSecondary,
+                    text = if (isLocked) "$timeStr · Locked ($countdownStr)" else "$timeStr · $countdownStr",
+                    color = if (isLocked) DangerPenaltyRed else if (diffMs <= 0L) PrimaryManaBlue else TextSecondary,
                     fontSize = 11.sp
                 )
             }
