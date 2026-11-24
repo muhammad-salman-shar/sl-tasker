@@ -346,6 +346,7 @@ fun MainAppScaffold(
         TabItem("Tasks", Icons.Rounded.ChecklistRtl),
         TabItem("Alarm", Icons.Rounded.Alarm),
         TabItem("Player", Icons.Rounded.MilitaryTech),
+        TabItem("Settings", Icons.Rounded.Settings),
     )
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -414,7 +415,7 @@ fun MainAppScaffold(
             com.neurasamu.build.sl_tasker.ui.components.GlassHeader(
                 title = tabs[selectedTabIndex].title,
                 subtitleSlot = { LiveClock() },
-                showSettings = selectedTabIndex == 3,
+                showSettings = false,
                 onSettingsClick = {
                     if (locked) {
                         Toast.makeText(
@@ -478,6 +479,9 @@ fun MainAppScaffold(
                 )
                 3 -> StatsScreen(
                     statsViewModel = statsViewModel
+                )
+                4 -> PlayerSettingsScreen(
+                    onClose = { selectedTabIndex = 0 }
                 )
             }
         }

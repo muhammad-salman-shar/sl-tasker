@@ -90,7 +90,21 @@ class AlarmRingActivity : ComponentActivity() {
                     snoozeEnabled = snoozeEnabled,
                     snoozeMinutes = snoozeMinutes,
                     onForgotCredential = { requestDeviceUnlock() },
-                    onDismissConfirmed = { dismissAlarm() },
+                    onDismissConfirmed = {
+                        if (alarmId > 0L) {
+                            val appCtx = applicationContext
+                            Thread {
+                                try {
+                                    val db = com.neurasamu.build.sl_tasker.data.db.AppDatabase.getInstance(appCtx)
+                                    val al = kotlinx.coroutines.runBlocking { db.alarmDao().getAlarmById(alarmId) }
+                                    if (al != null && al.repeatRule == com.neurasamu.build.sl_tasker.data.model.RepeatRule.ONCE) {
+                                        kotlinx.coroutines.runBlocking { db.alarmDao().updateEnabled(alarmId, false) }
+                                    }
+                                } catch (_: Throwable) {}
+                            }.start()
+                        }
+                        dismissAlarm()
+                    },
                     onSnoozeConfirmed = {
                         if (alarmId > 0) {
                             AlarmScheduler(this).snooze(
