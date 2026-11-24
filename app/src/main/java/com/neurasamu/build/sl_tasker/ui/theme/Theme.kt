@@ -12,7 +12,7 @@ fun SoloLevelingTheme(
     content: @Composable () -> Unit
 ) {
     val t = ThemeState.tokens
-    val scheme = if (t.isLight) {
+    val scheme = if (ThemeState.isLight) {
         lightColorScheme(
             primary = t.accent,
             onPrimary = t.onAccent,
@@ -50,7 +50,7 @@ fun SoloLevelingTheme(
 
     MaterialTheme(
         colorScheme = scheme,
-        typography = AppTypography,
+        typography = Typography,
         content = content
     )
 }

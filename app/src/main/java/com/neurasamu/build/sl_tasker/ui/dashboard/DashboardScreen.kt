@@ -573,7 +573,7 @@ private fun CategoryGlowSwipeCard(
         modifier = Modifier
             .width(264.dp)
             .height(294.dp)
-            .androidx.compose.ui.draw.shadow(
+            .shadow(
                 elevation = 18.dp,
                 shape = RoundedCornerShape(22.dp),
                 ambientColor = diffColor.copy(alpha = 0.50f),
