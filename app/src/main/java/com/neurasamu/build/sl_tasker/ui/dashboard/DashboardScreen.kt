@@ -330,6 +330,7 @@ fun DashboardScreen(
                     ) { item ->
                         CategoryGlowSwipeCard(
                             item = item,
+                            isCompletedTab = subTab == 1,
                             onStart = {
                                 if (item.task.isAdvanced && item.task.requireQrProof) {
                                     pendingQrTaskItem = item
@@ -543,18 +544,32 @@ private fun TypeChipSmall(label: String, count: Int, selected: Boolean, onClick:
 @Composable
 private fun CategoryGlowSwipeCard(
     item: com.neurasamu.build.sl_tasker.ui.viewmodel.TaskOccurrenceItem,
+    isCompletedTab: Boolean = false,
     onStart: () -> Unit,
     onComplete: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val diffColor = when (item.task.difficulty) {
-        com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> DangerPenaltyRed
-        com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> com.neurasamu.build.sl_tasker.ui.theme.AccentGold
-        com.neurasamu.build.sl_tasker.data.model.Difficulty.MEDIUM -> PrimaryManaBlue
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    androidx.compose.runtime.LaunchedEffect(item.occurrence.scheduledAt) {
+        while (true) {
+            nowMs = System.currentTimeMillis()
+            kotlinx.coroutines.delay(15_000L)
+        }
     }
-    val diffMs = item.occurrence.scheduledAt - System.currentTimeMillis()
+    val isCompleted = isCompletedTab ||
+        item.occurrence.status == com.neurasamu.build.sl_tasker.data.model.OccurrenceStatus.COMPLETED
+    val isLocked = !isCompleted && !item.task.allowEarlyComplete && nowMs < item.occurrence.scheduledAt
+
+    val diffColor = when {
+        isCompleted -> com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
+        item.task.difficulty == com.neurasamu.build.sl_tasker.data.model.Difficulty.CRITICAL -> DangerPenaltyRed
+        item.task.difficulty == com.neurasamu.build.sl_tasker.data.model.Difficulty.HARD -> com.neurasamu.build.sl_tasker.ui.theme.AccentGold
+        else -> PrimaryManaBlue
+    }
+    val diffMs = item.occurrence.scheduledAt - nowMs
     val timeLeftLabel = when {
+        isCompleted -> "COMPLETED ✓"
         diffMs <= 0L -> "DUE NOW"
         diffMs < 60_000L -> "<1m LEFT"
         diffMs < 60L * 60_000L -> "${diffMs / 60_000L}m LEFT"
@@ -657,9 +672,17 @@ private fun CategoryGlowSwipeCard(
             Spacer(Modifier.height(10.dp))
             Button(
                 onClick = if (needsTimer) onStart else onComplete,
+                enabled = !isCompleted && !isLocked,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (needsTimer) diffColor else com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen,
-                    contentColor = Color.White
+                    containerColor = when {
+                        isCompleted -> com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen.copy(alpha = 0.25f)
+                        isLocked -> DarkSurface
+                        needsTimer -> diffColor
+                        else -> com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen
+                    },
+                    contentColor = Color.White,
+                    disabledContainerColor = if (isCompleted) com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen.copy(alpha = 0.22f) else DarkSurface,
+                    disabledContentColor = if (isCompleted) com.neurasamu.build.sl_tasker.ui.theme.SuccessGreen else TextMuted
                 ),
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
@@ -667,7 +690,12 @@ private fun CategoryGlowSwipeCard(
                     .height(46.dp)
             ) {
                 Text(
-                    text = if (needsTimer) "START QUEST" else "COMPLETE",
+                    text = when {
+                        isCompleted -> "COMPLETED ✓"
+                        isLocked -> "LOCKED"
+                        needsTimer -> "START QUEST"
+                        else -> "COMPLETE"
+                    },
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp

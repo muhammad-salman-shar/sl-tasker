@@ -223,7 +223,7 @@ fun PaywallScreen(
             BenefitRow("AI Hub: Interactive Chat Mode for instant guidance")
             BenefitRow("AI Hub: Autonomous Agent Mode for smart task planning")
             BenefitRow("AI Hub: Connect your own API key anytime")
-            BenefitRow("AI Hub: Run offline local AI models via SaMu Lab (neurasamu.com)")
+            BenefitRow("AI Hub: Run offline local AI models via SaMu Lab (neurasamu.com/store)")
             BenefitRow("Live HP-Drop alert notifications on every drop until 0 HP")
             BenefitRow("Orbiting light-beam Pro animation on HP and EP circles")
             BenefitRow("Exclusive Gold and Black PRO Hunter Nameplate")

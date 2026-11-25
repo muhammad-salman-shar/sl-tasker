@@ -407,7 +407,7 @@ private fun SamuLabCard(ctx: Context) {
             .border(1.dp, PrimaryManaBlue.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
             .clickable {
                 try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://neurasamu.com"))
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://neurasamu.com/store"))
                     ctx.startActivity(intent)
                 } catch (_: Exception) {}
             }
@@ -423,7 +423,7 @@ private fun SamuLabCard(ctx: Context) {
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                "Host private offline models on your PC/phone & connect to SL Tasker. Download at neurasamu.com",
+                "Host private offline models on your PC/phone & connect to SL Tasker. Download at neurasamu.com/store",
                 color = TextSecondary,
                 fontSize = 10.sp,
                 lineHeight = 14.sp
@@ -432,7 +432,7 @@ private fun SamuLabCard(ctx: Context) {
         Spacer(Modifier.width(8.dp))
         Icon(
             imageVector = Icons.Rounded.OpenInNew,
-            contentDescription = "Open neurasamu.com",
+            contentDescription = "Open neurasamu.com/store",
             tint = PrimaryManaBlue,
             modifier = Modifier.size(16.dp)
         )
